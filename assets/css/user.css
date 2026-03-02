@@ -1,0 +1,86 @@
+/*-----------------------------------------------
+|   Theme Styles
+-----------------------------------------------*/
+:root,
+[data-bs-theme=light] {
+    --falcon-primary: #01fb92;
+    --falcon-primary-rgb: 0, 210, 122;
+    /*...*/
+    /*...*/
+    /*...*/
+        /* grays */
+    --falcon-gray-100:  #f9fafd;
+    --falcon-gray-100-rgb: 249, 250, 253;
+
+    .card{
+        --falcon-card-bg: #fcfdfd;
+    }
+}
+
+
+[data-bs-theme=dark]{
+    --falcon-primary:  #e63757;
+    --falcon-primary-rgb: 230, 55, 87;
+
+    .card{
+        --falcon-card-bg: #00d27a;
+    }
+}
+
+.fs-sm {
+    font-size: 90% !important;
+}
+
+#datatable,#datatable1,#datatable2 {
+    font-size: 90% !important;
+    /*min-width: 100vw !important;*/
+}
+
+.tab-pane {
+    overflow-x: auto;                /* Enable horizontal scrolling if content overflows */
+}
+
+.tab-pane .table {
+    width: 100%;                     /* Make the table take up the full width of the container */
+    table-layout: auto;              /* Let column widths be determined by content */
+    border-collapse: collapse;       /* Remove gaps between borders */
+}
+
+.tab-pane .table th,
+.tab-pane .table td {
+    white-space: nowrap;             /* Prevent text from wrapping */
+    overflow: hidden;                /* Hide overflowing text */
+    text-align: left;                /* Optional: Align text to the left */
+    padding: 6px;                    /* Add padding for readability */
+}
+
+.tab-pane .table th,
+.tab-pane .table td {
+    min-width: 1px;                /* Set a minimum width for each cell to prevent too-narrow columns */
+}
+
+.tab-pane .table th,
+.tab-pane .table td {
+    width: auto;                     /* Allow each column to expand based on content */
+}
+
+.tab-pane .table:after {
+    content: "";                     /* Empty content for pseudo-element */
+    display: block;
+    width: 100%;                     /* Ensure the table always stretches to full container width */
+}
+
+
+@media (max-width: 768px) {
+    .tab-pane .table {
+        display: block;              /* Make the table behave like a block element on small screens */
+        overflow-x: auto;            /* Allow horizontal scrolling on smaller devices */
+    }
+
+    .tab-pane .table th,
+    .tab-pane .table td {
+        display: block;              /* Stack table cells vertically */
+        width: 100vw !important;                 /* Make each cell take up the full width */
+    }
+}
+

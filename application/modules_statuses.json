@@ -1,0 +1,8 @@
+{
+    "Admin": true,
+    "Clerk": true,
+    "Account": true,
+    "Client": true,
+    "Tasks": true,
+    "Inventory": true
+}
