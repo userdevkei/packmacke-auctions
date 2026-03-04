@@ -141,6 +141,9 @@ Route::prefix('admin')->middleware(['auth', 'web', 'userRoles', 'userRole:1', 'd
     Route::get('view-external-transfer-details/{id}', [AdminController::class, 'viewExternalTransferDetails'])->name('admin.viewExternalTransferDetails');
 
     Route::post('release-transfer-request', [AdminController::class, 'releaseTransfer'])->name('admin.releaseTransfer');
+    Route::get('external-transfer-release-form/{delivery}', [AdminController::class, 'getReleaseForm'])->name('admin.releaseForm');
+
+    Route::post('amend-registered-external-transfer-request/{id}', [AdminController::class, 'amendRegisteredExternalRequest'])->name('admin.amendRegisteredExternalRequest');
 
     Route::get('view-internal-transfer-details/{id}', [AdminController::class, 'viewInternalTransferDetails'])->name('admin.viewInternalTransferDetails');
     Route::get('prepare-to-receive-transfer/{id}', [AdminController::class, 'prepareToReceiveTransfer'])->name('admin.prepareToReceiveTransfer');

@@ -190,12 +190,12 @@ class ClerkController extends Controller
             ->join('clients', 'clients.client_id', '=', 'delivery_orders.client_id')
             ->join('warehouses', 'warehouses.warehouse_id', '=', 'external_transfers.warehouse_id')
             ->leftJoin('transporters', 'transporters.transporter_id', '=', 'external_transfers.transporter_id')
-            ->select('external_transfers.status', 'client_name', 'warehouses.warehouse_name', 'station_name', 'external_transfers.delivery_number', 'transporter_name')
+            ->select('external_transfers.status', 'client_name', 'warehouses.warehouse_name', 'station_name', 'external_transfers.delivery_number', 'transporter_name', 'lot')
             ->selectRaw('SUM(transferred_palettes) AS total_palettes')
             ->selectRaw('SUM(transferred_weight) AS total_weight')
             ->orderBy('external_transfers.delivery_number', 'desc')
             ->orderBy('external_transfers.created_at', 'desc')
-            ->groupBy('delivery_number', 'status', 'client_name', 'warehouse_name', 'station_name', 'transporter_name')
+            ->groupBy('delivery_number', 'status', 'client_name', 'warehouse_name', 'station_name', 'transporter_name', 'lot')
             ->where(function($q) use ($query) {
                 $q->where('external_transfers.delivery_number', 'LIKE', "%$query%")
                     ->orWhere('client_name', 'LIKE', "%$query%");
@@ -528,78 +528,8 @@ class ClerkController extends Controller
 
         return view('clerk::transfers.viewExternalTransfer')->with(['transfers' => $transfers]);
     }
-    // public function viewExternalTransfers(Request $request)
-    // {
-    //     $from = $request->get('from') ?? Carbon::now()->startOfMonth();
-    //     $to = $request->get('to') ?? Carbon::now();
 
-    //     $transfers = ExternalTransfer::leftJoin('blendBalances', function ($join) {
-    //         $join->on('blendBalances.blend_balance_id', '=', 'external_transfers.stock_id')
-    //             ->on('blendBalances.blend_id', '=', 'external_transfers.delivery_id');
-    //         })
-    //         ->leftJoin('delivery_orders', function ($join) {
-    //             $join->on('delivery_orders.delivery_id', '=', 'external_transfers.delivery_id')
-    //                 ->whereNull('delivery_orders.deleted_at');
-    //         })
-    //         ->leftJoin('auctions', function ($join) {
-    //             $join->on('auctions.delivery_id', '=', 'external_transfers.delivery_id')
-    //                 ->whereNull('auctions.deleted_at');
-    //         })
-    //         ->leftJoin('clients as buyer', 'buyer.client_id', '=', 'auctions.client_id')
-    //         ->leftJoin('stock_ins', 'stock_ins.stock_id', '=', 'external_transfers.stock_id')
-    //         ->leftJoin('stations', 'stations.station_id', '=', 'stock_ins.station_id')
-    //         ->leftJoin('warehouse_locations', 'warehouse_locations.location_id', '=', 'stations.location_id')
-    //         ->leftJoin('clients', 'clients.client_id', '=', 'delivery_orders.client_id')
-    //         ->leftjoin('warehouses', 'warehouses.warehouse_id', '=', 'external_transfers.warehouse_id')
-    //         ->leftjoin('other_destinations', 'other_destinations.warehouse_id', '=', 'external_transfers.warehouse_id')
-    //         ->leftJoin('transporters', 'transporters.transporter_id', '=', 'external_transfers.transporter_id')
-    //         ->leftJoin('other_transporters', 'other_transporters.transporter_id', '=', 'external_transfers.transporter_id')
-    //         ->leftJoin('drivers', 'drivers.driver_id', '=', 'external_transfers.driver_id')
-    //         ->select('external_transfers.status',
-    //             DB::raw("CONCAT(COALESCE(clients.client_name, ''), COALESCE(blendBalances.client_name, '')) as client_name"),
-    //             DB::raw('COALESCE(warehouses.warehouse_name, other_destinations.warehouse_name) as warehouse_name'),
-    //             DB::raw('COALESCE(warehouses.warehouse_id, other_destinations.warehouse_id) as warehouse_id'),
-    //             DB::raw('COALESCE(stations.station_name, blendBalances.station_name) as station_name'),
-    //             'external_transfers.delivery_number',
-    //             DB::raw('DATE(external_transfers.created_at) as created_at'),
-    //             'buyer.client_name as buyer_name', 'warehouse_locations.location_id',
-    //             DB::raw("CONCAT(COALESCE(transporters.transporter_id, ''), COALESCE(other_transporters.transporter_id, '')) as transporter_id"),
-    //             DB::raw("CONCAT(COALESCE(transporters.transporter_name, ''), COALESCE(other_transporters.transporter_name, '')) as transporter_name"),
-    //             'external_transfers.driver_id', 'driver_name', 'drivers.phone', 'id_number', 'external_transfers.registration', 'external_transfers.release_date', 'lot'
-    //         )
-    //         ->selectRaw('SUM(external_transfers.transferred_palettes) AS total_palettes')
-    //         ->selectRaw('SUM(external_transfers.transferred_weight) AS total_weight')
-    //         ->orderBy('delivery_number', 'desc')
-    //         ->orderBy('external_transfers.created_at', 'desc')
-    //         ->groupBy(
-    //             'external_transfers.status',
-    //             DB::raw("CONCAT(COALESCE(clients.client_name, ''), COALESCE(blendBalances.client_name, ''))"),
-
-    //             DB::raw('COALESCE(warehouses.warehouse_name, other_destinations.warehouse_name)'),
-    //             DB::raw('COALESCE(warehouses.warehouse_id, other_destinations.warehouse_id)'),
-    //             DB::raw('COALESCE(stations.station_name, blendBalances.station_name)'),
-    //             'external_transfers.delivery_number',
-    //             DB::raw('DATE(external_transfers.created_at)'),
-    //             'buyer_name', 'warehouse_locations.location_id',
-    //             DB::raw("CONCAT(COALESCE(transporters.transporter_id, ''), COALESCE(other_transporters.transporter_id, ''))"),
-    //             DB::raw("CONCAT(COALESCE(transporters.transporter_name, ''), COALESCE(other_transporters.transporter_name, ''))"),
-    //             'driver_id', 'driver_name', 'phone', 'id_number', 'registration', 'external_transfers.release_date', 'lot'
-    //         )
-    //         ->take(300)
-    //         ->get();
-
-
-    //     $houses = Warehouse::select('warehouse_id', 'warehouse_name')->orderBy('warehouse_name')->get();
-    //     $otherWarehouses = OtherDestination::select('warehouse_id', 'warehouse_name')->orderBy('warehouse_name')->get();
-    //     $warehouses = $houses->concat($otherWarehouses);
-    //     $transports = Transporter::select('transporter_id', 'transporter_name')->orderBy('transporter_name')->get();
-    //     $otherTransports = OtherTransporter::select('transporter_id', 'transporter_name')->orderBy('transporter_name')->get();
-    //     $transporters = $transports->concat($otherTransports);
-    //     $users = Driver::select('id_number')->orderBy('driver_name')->get();
-    //     return view('clerk::transfers.externalTransfers')->with(['transfers' => $transfers, 'warehouses' => $warehouses, 'transporters' => $transporters, 'users' => $users, 'from' => $from, 'to' => $to]);
-    // }
-
-    public function viewExternalTransfers(Request $request)
+public function viewExternalTransfers(Request $request)
 {
     $from = $request->get('from') ?? Carbon::now()->startOfMonth();
     $to = $request->get('to') ?? Carbon::now();
@@ -637,6 +567,7 @@ class ClerkController extends Controller
             'external_transfers.lot',
             'external_transfers.created_at',
             'warehouse_locations.location_id',
+            'external_transfers.lot',
             
             // Use COALESCE but optimize it
             DB::raw("COALESCE(clients.client_name, blendBalances.client_name, '') as client_name"),
@@ -655,10 +586,6 @@ class ClerkController extends Controller
             DB::raw('SUM(external_transfers.transferred_palettes) as total_palettes'),
             DB::raw('SUM(external_transfers.transferred_weight) as total_weight')
         ])
-        // ->whereBetween(DB::raw('DATE(external_transfers.created_at)'), [
-        //     Carbon::parse($from)->format('Y-m-d'),
-        //     Carbon::parse($to)->format('Y-m-d')
-        // ])
         ->groupBy([
             'external_transfers.delivery_number',
             'external_transfers.status',
@@ -682,11 +609,11 @@ class ClerkController extends Controller
             'drivers.driver_id',
             'drivers.driver_name',
             'drivers.phone',
-            'drivers.id_number'
+            'drivers.id_number',
+            'external_transfers.lot'
         ])
         ->orderByDesc('external_transfers.delivery_number')
         ->orderByDesc('external_transfers.created_at')
-        ->limit(300)
         ->get();
 
     // Cache static lookups
@@ -1065,8 +992,10 @@ class ClerkController extends Controller
         $this->logger->create();
         return redirect()->back()->with('success', 'Success! Transfer request approved successfully');
     }
+ 
     public function releaseExternalTransfer(Request $request, $id)
     {
+        
         if (!Driver::where('id_number', $request->idNumber)->exists()){
             $driver = Driver::create([
                 'driver_id' => (new CustomIds())->generateId(),
@@ -1080,12 +1009,32 @@ class ClerkController extends Controller
             $driverId = Driver::where('id_number', $request->idNumber)->first()->driver_id;
         }
 
-        ExternalTransfer::where('delivery_number', base64_decode($id))->update([
+        if($request->transporter === 'other'){
+            $existingTransporter = Transporter::where('transporter_name', $request->transporter_other)->first();
+            if ($existingTransporter) {
+                $transporterId = $existingTransporter->transporter_id;
+            } else {
+                $transporterDetails = [
+                    'transporter_id' => (new CustomIds())->generateId(),
+                    'transporter_name' => $request->transporter_other,
+                    'transporter_type' => 2,
+                    'created_by' => auth()->user()->user_id
+                ];
+                Transporter::create($transporterDetails);
+                $transporterId = $transporterDetails['transporter_id'];
+            }
+        }else{
+            $transporterId = $request->transporter;
+        }
+
+        list($deliveryId, $lot) = explode(':', base64_decode($id));
+
+        ExternalTransfer::where(['delivery_number' => $deliveryId, 'lot' => $lot])->update([
             'warehouse_id' => $request->warehouse_id,
             'status' => 4,
             'driver_id' => $driverId,
             'registration' => $request->registration,
-            'transporter_id' => $request->transporter_id
+            'transporter_id' => $transporterId
         ]);
         $this->logger->create();
         return redirect()->back()->with('success', 'Success! Transfer request released successfully');
@@ -4490,6 +4439,7 @@ class ClerkController extends Controller
                 'Content-Disposition' => "attachment; filename={$filename}.csv",
             ];
 
+
             $callback = function () use ($auctions) {
                 $handle = fopen('php://output', 'w');
 
@@ -4513,7 +4463,7 @@ class ClerkController extends Controller
                         $row->broker_name,
                         $row->buyer_name,
                         $row->warehouse_name,
-                        $row->sale,
+                        "\t" . $row->sale,
                         $row->sale_date,
                         $row->prompt_date,
                         $row->delivery_number,
@@ -4892,5 +4842,16 @@ class ClerkController extends Controller
         $tci->delete();
         $this->logger->create();
         return redirect()->back()->with('success', 'Success! Tea removed from TCI');
+    }
+        public function getReleaseForm($delivery) {
+        list($delivery, $lot) = explode(':', base64_decode($delivery));
+        $transfer = ExternalTransfer::where(['delivery_number' => $delivery, 'external_transfers.lot' => $lot])
+            ->leftJoin('drivers', 'drivers.driver_id', '=', 'external_transfers.driver_id')
+            ->first();
+        $warehouses = Warehouse::all();
+        $transporters = Transporter::all();
+        $users = Driver::all();
+
+        return view('clerk::transfers.release-form', compact('transfer', 'warehouses', 'transporters', 'users'));
     }
 }

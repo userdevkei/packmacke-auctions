@@ -3069,6 +3069,7 @@ class AppClass
     public function downloadExternalTransfers($id)
     {
         list($delNumber, $lot) = explode(':', base64_decode($id));
+
         $orders = ExternalTransfer::leftJoin('blendBalances', function ($join) {
             $join->on('blendBalances.blend_balance_id', '=', 'external_transfers.stock_id')
                 ->on('blendBalances.blend_id', '=', 'external_transfers.delivery_id');
@@ -3154,6 +3155,7 @@ class AppClass
     public function downloadExternalDelNote($id)
     {
         list($delNumber, $lot) = explode(':', base64_decode($id));
+
         $orders = ExternalTransfer::leftJoin('blendBalances', function ($join) {
             $join->on('blendBalances.blend_balance_id', '=', 'external_transfers.stock_id')
                 ->on('blendBalances.blend_id', '=', 'external_transfers.delivery_id');

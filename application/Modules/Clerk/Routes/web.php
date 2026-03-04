@@ -34,6 +34,7 @@ Route::prefix('clerk')->middleware(['auth', 'web', 'userRoles', 'userRole:2,3,4,
     Route::get('cancel-transfer-request/{id}', [ClerkController::class, 'cancelInterTransferRequest'])->name('clerk.cancelInterTransferRequest');
     Route::get('cancel-external-transfer-request/{id}', [ClerkController::class, 'cancelExternalTransferRequest'])->name('clerk.cancelExternalTransferRequest');
 
+    Route::get('external-transfer-release-form/{delivery}', [ClerkController::class, 'getReleaseForm'])->name('clerk.releaseForm');
 
     Route::post('release-transfer-request', [ClerkController::class, 'releaseTransfer'])->name('clerk.releaseTransfer');
 

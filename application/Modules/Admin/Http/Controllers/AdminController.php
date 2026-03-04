@@ -2501,10 +2501,35 @@ class AdminController extends Controller
             ->leftjoin('other_destinations', 'other_destinations.warehouse_id', '=', 'external_transfers.warehouse_id')
             ->leftJoin('gardens', 'gardens.garden_id', '=', 'delivery_orders.garden_id')
             ->leftJoin('grades', 'grades.grade_id', '=', 'delivery_orders.grade_id')
-            ->select('ex_transfer_id', 'external_transfers.status', DB::raw('COALESCE(clients.client_name, blendBalances.client_name) as client_name'), DB::raw('COALESCE(warehouses.warehouse_name, other_destinations.warehouse_name) as warehouse_name'), DB::raw('COALESCE(stations.station_name, blendBalances.station_name) as station_name'), 'external_transfers.delivery_number', DB::raw('DATE(external_transfers.created_at) as created_at'), 'location_id', DB::raw('COALESCE(gardens.garden_name, blendBalances.garden) as garden_name'),DB::raw('COALESCE(grades.grade_name, blendBalances.grade) as grade_name'), DB::raw('COALESCE(delivery_orders.invoice_number, blendBalances.blend_number) as invoice_number'), 'external_transfers.transferred_palettes', 'external_transfers.transferred_weight', 'delivery_orders.lot_number', 'external_transfers.release_date', 'lot')
+            ->select('ex_transfer_id', 'external_transfers.status', DB::raw('COALESCE(clients.client_name, blendBalances.client_name) as client_name'), DB::raw('COALESCE(warehouses.warehouse_name, other_destinations.warehouse_name) as warehouse_name'), DB::raw('COALESCE(stations.station_name, blendBalances.station_name) as station_name'), 'external_transfers.delivery_number', DB::raw('DATE(external_transfers.created_at) as created_at'), 'location_id', DB::raw('COALESCE(gardens.garden_name, blendBalances.garden) as garden_name'),DB::raw('COALESCE(grades.grade_name, blendBalances.grade) as grade_name'), DB::raw('COALESCE(delivery_orders.invoice_number, blendBalances.blend_number) as invoice_number'), 'external_transfers.transferred_palettes', 'external_transfers.transferred_weight', 'delivery_orders.lot_number', 'external_transfers.release_date', 'lot', 'clients.client_id', 'stations.station_id')
             ->where(['external_transfers.delivery_number' => base64_decode($id)])
             ->get();
-        return view('admin::transfers.viewExternalTransfer')->with(['transfers' => $transfers]);
+
+        $transfer = $transfers->first();    
+
+        $stock = DB::table('currentstock')->where('current_stock', '>', 0)
+            ->where('current_weight', '>', 0)
+            ->where(['client_id' => $transfer->client_id, 'station_id' => $transfer->station_id])
+            ->select('client_id', 'stock_id', 'order_number', 'garden_name', 'grade_name', 'invoice_number', 'lot_number', 'current_stock', 'current_weight', DB::raw("1 as type"))
+            ->orderBy('garden_name', 'asc')
+            ->orderBy('invoice_number', 'asc')
+            ->get();
+
+        $balances = DB::table('blendBalances')->where('current_packages', '>', 0)
+            ->where('current_weight', '>', 0)
+            ->where(['client_id' => $transfer->client_id, 'station_id' => $transfer->station_id])
+            ->select('client_id', 'blend_balance_id as stock_id', 'blend_number as order_number', 'garden as garden_name', 'grade as grade_name', 'blend_number as invoice_number', 'blend_number as lot_number', 'current_packages as current_stock', 'current_weight', DB::raw("2 as type"))
+            ->get();
+
+        $teas = collect([])->merge($stock)->merge($balances)
+            ->sortBy([
+                ['garden_name', 'asc'],
+                ['garden', 'asc'],
+                ['invoice_number', 'asc'],
+                ['lot_number', 'asc']
+            ]);
+
+        return view('admin::transfers.viewExternalTransfer')->with(['transfers' => $transfers, 'teas' => $teas]);
     }
     public function viewExternalTransfers(Request $request)
     {
@@ -2816,6 +2841,54 @@ class AdminController extends Controller
             return redirect()->back()->with('error', 'No teas selected');
         }
     }
+
+    public function amendRegisteredExternalRequest(Request $request, $id)
+    {
+        $trf = ExternalTransfer::where('delivery_number', base64_decode($id))->first();
+        $requestData = json_decode($request->allDeliveries, true);
+        if (isset($requestData['deliveries']) && !empty($requestData['deliveries'])) {
+            DB::beginTransaction();
+            try {
+                $customId = new CustomIds();
+                    $delID = $trf->delivery_number;
+                    foreach ($requestData['deliveries'] as $delivery) {
+                        $transferId = $customId->generateId();
+                        $stock = StockIn::where('stock_id', $delivery['deliveryId'])->first()
+                            ?? DB::table('blendBalances')->where('blend_balance_id', $delivery['deliveryId'])
+                                ->select('blend_balance_id as stock_id', 'blend_id as delivery_id')
+                                ->first();
+                        $transfer = [
+                            'stock_id' => $stock->stock_id,
+                            'ex_transfer_id' => $transferId,
+                            'delivery_number' => $delID,
+                            'driver_id' => null,
+                            'delivery_id' => $stock->delivery_id,
+                            'warehouse_id' => $trf->warehouse_id,
+                            'registration' => null,
+                            'loading_number' => $trf->loading_number,
+                            'transporter_id' => null,
+                            'transferred_palettes' => $delivery['palette'],
+                            'transferred_weight' => $delivery['weight'],
+                            'created_by' => auth()->user()->user_id,
+                            'status' => 3,
+                            'buyer_id' => $trf->buyer_id
+                        ];
+                        ExternalTransfer::create($transfer);
+                    }
+
+                $this->logger->create();
+                DB::commit();
+                return redirect()->back()->with('success', 'Success! External transfer created successfully');
+            } catch (Exception $e) {
+//                // Rollback the transaction if an exception occurs
+                DB::rollback();
+//                // Handle or log the exception
+                return redirect()->back()->with('error', 'Oops! An error occurred please try again '.$e);
+            }
+        }else{
+            return redirect()->back()->with('error', 'No teas selected');
+        }
+    }
     public function initiateTransfer($id)
     {
         Transfers::where('delivery_number', base64_decode($id))->update(['status' => 0]);
@@ -2855,6 +2928,19 @@ class AdminController extends Controller
         $this->logger->create();
         return redirect()->back()->with('success', 'Success! Transfer request approved successfully');
     }
+
+    public function getReleaseForm($delivery) {
+        list($delivery, $lot) = explode(':', base64_decode($delivery));
+        $transfer = ExternalTransfer::where(['delivery_number' => $delivery, 'external_transfers.lot' => $lot])
+            ->leftJoin('drivers', 'drivers.driver_id', '=', 'external_transfers.driver_id')
+            ->first();
+        $warehouses = Warehouse::all();
+        $transporters = Transporter::all();
+        $users = Driver::all();
+
+        return view('admin::transfers.release-form', compact('transfer', 'warehouses', 'transporters', 'users'));
+    }
+
     public function releaseExternalTransfer(Request $request, $id)
     {
         if (!Driver::where('id_number', $request->idNumber)->exists()){
@@ -2870,12 +2956,31 @@ class AdminController extends Controller
             $driverId = Driver::where('id_number', $request->idNumber)->first()->driver_id;
         }
 
-        ExternalTransfer::where('delivery_number', base64_decode($id))->update([
+         if($request->transporter === 'other'){
+            $existingTransporter = Transporter::where('transporter_name', $request->transporter_other)->first();
+            if ($existingTransporter) {
+                $transporterId = $existingTransporter->transporter_id;
+            } else {
+                $transporterDetails = [
+                    'transporter_id' => (new CustomIds())->generateId(),
+                    'transporter_name' => $request->transporter_other,
+                    'transporter_type' => 2,
+                    'created_by' => auth()->user()->user_id
+                ];
+                Transporter::create($transporterDetails);
+                $transporterId = $transporterDetails['transporter_id'];
+            }
+        }else{
+            $transporterId = $request->transporter;
+        }
+
+        list($deliveryId, $lot) = explode(':', base64_decode($id));
+        ExternalTransfer::where(['delivery_number' => $deliveryId, 'lot' => $lot])->update([
             'warehouse_id' => $request->warehouse_id,
             'status' => 4,
             'driver_id' => $driverId,
             'registration' => $request->registration,
-            'transporter_id' => $request->transporter_id
+            'transporter_id' => $transporterId
         ]);
 
         $this->logger->create();
@@ -6225,7 +6330,7 @@ $clients = Client::join('delivery_orders', 'delivery_orders.client_id', '=', 'cl
                         $row->broker_name,
                         $row->buyer_name,
                         $row->warehouse_name,
-                        $row->sale,
+                        "\t" . $row->sale,
                         $row->sale_date,
                         $row->prompt_date,
                         $row->delivery_number,

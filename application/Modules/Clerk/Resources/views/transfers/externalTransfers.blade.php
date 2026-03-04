@@ -99,7 +99,7 @@
                             <tr>
                                 <td>{{ $loop->iteration }}</td>
                                 <td>{{ \Carbon\Carbon::parse($transfer->created_at)->format('d/m/y') }}</td>
-                                <td>{{ $transfer->delivery_number }}</td>
+                                <td>{{ $transfer->delivery_number }}{{ $transfer->lot }}</td>
                                 <td>{{ $transfer->client_name }}</td>
                                 <td>{{ number_format($transfer->total_palettes, 0) }}</td>
                                 <td>{{ number_format($transfer->total_weight, 2) }}</td>
@@ -116,10 +116,15 @@
                                                 <a class="link text-warning" data-bs-toggle="tooltip" data-bs-placement="left" title="Click to approve this transfer" onclick="return confirm('Are you sure you want to initiate this transfer request?')" href="{{ route('clerk.initiateExternalTransfer', base64_encode($transfer->delivery_number)) }}" ><span class="fa-regular fa-thumbs-up"></span></a>
                                             @elseif($transfer->status == 1)
                                                 <a class="link text-danger" data-bs-toggle="tooltip" data-bs-placement="left" title="Transfer initiated, pending approval"> <span class="fa-solid fa-check"> </span> </a>
-                                            @elseif($transfer->status == 3 && @canuser('external.release'))
-                                                <!-- Button trigger modal -->
-                                                <a class="link link-danger" title="Transfer approved, pending release" data-bs-toggle="modal" data-bs-target="#staticBackdrop-{{ $transfer->delivery_number }}">
-                                                    <span class="fa-solid fa-truck-arrow-right"> </span> </a>
+                                            @elseif($transfer->status == 3 && @canuser('external.release') && $transfer->lot != null)
+                                                 <a class="link link-danger release-btn"
+                                                   title="Transfer approved, pending release"
+                                                   data-delivery="{{ $transfer->delivery_number }}"
+                                                   data-url="{{ route('clerk.releaseForm', base64_encode($transfer->delivery_number.':'.($transfer->lot ?? ''))) }}"
+                                                   data-client="{{ $transfer->client_name }}"
+                                                   href="#">
+                                                    <span class="fa-solid fa-truck-arrow-right"></span>
+                                                </a>
 
                                             @elseif($transfer->status == 3)
                                                 <a class="link text-secondary" data-bs-toggle="tooltip" data-bs-placement="left" title="Transfer approved, pending release"> <span class="fa-solid fa-truck-arrow-right"> </span></a>
@@ -131,10 +136,15 @@
                                                 <a class="link text-warning" data-bs-toggle="tooltip" data-bs-placement="left" title="Click to approve this transfer" onclick="return confirm('Are you sure you want to approve this transfer request?')" href="{{ route('clerk.approveExternalTransfer', base64_encode($transfer->delivery_number)) }}" ><span class="fa-regular fa-thumbs-up"></span></a>
                                             @elseif($transfer->status == 2)
                                                 <a class="link text-info" data-bs-toggle="tooltip" data-bs-placement="left" title="Transfer Approved By Operations"> <span class="fa-solid fa-check"></span> </a>
-                                            @elseif($transfer->status == 3)
-                                                <!-- Button trigger modal -->
-                                                <a class="link link-danger" title="Transfer approved, pending release" data-bs-toggle="modal" data-bs-target="#staticBackdrop-{{ $transfer->delivery_number }}">
-                                                    <span class="fa-solid fa-truck-arrow-right"> </span> </a>
+                                            @elseif($transfer->status == 3 && $transfer->lot != null)
+                                                 <a class="link link-danger release-btn"
+                                                   title="Transfer approved, pending release"
+                                                   data-delivery="{{ $transfer->delivery_number }}"
+                                                   data-url="{{ route('clerk.releaseForm', base64_encode($transfer->delivery_number.':'.($transfer->lot ?? ''))) }}"
+                                                   data-client="{{ $transfer->client_name }}"
+                                                   href="#">
+                                                    <span class="fa-solid fa-truck-arrow-right"></span>
+                                                </a>
                                             @else
                                                 <a class="link text-success" data-bs-toggle="tooltip" data-bs-placement="left" title="Transfer released, stock updated"> <span class="fa-solid fa-check-double"></span> </a>
                                             @endif
@@ -169,81 +179,27 @@
                                             </div>
                                         </div>
                                     </div>
-                                    <!-- Modal -->
-                                    <div class="modal fade" id="staticBackdrop-{{ $transfer->delivery_number }}" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="staticBackdropLabel" aria-hidden="true">
-                                        <div class="modal-dialog modal-dialog-centered modal-xl">
-                                            <div class="modal-content">
-                                                <div class="modal-header">
-                                                    <h1 class="modal-title fs-1" id="staticBackdropLabel">Release {{ $transfer->delivery_number }} - {{ $transfer->client_name }}</h1>
-                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                                </div>
-                                                <div class="modal-body">
-                                                    <form method="POST" action="{{ route('clerk.releaseExternalTransfer', base64_encode($transfer->delivery_number)) }}">
-                                                        @csrf
-                                                        <div class="row row-cols-2 mb-3">
-                                                            <div class="mb-2">
-                                                                <label>Destination</label>
-                                                                <select class="form-select js-choice" name="warehouse_id" required>
-                                                                    @foreach($warehouses as $warehouse)
-                                                                        <option
-                                                                            @selected($transfer && $warehouse->warehouse_id == $transfer->warehouse_id)
-                                                                            value="{{ $warehouse->warehouse_id }}">
-                                                                            {{ $warehouse->warehouse_name }}
-                                                                        </option>
-                                                                    @endforeach
-                                                                </select>
-                                                            </div>
-
-                                                            <div class="mb-2">
-                                                                <label>Transporter</label>
-                                                                <select class="form-select js-choice" name="transporter_id" required>
-                                                                    {{--                                                            <option value="" selected >--select transporter--</option>--}}
-                                                                    @foreach($transporters as $transporter)
-                                                                        <option
-                                                                            @selected($transfer && $transporter->transporter_id == $transfer->transporter_id)
-                                                                            value="{{ $transporter->transporter_id }}">
-                                                                            {{ $transporter->transporter_name }}
-                                                                        </option>
-                                                                    @endforeach
-                                                                </select>
-                                                            </div>
-
-                                                            <div class="mb-2">
-                                                                <label class="my-1 fs-xs fw-bold" style="font-size: 85% !important;">DRIVER'S ID NUMBER</label> <br>
-                                                                <input id="idSelect" type="text" list="idList" name="idNumber" class="form-control idSelect" placeholder="-- Driver's ID Number --" required style="height: 67% !important;" value="{{ $transfer->id_number }}">
-                                                                <datalist id="idList">
-                                                                    @foreach($users as $user)
-                                                                        <option value="{{ $user->id_number }}">{{ $user->id_number }}</option>
-                                                                    @endforeach
-                                                                </datalist>
-                                                            </div>
-                                                            <div class="mb-2">
-                                                                <label class="my-1 fs-xs fw-bold" style="font-size: 85% !important;">VEHICLE REGISTRATION</label><br>
-                                                                <input class="form-control" name="registration" type="text" placeholder="-- plate number --" required value="{{ $transfer->registration }}" style="height: 67%;">
-                                                            </div>
-                                                            <div class="mb-2">
-                                                                <label class="my-1 fs-xs fw-bold" style="font-size: 85% !important;">DRIVER'S NAME</label>
-                                                                <input type="text" name="driverName" id="driverName" class="form-control driverName" value="{{ $transfer->driver_name }}" required style="height: 67% !important;">
-                                                            </div>
-
-                                                            <div class="mb-2">
-                                                                <label class="my-1 fs-xs fw-bold" style="font-size: 85% !important;">DRIVER'S PHONE NUMBER</label>
-                                                                <input type="text" name="driverPhone" id="driverPhone" class="form-control driverPhone" value="{{ $transfer->phone }}" required style="height: 67% !important;">
-                                                            </div>
-                                                        </div>
-                                                        <div class="d-flex justify-content-center">
-                                                            <button type="submit" class="btn btn-danger col-7" onclick="return confirm('Are you sure you want to proceed?')">UPDATE & RELEASE</button>
-                                                        </div>
-                                                    </form>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
                                 </td>
                             </tr>
                         @endforeach
                         </tbody>
                     </table>
+                    <div class="modal fade" id="releaseModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
+                        <div class="modal-dialog modal-dialog-centered modal-xl">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h1 class="modal-title fs-1" id="releaseModalLabel">Release Transfer</h1>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                </div>
+                                <div class="modal-body" id="releaseModalBody">
+                                    <div class="text-center py-4">
+                                        <div class="spinner-border text-primary" role="status"></div>
+                                        <p class="mt-2">Loading...</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -278,28 +234,98 @@
 
         });
 
-        $('.idSelect').on('change', function () {
-
+        $(document).on('input', '.idSelect', function () {
             var idNumber = $(this).val();
-
             $.ajax({
                 url: '{{ route('clerk.fetchIdNumber') }}',
                 method: 'GET',
-                data: {idNumber},
+                data: { idNumber },
                 dataType: 'json',
                 success: function (response) {
-                    console.log('Success:', response.driver_name);
-
-                    $('.driverName').val(response.driver_name)
-                    $('.driverPhone').val(response.driver_phone)
+                    $('.driverName').val(response.driver_name);
+                    $('.driverPhone').val(response.driver_phone);
                 },
-                error: function (xhr, status, error) {
-                    // Function to handle errors
-                    console.error('Error:', error);
-                    $('#driverName').val('')
-                    $('#driverPhone').val('')
+                error: function () {
+                    $('.driverName').val('');
+                    $('.driverPhone').val('');
                 }
             });
+        });
+
+        //     var idNumber = $(this).val();
+
+        //     $.ajax({
+        //         url: '{{ route('clerk.fetchIdNumber') }}',
+        //         method: 'GET',
+        //         data: {idNumber},
+        //         dataType: 'json',
+        //         success: function (response) {
+        //             console.log('Success:', response.driver_name);
+
+        //             $('.driverName').val(response.driver_name)
+        //             $('.driverPhone').val(response.driver_phone)
+        //         },
+        //         error: function (xhr, status, error) {
+        //             // Function to handle errors
+        //             console.error('Error:', error);
+        //             $('#driverName').val('')
+        //             $('#driverPhone').val('')
+        //         }
+        //     });
+        // });
+
+        document.addEventListener('click', function(e) {
+            const btn = e.target.closest('.release-btn');
+            if (!btn) return;
+
+            e.preventDefault();
+
+            const delivery = btn.dataset.delivery;
+            const client = btn.dataset.client;
+            const modal = new bootstrap.Modal(document.getElementById('releaseModal'));
+            const url = btn.dataset.url;
+
+
+            // Reset modal body
+            document.getElementById('releaseModalLabel').textContent = `Release ${delivery} - ${client}`;
+            document.getElementById('releaseModalBody').innerHTML = `
+            <div class="text-center py-4">
+                <div class="spinner-border text-primary" role="status"></div>
+                <p class="mt-2">Loading...</p>
+            </div>`;
+
+            modal.show();
+
+            // Fetch form content
+            fetch(url)
+                .then(res => res.text())
+                .then(html => {
+                    document.getElementById('releaseModalBody').innerHTML = html;
+                    document.querySelectorAll('#releaseModalBody .js-choice').forEach(function(el) {
+                        const choicesInstance = new Choices(el, {
+                            searchEnabled: true,
+                            itemSelectText: '',
+                        });
+
+                        // ✅ Handle "Other" option specifically for transporterSelect2
+                        if (el.id === 'transporterSelect2') {
+                            el.addEventListener('change', function () {
+                                const otherInput = document.getElementById('otherTransporterInput2');
+                                if (this.value === 'other') {
+                                    otherInput.classList.remove('d-none');
+                                    otherInput.required = true;
+                                } else {
+                                    otherInput.classList.add('d-none');
+                                    otherInput.required = false;
+                                    otherInput.value = '';
+                                }
+                            });
+                        }
+                    });
+                })
+                .catch(() => {
+                    document.getElementById('releaseModalBody').innerHTML = '<p class="text-danger">Failed to load form.</p>';
+                });
         });
     });
 </script>
