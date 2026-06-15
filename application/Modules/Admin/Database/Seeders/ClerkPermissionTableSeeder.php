@@ -84,9 +84,10 @@ class ClerkPermissionTableSeeder extends Seeder
             ['name' => 'Amend Straight Line Teas', 'key' => 'straightline.amend', 'category' => 'shipping'],
             ['name' => 'Amend Blend Teas', 'key' => 'blend.amend', 'category' => 'shipping'],
             ['name' => 'Amend Blend Outturn Report', 'key' => 'blend.amendOutturn', 'category' => 'shipping'],
-            
-    
-
+            ['name' => 'Approve Blend Sheets', 'key' => 'blend.approve', 'category' => 'shipping'],
+            ['name' => 'Approve Straight Line', 'key' => 'straightline.approve', 'category' => 'shipping'],
+            ['name' => 'Approve Straight Line', 'key' => 'straightline.approve', 'category' => 'shipping'],
+            ['name' => 'Add Missing Lines to Straight Line', 'key' => 'straightline.addmissinglines', 'category' => 'shipping'],
         ];
 
         foreach ($permissions as $perm) {

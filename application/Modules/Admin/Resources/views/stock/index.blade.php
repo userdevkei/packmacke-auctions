@@ -472,10 +472,12 @@
                                     @php
                                         $available = $stock->current_stock;
                                         $availableWeight = $stock->current_weight;
+                                        $grossWeight = $stock->gross_weight;
                                     @endphp
                                     <strong class="{{ $available > 0 ? 'text-success' : 'text-danger' }}">
                                         {{ $available }} pkgs<br>
-                                        <small>{{ number_format($availableWeight, 2) }} kg</small>
+                                        <small>N : {{ number_format($availableWeight, 2) }} kg</small> <br>
+                                        <small>G : {{ number_format($grossWeight, 2) }} kg</small>
                                     </strong>
                                 </td>
                                 <td nowrap="">{{ \Carbon\Carbon::createFromTimestamp($stock->date_received)->format('d/m/Y') }}</td>

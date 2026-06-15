@@ -8,7 +8,9 @@ use App\Models\Garden;
 use App\Models\Grade;
 use App\Models\StockIn;
 use App\Models\Warehouse;
+use App\Models\WarehouseBay;
 use App\Services\CustomIds;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Maatwebsite\Excel\Concerns\Importable;
@@ -17,7 +19,6 @@ use Maatwebsite\Excel\Concerns\WithCalculatedFormulas;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
 use Maatwebsite\Excel\Row;
 use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
-use Carbon\Carbon;
 
 class ImportBulkyTeas implements OnEachRow, WithHeadingRow, WithCalculatedFormulas
 {
@@ -56,6 +57,7 @@ class ImportBulkyTeas implements OnEachRow, WithHeadingRow, WithCalculatedFormul
             $grade   = Grade::where('grade_name', trim($row['grade']))->first();
             $client  = Client::where('client_id', $this->data['client_id'])->first();
             $warehouse = Warehouse::where('warehouse_name', trim($row['producer_warehouse']))->first();
+            $bay = WarehouseBay::where(['station_id' => $this->data['station_id'], 'bay_name' => trim($row['warehouse_bay'])])->first();
 
             $deliveryId = (new CustomIds())->generateId();
             $stockId    = (new CustomIds())->generateId();
@@ -122,7 +124,7 @@ class ImportBulkyTeas implements OnEachRow, WithHeadingRow, WithCalculatedFormul
                 'station_id' => $this->data['station_id'],
                 'date_received' => time(),
                 'delivery_number' => $row['delivery_number'],
-                'warehouse_bay' => $this->data['bay_id'],
+                'warehouse_bay' => $bay ? $bay->bay_id : $this->data['bay_id'],
                 'total_weight' => $row['total_gross_weight'],
                 'total_pallets' => $row['total_packages'],
                 'pallet_weight' => $row['pallet_weight'],

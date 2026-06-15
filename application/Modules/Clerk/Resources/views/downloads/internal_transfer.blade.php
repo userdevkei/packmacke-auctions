@@ -183,7 +183,6 @@
                         return auth()->user()->hasPermission('transfer.internal.approve') == true || is_string($s->department_name) && stripos($s->department_name, 'Stock') !== false;
                     });
 
-                    dd($signatory);
                     $image = $signatory?->signature;
                 } elseif ($key === 1) {
                     $signatory = $signatories->first(function ($s) {

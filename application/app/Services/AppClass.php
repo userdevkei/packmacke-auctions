@@ -2880,6 +2880,7 @@ class AppClass
                 })
                     ->orWhere(function ($q) {
                         $q->where('allocated_weight', '>', 0)
+                            ->where('current_stock', '>', 0)
                             ->where('allocated_packages', '>', 0);
                     });
             })
@@ -3166,7 +3167,7 @@ class AppClass
             ->leftJoin('auctions', function ($join) {
                 $join->on('auctions.delivery_id', '=', 'external_transfers.delivery_id');
             })
-            ->leftJoin('clients as buyer', 'buyer.client_id', '=', 'auctions.client_id')
+            ->join('clients as buyer', 'buyer.client_id', '=', 'auctions.client_id')
             ->leftJoin('stock_ins', 'stock_ins.stock_id', '=', 'external_transfers.stock_id')
             ->leftJoin('stations', 'stations.station_id', '=', 'stock_ins.station_id')
             ->leftJoin('clients', 'clients.client_id', '=', 'delivery_orders.client_id')

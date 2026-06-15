@@ -116,61 +116,87 @@
                                 </td>
                                 <td nowrap="">
                                     <div class="d-flex align-items-center">
-                                        <!-- Trace Tea Icon -->
-                                        @if(auth()->user()->role_id == 3)
-                                            @if($transfer->status === null)
-                                                <a class="link text-danger" data-bs-toggle="tooltip" data-bs-placement="left" title="Transfer pending initiation"> <span class="fa-solid fa-spinner"></span></a>
-                                            @elseif($transfer->status == 0)
-                                                <a class="link text-success" data-bs-toggle="tooltip" data-bs-placement="left" title="Transfer initiated, pending approval"> <span class="fa-regular fa-hourglass-half"></span> </a>
-                                            @elseif($transfer->status == 2 && $transfer->origin === auth()->user()->station->location->location_id)
-                                                <a class="link text-success" data-bs-toggle="tooltip" data-bs-placement="left" title="Transfer approved, release transfer"  onclick="return confirm('Are you sure you want to release teas for this request?')" href="{{ route('clerk.serviceRequest', base64_encode($transfer->delivery_number)) }}"> <span class="fa-solid fa-retweet"></span> </a>
-                                            @elseif($transfer->status == 1)
-                                                <a class="link text-danger" data-bs-toggle="tooltip" data-bs-placement="left" title="Transfer approved, pending release"> <span class="fa-solid fa-check"> </span> </a>
-                                            @elseif($transfer->status == 3)
-                                                <a class="link text-secondary" data-bs-toggle="tooltip" data-bs-placement="left" title="Transfer released, pending receiving"> <span class="fa-solid fa-truck-arrow-right"> </span></a>
-                                            @else
-                                                <a class="link text-success" data-bs-toggle="tooltip" data-bs-placement="left" title="Transfer received, and stock updated"> <span class="fa-solid fa-check-double"></span> </a>
-                                            @endif
-                                        @elseif(@canuser('transfer.internal.approve'))
-                                            @if($transfer->status == null || $transfer->status == 0)
-                                                <a class="link text-warning" data-bs-toggle="tooltip" data-bs-placement="left" title="Click to approve this transfer" onclick="return confirm('Are you sure you want to approve this transfer request?')" href="{{ route('clerk.initiateTransfer', base64_encode($transfer->delivery_number)) }}" ><span class="fa-regular fa-thumbs-up"></span></a>
-                                            @elseif($transfer->status == 1)
-                                                <a class="link text-success" data-bs-toggle="tooltip" data-bs-placement="left" title="Transfer approved, pending release"> <span class="fa-solid fa-check"></span> </a>
-                                            @elseif($transfer->status == 3)
-                                                <a class="link text-success" data-bs-toggle="tooltip" data-bs-placement="left" title="Transfer released"> <span class="fa-solid fa-truck-arrow-right"></span> </a>
-                                            @else
-                                                <a class="link text-success" data-bs-toggle="tooltip" data-bs-placement="left" title="Transfer released"> <span class="fa-solid fa-check-double"></span> </a>
-                                            @endif
-                                        @else
-                                            @if($transfer->status === null)
-                                                <a class="link text-danger" data-bs-toggle="tooltip" data-bs-placement="left" title="Transfer pending initiation"> <span class="fa-solid fa-spinner"></span></a>
-                                            @elseif($transfer->status == 0)
-                                                <a class="link text-info" data-bs-toggle="tooltip" data-bs-placement="left" title="Transfer Pending Approval" href="#" ><span class="fa-solid fa-spinner"></span></a>
-                                            @elseif($transfer->status == 1)
-                                                <a class="link text-success" data-bs-toggle="tooltip" data-bs-placement="left" title="Transfer approved, pending release"> <span class="fa-solid fa-check"></span> </a>
-                                            @elseif($transfer->status == 3)
-                                                <a class="link text-success" data-bs-toggle="tooltip" data-bs-placement="left" title="Transfer released"> <span class="fa-solid fa-truck-arrow-right"></span> </a>
-                                            @else
-                                                <a class="link text-success" data-bs-toggle="tooltip" data-bs-placement="left" title="Transfer released"> <span class="fa-solid fa-check-double"></span> </a>
+                                            @if ($transfer->status == null && $transfer->origin == auth()->user()->station->location->location_id && !@canuser('transfer.internal.approve'))
 
+                                                {{-- Pending initiation --}}
+                                                <a class="link text-danger" data-bs-toggle="tooltip"
+                                                    data-bs-placement="left" title="Transfer pending initiation">
+                                                    <span class="fa-solid fa-spinner"></span>
+                                                </a>
+                                            @elseif($transfer->status == 0)
+                                                {{-- Initiated, pending approval --}}
+                                                @if (@canuser('transfer.internal.approve'))
+                                                    <a class="link text-warning" data-bs-toggle="tooltip"
+                                                        data-bs-placement="left" title="Click to approve this transfer"
+                                                        onclick="return confirm('Are you sure you want to approve this transfer request?')"
+                                                        href="{{ route('clerk.initiateTransfer', base64_encode($transfer->delivery_number)) }}">
+                                                        <span class="fa-regular fa-thumbs-up"></span>
+                                                    </a>
+                                                @else
+                                                    <a class="link text-info" data-bs-toggle="tooltip"
+                                                        data-bs-placement="left" title="Transfer Pending Approval">
+                                                        <span class="fa-regular fa-hourglass-half"></span>
+                                                    </a>
+                                                @endif
+                                            @elseif($transfer->status == 1)
+                                                {{-- Approved, pending release --}}
+                                                @if (@canuser('transfer.internal.release') && $transfer->origin === auth()->user()->station->location->location_id)
+                                                    <a class="link text-success" data-bs-toggle="tooltip"
+                                                        data-bs-placement="left"
+                                                        title="Transfer approved, release transfer"
+                                                        onclick="return confirm('Are you sure you want to release teas for this request?')"
+                                                        href="{{ route('clerk.serviceRequest', base64_encode($transfer->delivery_number)) }}">
+                                                        <span class="fa-solid fa-retweet"></span>
+                                                    </a>
+                                                @else
+                                                    <a class="link text-danger" data-bs-toggle="tooltip"
+                                                        data-bs-placement="left"
+                                                        title="Transfer approved, pending release">
+                                                        <span class="fa-solid fa-check"></span>
+                                                    </a>
+                                                @endif
+                                            @elseif($transfer->status == 3)
+                                                {{-- Released, pending receiving --}}
+                                                <a class="link text-secondary" data-bs-toggle="tooltip"
+                                                    data-bs-placement="left" title="Transfer released, pending receiving">
+                                                    <span class="fa-solid fa-truck-arrow-right"></span>
+                                                </a>
+                                            @else
+                                                {{-- Received, stock updated --}}
+                                                <a class="link text-success" data-bs-toggle="tooltip"
+                                                    data-bs-placement="left" title="Transfer received, and stock updated">
+                                                    <span class="fa-solid fa-check-double"></span>
+                                                </a>
                                             @endif
-                                        @endif
-                                        <!-- Dropdown Icon -->
-                                        <div class="dropdown font-sans-serif position-static" >
-                                            <a class="link text-600 btn-sm dropdown-toggle btn-reveal" type="button" data-bs-toggle="dropdown" data-boundary="window" aria-haspopup="true" aria-expanded="false">
-                                                <span class="fas fa-ellipsis-h fs-10"></span>
-                                            </a>
-                                            <div class="dropdown-menu dropdown-menu-end border py-0">
-                                                <div class="py-2">
-                                                    <a class="dropdown-item text-info" href="{{ route('clerk.viewInternalTransferDetails', base64_encode($transfer->delivery_number)) }}">View Transfer</a>
-                                                    <a class="dropdown-item text-primary" href="{{ route('clerk.downloadInterDelNote', base64_encode($transfer->delivery_number)) }}" target="_blank">Download Transfer</a>
-                                                    @if($transfer->location_id == auth()->user()->station->location->location_id && $transfer->status == 3 || @canuser('transfer.internal.receive'))
-                                                        <a class="dropdown-item text-danger" href="{{ route('clerk.prepareToReceiveTransfer', base64_encode($transfer->delivery_number)) }}">Receive Transfer</a>
-                                                    @endif
+                                            <!-- Dropdown Icon -->
+                                            <div class="dropdown font-sans-serif position-static">
+                                                <a class="link text-600 btn-sm dropdown-toggle btn-reveal" type="button"
+                                                    data-bs-toggle="dropdown" data-boundary="window" aria-haspopup="true"
+                                                    aria-expanded="false">
+                                                    <span class="fas fa-ellipsis-h fs-10"></span>
+                                                </a>
+                                                <div class="dropdown-menu dropdown-menu-end border py-0">
+                                                    <div class="py-2">
+                                                        <a class="dropdown-item text-info"
+                                                            href="{{ route('clerk.viewInternalTransferDetails', base64_encode($transfer->delivery_number)) }}">View
+                                                            Transfer</a>
+                                                        @php $approved = \Modules\Clerk\Entities\Approval::where('job_id', $transfer->delivery_number)->get(); @endphp
+                                                        @if ($approved && $approved->count() >= 2)
+                                                            <a class="dropdown-item text-primary"
+                                                                href="{{ route('clerk.downloadInterDelNote', base64_encode($transfer->delivery_number)) }}"
+                                                                target="_blank"> Download Transfer </a>
+                                                        @endif
+                                                        @if (
+                                                            ($transfer->location_id == auth()->user()->station->location->location_id && $transfer->status == 3) ||
+                                                                @canuser('transfer.internal.receive') && $transfer->status > 1)
+                                                            <a class="dropdown-item text-danger"
+                                                                href="{{ route('clerk.prepareToReceiveTransfer', base64_encode($transfer->delivery_number)) }}">Receive
+                                                                Transfer</a>
+                                                        @endif
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
-                                    </div>
                                 </td>
                             </tr>
                         @endforeach

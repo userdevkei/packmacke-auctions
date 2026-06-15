@@ -116,7 +116,7 @@
                                                 <a class="link text-warning" data-bs-toggle="tooltip" data-bs-placement="left" title="Click to approve this transfer" onclick="return confirm('Are you sure you want to initiate this transfer request?')" href="{{ route('clerk.initiateExternalTransfer', base64_encode($transfer->delivery_number)) }}" ><span class="fa-regular fa-thumbs-up"></span></a>
                                             @elseif($transfer->status == 1)
                                                 <a class="link text-danger" data-bs-toggle="tooltip" data-bs-placement="left" title="Transfer initiated, pending approval"> <span class="fa-solid fa-check"> </span> </a>
-                                            @elseif($transfer->status == 3 && @canuser('external.release') && $transfer->lot != null)
+                                            @elseif($transfer->status == 3 && (@canuser('external.release') && $transfer->lot != null))
                                                  <a class="link link-danger release-btn"
                                                    title="Transfer approved, pending release"
                                                    data-delivery="{{ $transfer->delivery_number }}"

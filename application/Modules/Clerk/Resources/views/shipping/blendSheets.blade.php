@@ -68,7 +68,7 @@
                                             @endif
 
                                         @elseif($transfer->status == 3)
-                                            @if(auth()->user()->role_id == 2)
+                                            @if(auth()->user()->role_id == 2 || @canuser('blend.approve'))
                                                 <a class="link text-danger" data-bs-toggle="tooltip" data-bs-placement="left" title="Blend pending confirmation and shipping" onclick="return confirm('Are you sure you want to approve this Blend? This will mark Blend as shipped')" href="{{ route('clerk.updateBlendSheet', $transfer->blend_id) }}"><span class="fa-regular fa-thumbs-up"></span></a>
                                             @else
                                                 <a class="link dark__text-warning" data-bs-toggle="tooltip" data-bs-placement="left" title="Blend pending confirmation and shipping"><span class="fa-regular fa-hourglass-half"></span></a>

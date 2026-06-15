@@ -8,7 +8,7 @@
                 </div>
                 <div class="col-6 col-sm-auto ms-auto text-end ps-0">
                     <div id="table-simple-pagination-replace-element">
-                        @if($si->status == 0 && @canuser('straightline.update') || $si->status < 4 && @canuser('straightline.amend'))
+                        @if($si->status == 0 && @canuser('straightline.update') || $si->status < 4 && @canuser('straightline.amend') || $si->status < 4 && @canuser('straightline.addmissinglines'))
                             <a class="btn btn-falcon-default btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#staticBackdrop">Select Teas</a>
                         @endif
                     </div>
@@ -55,7 +55,7 @@
                                             <td>{{ $cTea->grade_name }}</td>
                                             <td>{{ $cTea->invoice_number }}</td>
                                             <td>{{ $cTea->lot_number }}</td>
-                                            <td><input type="number" min="1" max="{{ $cTea->current_stock }}" class="form-control form-control-sm" name="current_stock[]" value="{{ $cTea->current_stock }}" onchange="recalculateWeight(this)"></td>
+                                            <td><input type="number" min="1" max="{{ $cTea->current_stock }}" step="0.1" class="form-control form-control-sm" name="current_stock[]" value="{{ $cTea->current_stock }}" onchange="recalculateWeight(this)"></td>
                                             <td><span id="current_weight_{{ $cTea->stock_id }}">{{ $cTea->current_weight }}</span></td>
                                            {{-- <td>
                                                 <input type="number" class="form-control form-control-sm" step="0.01" name="package_tare[]" value="{{ $cTea->package_tare }}">

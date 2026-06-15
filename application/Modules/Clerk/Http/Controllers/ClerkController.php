@@ -471,7 +471,7 @@ class ClerkController extends Controller
             ->orderBy('transfers.created_at', 'desc')
             ->select('stations.station_name', 'stations.station_id', 'clients.client_name', 'destination_station.station_name as destination_name', 'destination_station.station_id as destination', 'transfers.status', 'transfers.delivery_number', 'transfers.created_at', 'warehouse_locations.location_id', 'stations.location_id as origin', 'transfers.requested_palettes', 'transfers.requested_weight', 'garden_name', 'grade_name', 'invoice_number', 'lot_number', 'stock_id', 'registration', 'driver_name', 'id_number', 'drivers.phone', 'transporters.transporter_id', 'transporter_name', 'transfer_id', 'garden', 'grade', 'blend_number', DB::raw("CASE WHEN blendBalances.blend_balance_id IS NOT NULL THEN 2 WHEN delivery_orders.delivery_id IS NOT NULL THEN 1 ELSE NULL END AS transfer_type"))
             ->where(['delivery_number' => base64_decode($id)])
-            ->whereIn('transfers.status', [2, 3])
+            ->whereIn('transfers.status', [1, 2, 3])
             ->get();
 
         $transporters = Transporter::all();
@@ -534,87 +534,72 @@ public function viewExternalTransfers(Request $request)
     $from = $request->get('from') ?? Carbon::now()->startOfMonth();
     $to = $request->get('to') ?? Carbon::now();
 
-    // Main optimized query with strategic joins
     $transfers = DB::table('external_transfers')
-        ->leftJoin('blendBalances', function ($join) {
-            $join->on('blendBalances.blend_balance_id', '=', 'external_transfers.stock_id')
-                ->on('blendBalances.blend_id', '=', 'external_transfers.delivery_id');
-        })
-        ->leftJoin('delivery_orders', function ($join) {
-            $join->on('delivery_orders.delivery_id', '=', 'external_transfers.delivery_id')
-                ->whereNull('delivery_orders.deleted_at');
-        })
-        ->leftJoin('clients', 'clients.client_id', '=', 'delivery_orders.client_id')
-        ->leftJoin('auctions', function ($join) {
-            $join->on('auctions.delivery_id', '=', 'external_transfers.delivery_id')
-                ->whereNull('auctions.deleted_at');
-        })
-        ->leftJoin('clients as buyer', 'buyer.client_id', '=', 'auctions.client_id')
-        ->leftJoin('stock_ins', 'stock_ins.stock_id', '=', 'external_transfers.stock_id')
-        ->leftJoin('stations', 'stations.station_id', '=', 'stock_ins.station_id')
-        ->leftJoin('warehouse_locations', 'warehouse_locations.location_id', '=', 'stations.location_id')
-        ->leftJoin('warehouses', 'warehouses.warehouse_id', '=', 'external_transfers.warehouse_id')
-        ->leftJoin('other_destinations', 'other_destinations.warehouse_id', '=', 'external_transfers.warehouse_id')
-        ->leftJoin('transporters', 'transporters.transporter_id', '=', 'external_transfers.transporter_id')
-        ->leftJoin('other_transporters', 'other_transporters.transporter_id', '=', 'external_transfers.transporter_id')
-        ->leftJoin('drivers', 'drivers.driver_id', '=', 'external_transfers.driver_id')
-        ->select([
-            'external_transfers.delivery_number',
-            'external_transfers.status',
-            'external_transfers.warehouse_id',
-            'external_transfers.registration',
-            'external_transfers.release_date',
-            'external_transfers.lot',
-            'external_transfers.created_at',
-            'warehouse_locations.location_id',
-            'external_transfers.lot',
-            
-            // Use COALESCE but optimize it
-            DB::raw("COALESCE(clients.client_name, blendBalances.client_name, '') as client_name"),
-            DB::raw("COALESCE(warehouses.warehouse_name, other_destinations.warehouse_name, '') as warehouse_name"),
-            DB::raw("COALESCE(stations.station_name, blendBalances.station_name, '') as station_name"),
-            DB::raw("COALESCE(transporters.transporter_id, other_transporters.transporter_id) as transporter_id"),
-            DB::raw("COALESCE(transporters.transporter_name, other_transporters.transporter_name, '') as transporter_name"),
-            
-            'buyer.client_name as buyer_name',
-            'drivers.driver_id',
-            'drivers.driver_name',
-            'drivers.phone',
-            'drivers.id_number',
-            
-            // Aggregations
-            DB::raw('SUM(external_transfers.transferred_palettes) as total_palettes'),
-            DB::raw('SUM(external_transfers.transferred_weight) as total_weight')
-        ])
-        ->groupBy([
-            'external_transfers.delivery_number',
-            'external_transfers.status',
-            'external_transfers.warehouse_id',
-            'external_transfers.registration',
-            'external_transfers.release_date',
-            'external_transfers.lot',
-            'external_transfers.created_at',
-            'warehouse_locations.location_id',
-            'clients.client_name',
-            'blendBalances.client_name',
-            'warehouses.warehouse_name',
-            'other_destinations.warehouse_name',
-            'stations.station_name',
-            'blendBalances.station_name',
-            'transporters.transporter_id',
-            'other_transporters.transporter_id',
-            'transporters.transporter_name',
-            'other_transporters.transporter_name',
-            'buyer.client_name',
-            'drivers.driver_id',
-            'drivers.driver_name',
-            'drivers.phone',
-            'drivers.id_number',
-            'external_transfers.lot'
-        ])
-        ->orderByDesc('external_transfers.delivery_number')
-        ->orderByDesc('external_transfers.created_at')
-        ->get();
+    ->leftJoin('blendBalances', function ($join) {
+        $join->on('blendBalances.blend_balance_id', '=', 'external_transfers.stock_id')
+            ->on('blendBalances.blend_id', '=', 'external_transfers.delivery_id');
+    })
+    // Force 1 row per delivery_id using MIN(client_id)
+    ->leftJoin(DB::raw('(
+        SELECT delivery_id, MIN(client_id) as client_id 
+        FROM delivery_orders 
+        WHERE deleted_at IS NULL
+        GROUP BY delivery_id
+    ) as delivery_orders'), 'delivery_orders.delivery_id', '=', 'external_transfers.delivery_id')
+    ->leftJoin('clients', 'clients.client_id', '=', 'delivery_orders.client_id')
+    // Force 1 row per delivery_id using MIN(client_id)
+    ->leftJoin(DB::raw('(
+        SELECT delivery_id, MIN(client_id) as client_id 
+        FROM auctions 
+        WHERE deleted_at IS NULL
+        GROUP BY delivery_id
+    ) as auctions'), 'auctions.delivery_id', '=', 'external_transfers.delivery_id')
+    ->leftJoin('clients as buyer', 'buyer.client_id', '=', 'auctions.client_id')
+    // Force 1 row per stock_id
+    ->leftJoin(DB::raw('(
+        SELECT stock_id, MIN(station_id) as station_id
+        FROM stock_ins
+        GROUP BY stock_id
+    ) as stock_ins'), 'stock_ins.stock_id', '=', 'external_transfers.stock_id')
+    ->leftJoin('stations', 'stations.station_id', '=', 'stock_ins.station_id')
+    ->leftJoin('warehouse_locations', 'warehouse_locations.location_id', '=', 'stations.location_id')
+    ->leftJoin('warehouses', 'warehouses.warehouse_id', '=', 'external_transfers.warehouse_id')
+    ->leftJoin('other_destinations', 'other_destinations.warehouse_id', '=', 'external_transfers.warehouse_id')
+    ->leftJoin('transporters', 'transporters.transporter_id', '=', 'external_transfers.transporter_id')
+    ->leftJoin('other_transporters', 'other_transporters.transporter_id', '=', 'external_transfers.transporter_id')
+    ->leftJoin('drivers', 'drivers.driver_id', '=', 'external_transfers.driver_id')
+    ->select([
+        'external_transfers.delivery_number',
+        'external_transfers.status',
+        'external_transfers.warehouse_id',
+        'external_transfers.registration',
+        'external_transfers.release_date',
+        'external_transfers.lot',
+        'external_transfers.created_at',
+        'warehouse_locations.location_id',
+
+        DB::raw("COALESCE(clients.client_name, blendBalances.client_name, '') as client_name"),
+        DB::raw("COALESCE(warehouses.warehouse_name, other_destinations.warehouse_name, '') as warehouse_name"),
+        DB::raw("COALESCE(stations.station_name, blendBalances.station_name, '') as station_name"),
+        DB::raw("COALESCE(transporters.transporter_id, other_transporters.transporter_id) as transporter_id"),
+        DB::raw("COALESCE(transporters.transporter_name, other_transporters.transporter_name, '') as transporter_name"),
+
+        'buyer.client_name as buyer_name',
+        'drivers.driver_id',
+        'drivers.driver_name',
+        'drivers.phone',
+        'drivers.id_number',
+
+        DB::raw('SUM(external_transfers.transferred_palettes) as total_palettes'),
+        DB::raw('SUM(external_transfers.transferred_weight) as total_weight')
+    ])
+    ->groupBy([
+        'external_transfers.delivery_number',
+        'external_transfers.lot',
+    ])
+    ->orderByDesc('external_transfers.delivery_number')
+    ->whereNull('external_transfers.deleted_at')
+    ->get();
 
     // Cache static lookups
     $warehouses = Cache::remember('all_warehouses', 3600, function () {
@@ -955,7 +940,7 @@ public function viewExternalTransfers(Request $request)
             Transfers::where('delivery_number', base64_decode($id))->update(['status' => 0]);
             $this->logger->create();
             return redirect()->back()->with('success', 'Success! Transfer request initiated successfully');
-        }elseif(auth()->user()->role_id == 2 || auth()->user()->hasPermission('transfer.internal.approve')) {
+        }elseif(auth()->user()->role_id == 2 || auth()->user()->hasPermission('transfer.internal.approve') || auth()->user()->role_id ==  3 && auth()->user()->hasPermission('transfer.internal.approve')) {
             Transfers::where('delivery_number', base64_decode($id))->update(['status' => 1]);
             Approval::create([
                 'approval_id' => (new CustomIds())->generateId(),
@@ -1894,7 +1879,7 @@ public function viewExternalTransfers(Request $request)
                     OR requested_palettes > 0
                     THEN 1
                     ELSE 0
-                END AS used'), 'net_weight', 'total_pallets'
+                END AS used'), 'net_weight', 'total_pallets', DB::raw('(package_tare * current_stock) + current_weight AS gross_weight')
             );
         $deliveries = $teas->get();
         $clients = $teas->select('client_id', 'client_name')->groupBy('client_id', 'client_name')->get();
@@ -2735,7 +2720,7 @@ public function viewExternalTransfers(Request $request)
     }
     public function updateShippingInstruction($id)
     {
-        if (auth()->user()->role_id == 2){
+        if (auth()->user()->role_id == 2 || auth()->user()->hasPermission('straightline.approve')){
             ShippingInstruction::where('shipping_id', $id)->update(['status' => 4]);
             $this->logger->create();
         }else{
@@ -3032,7 +3017,7 @@ public function viewExternalTransfers(Request $request)
     }
     public function updateBlendSheet($id)
     {
-        if (auth()->user()->role_id == 2){
+        if (auth()->user()->role_id == 2 || auth()->user()->hasPermission('blend.approve')){
             $blend = BlendSheet::where('blend_id', $id)->first();
             $status = $blend->status !== 3 ? ($blend->status + 1) : 4;
             $blend->update(['status' => $status, 'blend_shipped' => time()]);

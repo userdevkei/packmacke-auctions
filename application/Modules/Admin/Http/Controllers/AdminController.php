@@ -463,8 +463,15 @@ class AdminController extends Controller
 
         $initial = $request->role == 1 ? 'AD' :($request->role == 2 ? 'OP' :( $request->role == 7 ? 'GA' : ( $request->role == 8 ? 'AR' : ( $request->role == 9 ? 'AP' : ($request->role == 11 ? 'US' : 'CL')))));
 
-        $users = User::whereRaw("LEFT(username, 2) = '" . date('y') . "'")->count();
-        $staffNumber = date('y') . $initial. str_pad($users + 1, 3, '0', STR_PAD_LEFT);
+         $prefix = date('y') . $initial; // e.g. "26CL"
+
+            $maxUsername = User::withTrashed()
+                ->whereRaw("LEFT(username, 4) = ?", [$prefix])
+                ->max('username'); // gets highest e.g. "26CL014"
+
+            $lastNumber = $maxUsername ? (int) substr($maxUsername, 4) : 0;
+
+            $staffNumber = $prefix . str_pad($lastNumber + 1, 3, '0', STR_PAD_LEFT);
 
         $customId = new CustomIds();
         $userID = $customId->generateId();
@@ -483,7 +490,7 @@ class AdminController extends Controller
             'first_name' => strtoupper($request->first_name),
             'middle_name' => strtoupper($request->other),
             'surname' => strtoupper($request->surname),
-            'gender' => $request->gender,
+            'gender' => $request->gender == 'Male' ? 'M' : 'F',
             'phone_number' => $request->phone,
             'email_address' => $request->email,
             'id_number' => $request->id_number
@@ -2026,7 +2033,7 @@ class AdminController extends Controller
                     OR requested_palettes > 0
                     THEN 1
                     ELSE 0
-                END AS used'), 'net_weight', 'total_pallets'
+                END AS used'), 'net_weight', 'total_pallets', DB::raw('(package_tare * current_stock) + current_weight AS gross_weight')
                     );
 
         $deliveries = $teas->get();
@@ -2465,7 +2472,7 @@ class AdminController extends Controller
             ->leftJoin('delivery_orders', function ($join) {
                 $join->on('delivery_orders.delivery_id', '=', 'transfers.delivery_id');
             })
-            ->join('stations', 'stations.station_id', '=', 'transfers.station_id')
+            ->leftJoin('stations', 'stations.station_id', '=', 'transfers.station_id')
             ->leftJoin('grades', 'grades.grade_id', '=', 'delivery_orders.grade_id')
             ->leftJoin('gardens', 'gardens.garden_id', '=', 'delivery_orders.garden_id')
             ->leftJoin('clients', 'clients.client_id', '=', 'delivery_orders.client_id')
@@ -2476,8 +2483,10 @@ class AdminController extends Controller
             ->orderBy('transfers.created_at', 'desc')
             ->select('stations.station_name', 'stations.station_id', 'clients.client_name', 'destination_station.station_name as destination_name', 'destination_station.station_id as destination', 'transfers.status', 'transfers.delivery_number', 'transfers.created_at', 'warehouse_locations.location_id', 'stations.location_id as origin', 'transfers.requested_palettes', 'transfers.requested_weight', 'garden_name', 'grade_name', 'invoice_number', 'lot_number', 'stock_id', 'registration', 'driver_name', 'id_number', 'drivers.phone', 'transporters.transporter_id', 'transporter_name', 'transfer_id', 'garden', 'grade', 'blend_number', DB::raw("CASE WHEN blendBalances.blend_balance_id IS NOT NULL THEN 2 WHEN delivery_orders.delivery_id IS NOT NULL THEN 1 ELSE NULL END AS transfer_type"))
             ->where(['delivery_number' => base64_decode($id)])
-            ->whereIn('transfers.status', [2, 3])
+            ->whereIn('transfers.status', [1, 2, 3])
             ->get();
+
+            return $transfers->first();
 
         $transporters = Transporter::all();
         $registrations = Transfers::pluck('registration')->toArray();
@@ -2536,60 +2545,74 @@ class AdminController extends Controller
         $from = $request->get('from') ?? Carbon::now()->startOfMonth();
         $to = $request->get('to') ?? Carbon::now();
 
-        $transfers = ExternalTransfer::leftJoin('blendBalances', function ($join) {
-            $join->on('blendBalances.blend_balance_id', '=', 'external_transfers.stock_id')
-                ->on('blendBalances.blend_id', '=', 'external_transfers.delivery_id');
+        $transfers = DB::table('external_transfers')
+            ->leftJoin('blendBalances', function ($join) {
+                $join->on('blendBalances.blend_balance_id', '=', 'external_transfers.stock_id')
+                    ->on('blendBalances.blend_id', '=', 'external_transfers.delivery_id');
             })
-            ->leftJoin('delivery_orders', function ($join) {
-                $join->on('delivery_orders.delivery_id', '=', 'external_transfers.delivery_id')
-                    ->whereNull('delivery_orders.deleted_at');
-            })
-            ->leftJoin('auctions', function ($join) {
-                $join->on('auctions.delivery_id', '=', 'external_transfers.delivery_id')
-                    ->whereNull('auctions.deleted_at');
-            })
+            // Force 1 row per delivery_id using MIN(client_id)
+            ->leftJoin(DB::raw('(
+                SELECT delivery_id, MIN(client_id) as client_id 
+                FROM delivery_orders 
+                WHERE deleted_at IS NULL
+                GROUP BY delivery_id
+            ) as delivery_orders'), 'delivery_orders.delivery_id', '=', 'external_transfers.delivery_id')
+            ->leftJoin('clients', 'clients.client_id', '=', 'delivery_orders.client_id')
+            // Force 1 row per delivery_id using MIN(client_id)
+            ->leftJoin(DB::raw('(
+                SELECT delivery_id, MIN(client_id) as client_id 
+                FROM auctions 
+                WHERE deleted_at IS NULL
+                GROUP BY delivery_id
+            ) as auctions'), 'auctions.delivery_id', '=', 'external_transfers.delivery_id')
             ->leftJoin('clients as buyer', 'buyer.client_id', '=', 'auctions.client_id')
-            ->leftJoin('stock_ins', 'stock_ins.stock_id', '=', 'external_transfers.stock_id')
+            // Force 1 row per stock_id
+            ->leftJoin(DB::raw('(
+                SELECT stock_id, MIN(station_id) as station_id
+                FROM stock_ins
+                GROUP BY stock_id
+            ) as stock_ins'), 'stock_ins.stock_id', '=', 'external_transfers.stock_id')
             ->leftJoin('stations', 'stations.station_id', '=', 'stock_ins.station_id')
             ->leftJoin('warehouse_locations', 'warehouse_locations.location_id', '=', 'stations.location_id')
-            ->leftJoin('clients', 'clients.client_id', '=', 'delivery_orders.client_id')
-            ->leftjoin('warehouses', 'warehouses.warehouse_id', '=', 'external_transfers.warehouse_id')
-            ->leftjoin('other_destinations', 'other_destinations.warehouse_id', '=', 'external_transfers.warehouse_id')
+            ->leftJoin('warehouses', 'warehouses.warehouse_id', '=', 'external_transfers.warehouse_id')
+            ->leftJoin('other_destinations', 'other_destinations.warehouse_id', '=', 'external_transfers.warehouse_id')
             ->leftJoin('transporters', 'transporters.transporter_id', '=', 'external_transfers.transporter_id')
             ->leftJoin('other_transporters', 'other_transporters.transporter_id', '=', 'external_transfers.transporter_id')
             ->leftJoin('drivers', 'drivers.driver_id', '=', 'external_transfers.driver_id')
-            ->select('external_transfers.status',
-                DB::raw("CONCAT(COALESCE(clients.client_name, ''), COALESCE(blendBalances.client_name, '')) as client_name"),
-                DB::raw('COALESCE(warehouses.warehouse_name, other_destinations.warehouse_name) as warehouse_name'),
-                DB::raw('COALESCE(warehouses.warehouse_id, other_destinations.warehouse_id) as warehouse_id'),
-                DB::raw('COALESCE(stations.station_name, blendBalances.station_name) as station_name'),
+            ->select([
                 'external_transfers.delivery_number',
-                DB::raw('DATE(external_transfers.created_at) as created_at'),
-                'buyer.client_name as buyer_name', 'warehouse_locations.location_id',
-                DB::raw("CONCAT(COALESCE(transporters.transporter_id, ''), COALESCE(other_transporters.transporter_id, '')) as transporter_id"),
-                DB::raw("CONCAT(COALESCE(transporters.transporter_name, ''), COALESCE(other_transporters.transporter_name, '')) as transporter_name"),
-                'external_transfers.driver_id', 'driver_name', 'drivers.phone', 'id_number', 'external_transfers.registration', 'external_transfers.release_date', 'lot'
-            )
-            ->selectRaw('SUM(external_transfers.transferred_palettes) AS total_palettes')
-            ->selectRaw('SUM(external_transfers.transferred_weight) AS total_weight')
-            ->orderBy('delivery_number', 'desc')
-            ->orderBy('external_transfers.created_at', 'desc')
-            ->groupBy(
                 'external_transfers.status',
-                DB::raw("CONCAT(COALESCE(clients.client_name, ''), COALESCE(blendBalances.client_name, ''))"),
+                'external_transfers.warehouse_id',
+                'external_transfers.registration',
+                'external_transfers.release_date',
+                'external_transfers.lot',
+                'external_transfers.created_at',
+                'warehouse_locations.location_id',
 
-                DB::raw('COALESCE(warehouses.warehouse_name, other_destinations.warehouse_name)'),
-                DB::raw('COALESCE(warehouses.warehouse_id, other_destinations.warehouse_id)'),
-                DB::raw('COALESCE(stations.station_name, blendBalances.station_name)'),
+                DB::raw("COALESCE(clients.client_name, blendBalances.client_name, '') as client_name"),
+                DB::raw("COALESCE(warehouses.warehouse_name, other_destinations.warehouse_name, '') as warehouse_name"),
+                DB::raw("COALESCE(stations.station_name, blendBalances.station_name, '') as station_name"),
+                DB::raw("COALESCE(transporters.transporter_id, other_transporters.transporter_id) as transporter_id"),
+                DB::raw("COALESCE(transporters.transporter_name, other_transporters.transporter_name, '') as transporter_name"),
+
+                'buyer.client_name as buyer_name',
+                'drivers.driver_id',
+                'drivers.driver_name',
+                'drivers.phone',
+                'drivers.id_number',
+
+                DB::raw('SUM(external_transfers.transferred_palettes) as total_palettes'),
+                DB::raw('SUM(external_transfers.transferred_weight) as total_weight')
+            ])
+            ->groupBy([
                 'external_transfers.delivery_number',
-                DB::raw('DATE(external_transfers.created_at)'),
-                'buyer_name', 'warehouse_locations.location_id',
-                DB::raw("CONCAT(COALESCE(transporters.transporter_id, ''), COALESCE(other_transporters.transporter_id, ''))"),
-                DB::raw("CONCAT(COALESCE(transporters.transporter_name, ''), COALESCE(other_transporters.transporter_name, ''))"),
-                'driver_id', 'driver_name', 'phone', 'id_number', 'registration', 'external_transfers.release_date', 'lot'
-            )
+                'external_transfers.lot'
+            ])
+            ->orderByDesc('external_transfers.delivery_number')
             ->whereBetween('external_transfers.created_at', [$from, $to])
+            ->whereNull('external_transfers.deleted_at')
             ->get();
+
         $warehouses = Warehouse::all();
         $transporters = Transporter::all();
         $clients = Client::all();

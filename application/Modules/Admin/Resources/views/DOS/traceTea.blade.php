@@ -306,10 +306,16 @@
                                                     class="info-value">{{ $teaDetails['deliveryOrder']->packet }}</span>
                                             </div>
                                             <div class="info-row">
-                                                <span class="info-label">Weight:</span>
+                                                <span class="info-label">Net Weight:</span>
                                                 <span
                                                     class="info-value">{{ $teaDetails['deliveryOrder']->weight }} kg</span>
                                             </div>
+
+                                            <div class="info-row">
+                                                <span class="info-label">Gross Weight:</span>
+                                                <span class="info-value">{{ $teaDetails['deliveryOrder']->gross_weight }} kg</span>
+                                            </div>
+
                                             <div class="info-row">
                                                 <span class="info-label">Package Type:</span>
                                                 <span
