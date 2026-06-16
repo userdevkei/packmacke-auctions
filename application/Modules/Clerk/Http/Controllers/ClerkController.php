@@ -3549,7 +3549,7 @@ public function viewExternalTransfers(Request $request)
             ])))->download();
         }
 
-        $orders = $query->limit(400)->get();
+        $orders = $query->limit(200)->get();
 
         // ── Sidebar dropdowns (cached — they rarely change) ──────────────────────
         $stations     = cache()->remember('stations_active', 300, fn() => Station::where('status', 1)->get());
