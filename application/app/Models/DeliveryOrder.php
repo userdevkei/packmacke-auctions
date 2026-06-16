@@ -14,7 +14,7 @@ class DeliveryOrder extends Model
     protected $keyType = 'string';
     protected $date = 'deleted_at';
 
-    protected $fillable = ['delivery_id', 'tea_id', 'garden_id', 'production_date', 'expiry_date', 'grade_id', 'packet', 'package', 'weight', 'warehouse_id', 'broker_id', 'sale_number', 'invoice_number', 'lot_number', 'sale_date', 'prompt_date', 'sub_warehouse_id', 'locality', 'created_by', 'status', 'client_id', 'order_number', 'delivery_type', 'unit_weight', 'gross_weight', 'total_weight', 'tea_type', 'height'];
+    protected $fillable = ['delivery_id', 'tea_id', 'garden_id', 'production_date', 'expiry_date', 'grade_id', 'packet', 'package', 'weight', 'warehouse_id', 'broker_id', 'sale_number', 'invoice_number', 'lot_number', 'sale_date', 'prompt_date', 'sub_warehouse_id', 'locality', 'created_by', 'status', 'client_id', 'order_number', 'delivery_type', 'unit_weight', 'gross_weight', 'total_weight', 'tea_type', 'height', 'dispatch_date', 'printed_weight'];
 
     public function stockIns() {
         return $this->hasMany(StockIn::class, 'delivery_id', 'delivery_id');

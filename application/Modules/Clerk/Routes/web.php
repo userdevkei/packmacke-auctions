@@ -142,6 +142,11 @@ Route::prefix('clerk')->middleware(['auth', 'web', 'userRoles', 'userRole:2,3,4,
     Route::get('download-template', [ClerkController::class, 'downloadTemplate'])->name('clerk.downloadTemplate');
     Route::post('import-bulky-teas', [ClerkController::class, 'importStock'])->name('clerk.importStock');
 
+    // routes/web.php (inside your clerk middleware group)
+    Route::post('/direct-deliveries-preview-import',  [ClerkController::class, 'previewImport'])->name('clerk.previewImport');
+    Route::get('/direct-deliveries-import-preview',   [ClerkController::class, 'importPreviewPage'])->name('clerk.importPreviewPage');
+    Route::post('/direct-deliveries-save-import',     [ClerkController::class, 'saveImport'])->name('clerk.saveImport');
+
 
     Route::get('trace-delivery-order/{id}', [ClerkController::class, 'traceTea'])->name('clerk.traceTea');
     Route::get('trace-blend-balance/{id}', [ClerkController::class, 'traceBlendBalance'])->name('clerk.traceBlendBalance');
