@@ -3895,8 +3895,6 @@ public function viewExternalTransfers(Request $request)
                         'printed_weight'  => $record['Printed Net Weight'] ?? null,
                         'height'          => $record['Pallete Height'],
                         'created_by'      => auth()->user()->user_id,
-                        'created_at'      => now(),
-                        'updated_at'      => now(),
                     ]);
 
                     // ── Insert StockIn ──────────────────────────────────────
@@ -4168,6 +4166,17 @@ public function viewExternalTransfers(Request $request)
     }
     public function downloadDirectDeliveries($id)
     {
+        list($doNumber, $type) = explode(':', base64_decode($id));
+        $request = new Request([
+            'delivery_number' => $doNumber
+        ]);
+
+        return (new \App\Exports\DirectDeliveryExport($request->only([
+            'dispatch_from', 'dispatch_to',
+            'arrival_from',  'arrival_to',
+            'client_id', 'delivery_number', 'transporter_id',
+        ])))->download();
+
         list($doNumber, $type) = explode(':', base64_decode($id));
         $orders = DeliveryOrder::join('clients', 'clients.client_id', '=', 'delivery_orders.client_id')
             ->join('grades', 'grades.grade_id', '=', 'delivery_orders.grade_id')

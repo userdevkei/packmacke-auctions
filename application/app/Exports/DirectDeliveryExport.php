@@ -56,12 +56,13 @@ class DirectDeliveryExport
                 'si.package_tare',
                 'si.net_weight as actual_net',
                 'do.printed_weight',
-                'si.total_weight as total_tare',
+                'si.total_weight',
                 'si.pallet_weight',
                 'do.height as pallet_height',
                 'si.ra',
                 'si.sample_received',
                 'si.gain_loss',
+                DB::raw('si.total_pallets * si.package_tare as total_tare')
             ]);
 
         if (!empty($this->filters['dispatch_from'])) {

@@ -202,6 +202,12 @@ Route::prefix('admin')->middleware(['auth', 'web', 'userRoles', 'userRole:1', 'd
     Route::get('view-direct-delivery/{id}', [AdminController::class, 'viewDirectDeliveryOrder'])->name('admin.viewDirectDeliveryOrder');
     Route::get('add-direct-delivery', [AdminController::class, 'addDirectDelivery'])->name('admin.addDirectDelivery');
 
+
+    // routes/web.php (inside your clerk middleware group)
+    Route::post('/direct-deliveries-preview-import',  [AdminController::class, 'previewImport'])->name('admin.previewImport');
+    Route::get('/direct-deliveries-import-preview',   [AdminController::class, 'importPreviewPage'])->name('admin.importPreviewPage');
+    Route::post('/direct-deliveries-save-import',     [AdminController::class, 'saveImport'])->name('admin.saveImport');
+
     Route::post('export-transport-report', [AdminController::class, 'exportTransportReport'])->name('admin.exportTransportReport');
     Route::post('export-internal-transfers-report', [AdminController::class, 'exportInterTransferReport'])->name('admin.exportInterTransferReport');
     Route::post('export-external-transfers-report', [AdminController::class, 'exportExterTransferReport'])->name('admin.exportExterTransferReport');

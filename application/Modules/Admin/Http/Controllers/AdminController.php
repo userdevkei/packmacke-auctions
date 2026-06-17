@@ -1265,7 +1265,7 @@ class AdminController extends Controller
         $this->logger->create();
         return redirect()->back()->with('success', 'Successful! Local loading instructions added successfully');
     }
-   
+
     public function downloadLLI($id)
     {
         list($loadNumber, $type) = explode(':', base64_decode($id));
@@ -2514,7 +2514,7 @@ class AdminController extends Controller
             ->where(['external_transfers.delivery_number' => base64_decode($id)])
             ->get();
 
-        $transfer = $transfers->first();    
+        $transfer = $transfers->first();
 
         $stock = DB::table('currentstock')->where('current_stock', '>', 0)
             ->where('current_weight', '>', 0)
@@ -2552,16 +2552,16 @@ class AdminController extends Controller
             })
             // Force 1 row per delivery_id using MIN(client_id)
             ->leftJoin(DB::raw('(
-                SELECT delivery_id, MIN(client_id) as client_id 
-                FROM delivery_orders 
+                SELECT delivery_id, MIN(client_id) as client_id
+                FROM delivery_orders
                 WHERE deleted_at IS NULL
                 GROUP BY delivery_id
             ) as delivery_orders'), 'delivery_orders.delivery_id', '=', 'external_transfers.delivery_id')
             ->leftJoin('clients', 'clients.client_id', '=', 'delivery_orders.client_id')
             // Force 1 row per delivery_id using MIN(client_id)
             ->leftJoin(DB::raw('(
-                SELECT delivery_id, MIN(client_id) as client_id 
-                FROM auctions 
+                SELECT delivery_id, MIN(client_id) as client_id
+                FROM auctions
                 WHERE deleted_at IS NULL
                 GROUP BY delivery_id
             ) as auctions'), 'auctions.delivery_id', '=', 'external_transfers.delivery_id')
@@ -4235,7 +4235,7 @@ class AdminController extends Controller
     {
         return $this->AppClass->driverClearanceBlends($id);
     }
-    public function viewDirectDeliveries(Request $request)
+   /* public function viewDirectDeliveries(Request $request)
     {
         $from = $request->get('from') ?? Carbon::now()->startOfMonth();
         $to = $request->get('to') ?? Carbon::now();
@@ -4276,7 +4276,477 @@ class AdminController extends Controller
         $transporters = Transporter::all();
         $users = Driver::all();
         return view('admin::DOS.directDelivery')->with(['orders' => $orders, 'stations' => $stations, 'clients' => $clients, 'from' => $from, 'to' => $to, 'transporters' => $transporters, 'users' => $users]);
+    }*/
+
+    public function viewDirectDeliveries(Request $request)
+    {
+        // ── Build filterable query ──────────────────────────────────────────────
+        $query = DB::table('stock_ins as si')
+            ->join('delivery_orders as do', 'do.delivery_id', '=', 'si.delivery_id')
+            ->join('clients as c', 'c.client_id', '=', 'do.client_id')
+            ->leftJoin('stations as st', 'st.station_id', '=', 'si.station_id')
+            ->leftJoin('warehouses as w', 'w.warehouse_id', '=', 'do.warehouse_id')
+            ->leftJoin('transporters as t', 't.transporter_id', '=', 'si.transporter_id')
+            ->leftJoin('drivers as d', 'd.driver_id', '=', 'si.driver_id')
+            ->leftJoin('delivery_notes as dn', 'dn.delivery_number', '=', 'si.delivery_number')
+            ->where('do.delivery_type', 2)
+            ->select([
+                'si.delivery_number',
+                'c.client_name',
+                'w.warehouse_name',
+                'st.station_name',
+                'do.status as order_status',
+                'do.created_at',
+                't.transporter_id',
+                'd.driver_id',
+                'si.registration',
+                'd.id_number',
+                'd.phone',
+                'd.driver_name',
+                'dn.path',
+                'do.dispatch_date',
+                't.transporter_name',
+                DB::raw('FROM_UNIXTIME(si.date_received) as arrival_date'),
+                DB::raw('SUM(si.total_pallets) as total_packages'),
+                DB::raw('SUM(si.net_weight) as total_net_weight'),
+            ])
+            ->groupBy(
+                'si.delivery_number',
+                'c.client_name',
+                'w.warehouse_name',
+                'st.station_name',
+                'do.status',
+                'do.created_at',
+                't.transporter_id',
+                'd.driver_id',
+                'si.registration',
+                'd.id_number',
+                'd.phone',
+                'd.driver_name',
+                'dn.path',
+                'do.dispatch_date',
+                't.transporter_name',
+                DB::raw('FROM_UNIXTIME(si.date_received)')
+            )
+            ->orderBy('do.created_at', 'desc');
+
+        // ── Filters ─────────────────────────────────────────────────────────────
+        if ($request->filled('dispatch_from')) {
+            $query->whereDate('do.dispatch_date', '>=', $request->dispatch_from);
+        }
+        if ($request->filled('dispatch_to')) {
+            $query->whereDate('do.dispatch_date', '<=', $request->dispatch_to);
+        }
+        if ($request->filled('arrival_from')) {
+//            $query->whereRaw('DATE(FROM_UNIXTIME(si.date_received)) >= ?', [$request->arrival_from ?? Carbon::startOfMonth()]);
+            $query->where('si.date_received', '>=', Carbon::parse($request->arrival_from ?? now()->subMonths(3))->startOfDay()->timestamp
+            );
+        }
+        if ($request->filled('arrival_to')) {
+            $query->whereRaw('DATE(FROM_UNIXTIME(si.date_received)) <= ?', [$request->arrival_to]);
+        }
+        if ($request->filled('client_id')) {
+            $query->where('do.client_id', $request->client_id);
+        }
+        if ($request->filled('delivery_number')) {
+            $query->where('si.delivery_number', 'like', '%' . $request->delivery_number . '%');
+        }
+        if ($request->filled('transporter_id')) {
+            $query->where('si.transporter_id', $request->transporter_id);
+        }
+
+        // ── Export ───────────────────────────────────────────────────────────────
+        if ($request->filled('export')) {
+            return (new \App\Exports\DirectDeliveryExport($request->only([
+                'dispatch_from', 'dispatch_to',
+                'arrival_from',  'arrival_to',
+                'client_id', 'delivery_number', 'transporter_id',
+            ])))->download();
+        }
+
+        $orders = $query->limit(200)->get();
+
+        // ── Sidebar dropdowns (cached — they rarely change) ──────────────────────
+        $stations     = cache()->remember('stations_active', 300, fn() => Station::where('status', 1)->get());
+        $clients      = cache()->remember('clients_all',     300, fn() => Client::all());
+        $transporters = cache()->remember('transporters_all', 300, fn() => Transporter::all());
+        $users        = Driver::all(); // not cached — may change more often
+
+        return view('admin::DOS.directDelivery', compact(
+            'orders', 'stations', 'clients', 'transporters', 'users'
+        ));
     }
+
+    /**
+     * Receive parsed rows from JS, store in session, redirect to preview page.
+     */
+    public function previewImport(Request $request)
+    {
+        $request->validate([
+            'clientId'  => 'required',
+            'stationId' => 'required',
+            'bayId'     => 'required',
+            'records'   => 'required|array|min:1',
+        ]);
+
+        $required = [
+            'Tea Type', 'Garden', 'Grade', 'Package', 'Packages', 'Package Tare', 'Gross Weight', 'Total Tare', 'Pallete Weight', 'Pallete Weight', 'Sample Received',
+            'Printed Net Weight', 'Actual Net Weight', 'Production Date', 'Expiry Date', 'Warehouse Bay', 'Delivery Number', 'Invoice Number', 'Producer Warehouse', 'RA'
+        ];
+
+        $records = [];
+        foreach ($request->records as $row) {
+            // Skip completely blank rows
+            if (empty(array_filter($row, fn($v) => $v !== null && $v !== ''))) {
+                continue;
+            }
+
+            $missing               = array_values(array_filter($required, fn($f) => empty($row[$f] ?? null)));
+            $row['_incomplete']    = !empty($missing);
+            $row['_missing']       = $missing;
+            $records[]             = $row;
+        }
+
+        // Store everything in session — no temp file needed
+        session([
+            'import_records'  => $records,
+            'import_meta'     => [
+                'clientId'  => $request->clientId,
+                'stationId' => $request->stationId,
+                'bayId'     => $request->bayId,
+            ],
+            'import_headers'  => array_keys((array) ($request->records[0] ?? [])),
+        ]);
+
+        return response()->json([
+            'success'  => true,
+            'redirect' => route('admin.importPreviewPage'),
+        ]);
+    }
+
+    /**
+     * Show the preview Blade page from session data.
+     */
+    public function importPreviewPage()
+    {
+        if (!session()->has('import_records')) {
+            return redirect()->route('admin.viewDirectDeliveries')
+                ->withErrors(['error' => 'No import data found. Please upload again.']);
+        }
+
+        $records      = session('import_records');
+        $meta         = session('import_meta');
+        $headerRow    = session('import_headers');
+
+        // Filter out internal keys from display headers
+        $displayCols  = array_filter($headerRow, fn($h) => !str_starts_with($h, '_'));
+
+        $transporters = Transporter::all();   // your model
+        $warehouses   = Station::all();       // producer warehouses
+        $users        = Driver::select('id_number', 'driver_name', 'phone')->get();
+
+        return view('admin::DOS.preview-import',
+            compact('records', 'meta', 'displayCols', 'transporters', 'warehouses', 'users')
+        );
+    }
+
+    /**
+     * Save confirmed records from session to DB.
+     */
+    public function saveImport(Request $request)
+    {
+        $request->validate([
+            'transporter_id'     => 'required',
+            'driver_name'        => 'required|string',
+            'driver_phone'       => 'required|string',
+            'registration'       => 'required|string',
+            'id_number'          => 'required|string',
+            'dispatch_date'      => 'required|date',
+            'arrival_date'       => 'required',
+            'delivery_note'      => 'required|file|mimes:png,jpg,jpeg,pdf|max:2048'
+        ]);
+
+        $records = session('import_records');
+
+        if (empty($records)) {
+            return back()->withErrors(['error' => 'Session expired. Please upload the file again.']);
+        }
+
+        $required = [
+            'Tea Type', 'Garden', 'Grade', 'Package', 'Packages', 'Package Tare', 'Gross Weight', 'Total Tare', 'Pallete Weight', 'Pallete Weight', 'Sample Received',
+            'Printed Net Weight', 'Actual Net Weight', 'Production Date', 'Expiry Date', 'Warehouse Bay', 'Delivery Number', 'Invoice Number', 'Producer Warehouse', 'RA'
+        ];
+
+        $meta = session('import_meta');
+
+        $imported = 0;
+        $skipped  = 0;
+        $errors   = [];
+
+        DB::beginTransaction();
+
+        try {
+            foreach ($records as $index => $record) {
+                $deliveryNumber = $record['Delivery Number'];
+
+                // Skip incomplete rows (flagged during preview)
+                if (!empty($record['_incomplete'])) {
+                    $skipped++;
+                    continue;
+                }
+
+                try {
+                    // ── Resolve related models ──────────────────────────────
+                    $garden = Garden::where('garden_name', trim($record['Garden']))->first();
+                    if (!$garden) {
+                        $errors[] = 'Row ' . ($index + 1) . ': Garden "' . $record['Garden'] . '" not found.';
+                        continue;
+                    }
+
+                    $grade = Grade::where('grade_name', trim($record['Grade']))->first();
+                    if (!$grade) {
+                        $errors[] = 'Row ' . ($index + 1) . ': Grade "' . $record['Grade'] . '" not found.';
+                        continue;
+                    }
+
+                    $client = Client::where('client_id', $meta['clientId'])->first();
+                    if (!$client) {
+                        $errors[] = 'Row ' . ($index + 1) . ': Client not found.';
+                        continue;
+                    }
+
+                    // Producer warehouse comes from the form select, not Excel column
+                    $warehouse = Warehouse::where('warehouse_name', $record['Producer Warehouse'])->first();
+                    if (!$warehouse) {
+                        $errors[] = 'Row ' . ($index + 1) . ': Producer warehouse not found.';
+                        continue;
+                    }
+
+                    // Bay: try to match by name from Excel first, fallback to selected bay
+                    $bay = WarehouseBay::where([
+                        'station_id' => $meta['stationId'],
+                        'bay_name'   => trim($record['Warehouse Bay'] ?? ''),
+                    ])->first();
+
+                    // ── Enums ───────────────────────────────────────────────
+                    $package = match (strtoupper(trim($record['Package'] ?? ''))) {
+                        'PB'    => 1,
+                        'PS'    => 2,
+                        default => null,
+                    };
+
+                    $teaType = match (strtoupper(trim($record['Tea Type'] ?? ''))) {
+                        'AUCTION TEAS'  => 1,
+                        'AUCTION TEA'   => 1,
+                        'PRIVATE TEAS'  => 2,
+                        'PRIVATE TEA'   => 2,
+                        'FACTORY TEAS'  => 3,
+                        'FACTORY TEA'   => 3,
+                        default         => 4,
+                    };
+
+                    // ── Duplicate check (same as onRow) ─────────────────────
+                    $existingOrder = DeliveryOrder::withoutTrashed()->where([
+                        'invoice_number' => $record['Invoice Number'],
+                        'client_id'      => $meta['clientId'],
+                        'garden_id'      => $garden->garden_id,
+                    ])->first();
+
+                    if ($existingOrder) {
+                        $errors[] = 'Row ' . ($index + 1) . ': Duplicate invoice "' . $record['Invoice Number'] . '" for client ' . $client->client_name . '.';
+                        $skipped++;
+                        continue;
+                    }
+
+                    // ── Dates (SheetJS sends formatted strings, not Excel serials) ──
+                    $productionDate = !empty($record['Production Date'])
+                        ? \Carbon\Carbon::parse($record['Production Date'])
+                        : null;
+
+                    $expiryDate = !empty($record['Expiry Date'])
+                        ? \Carbon\Carbon::parse($record['Expiry Date'])
+                        : null;
+
+                    // ── Generate IDs ────────────────────────────────────────
+                    $deliveryId = (new CustomIds())->generateId();
+                    $stockId    = (new CustomIds())->generateId();
+
+                    $driver = Driver::firstOrCreate(['id_number' => $request->id_number],
+                        [
+                            'driver_id' => (new CustomIds())->generateId(),
+                            'phone' => $request->driver_phone,
+                            'driver_name' => $request->driver_name,
+                        ]
+
+                    );
+
+                    if ($request->transporter_other) {
+                        $transporter = Transporter::firstOrCreate(['transporter_name' => $request->transporter_other],
+                            [
+                                'transporter_id' => (new CustomIds())->generateId(),
+                                'transporter_type' => 1,
+                                'created_by' => \auth()->user()->user_id
+                            ]);
+                    }else{
+                        $transporter = Transporter::where('transporter_id', $request->transporter_id)->first();
+                    }
+
+                    // ── Insert DeliveryOrder ────────────────────────────────
+                    DeliveryOrder::create([
+                        'delivery_id'     => $deliveryId,
+                        'delivery_type'   => 2,
+                        'order_number'    => $record['Order Number'] ?? $record['Delivery Number'],
+                        'client_id'       => $client->client_id,
+                        'tea_id'          => $teaType,
+                        'garden_id'       => $garden->garden_id,
+                        'grade_id'        => $grade->grade_id,
+                        'packet'          => $record['Packages'] ?? null,
+                        'package'         => $package,
+                        'unit_weight'     => $record['Actual Net Weight'] ?? null,
+                        'weight'          => number_format($record['Actual Net Weight']/$record['Packages'], 2, '.', ''),
+                        'gross_weight'    => number_format(($record['Actual Net Weight']/$record['Packages']) + $record['Package Tare'], 2, '.', ''),
+                        'total_weight'    => number_format($record['Actual Net Weight'] + ($record['Packages']   * $record['Package Tare']) + $record['Pallete Weight'], 2, '.', ''),
+                        'warehouse_id'    => $warehouse->warehouse_id,
+                        'invoice_number'  => $record['Invoice Number']     ?? null,
+                        'production_date' => $productionDate,
+                        'expiry_date'     => $expiryDate,
+                        'dispatch_date'   => $request->dispatch_date,
+                        'printed_weight'  => $record['Printed Net Weight'] ?? null,
+                        'height'          => $record['Pallete Height'],
+                        'created_by'      => auth()->user()->user_id,
+                    ]);
+
+                    // ── Insert StockIn ──────────────────────────────────────
+                    StockIn::create([
+                        'stock_id'        => $stockId,
+                        'delivery_id'     => $deliveryId,
+                        'station_id'      => $meta['stationId'],
+                        'date_received'   => strtotime($request->arrival_date),
+                        'delivery_number' => $record['Delivery Number'],
+                        'warehouse_bay'   => $bay ? $bay->bay_id : $meta['bayId'],
+                        'total_weight'    => number_format($record['Actual Net Weight'] + ($record['Packages']   * $record['Package Tare']) + $record['Pallete Weight'], 2, '.', ''),
+                        'total_pallets'   => $record['Packages']           ?? null,
+                        'pallet_weight'   => $record['Pallete Weight']     ?? null,
+                        'package_tare'    => $record['Package Tare']       ?? 0,
+                        'net_weight'      => number_format($record['Actual Net Weight']  ?? null, 2, '.', ''),
+                        'transporter_id'  => $transporter->transporter_id,
+                        'driver_id'       => $driver->driver_id,
+                        'registration'    => $request->registration,
+                        'ra'              => $record['RA'] ?? null,
+                        'sample_received' => $record['Sample Received'] ?? null,
+                        'gain_loss'       => $record['Gain/Loss']       ?? null,
+                        'user_id'         => auth()->user()->user_id
+                    ]);
+
+                    $imported++;
+
+                } catch (\Exception $e) {
+                    DB::rollBack();
+                    $errors[] = 'Row ' . ($index + 1) . ' (' . ($record['Invoice Number'] ?? '?') . '): ' . $e->getMessage();
+                }
+            }
+
+            $file = $request->file('delivery_note');
+            $ext = $file->getClientOriginalExtension();
+            $fileName = (string) Str::uuid() . '.' .$ext;
+            $path = $file->storeAs('/', $fileName, 'delivery_notes');
+
+            DeliveryNote::updateOrCreate(['delivery_number' => $deliveryNumber], ['path' => '/'.$path]);
+
+            DeliveryOrder::join('stock_ins', 'stock_ins.delivery_id', '=', 'delivery_orders.delivery_id')
+                ->where(['stock_ins.delivery_number' => $deliveryNumber, 'delivery_orders.delivery_type' => 2])
+                ->update(['delivery_orders.status' => 2]);
+            $this->logger->create();
+
+            DB::commit();
+            session()->forget(['import_records', 'import_meta', 'import_headers']);
+
+            $message = "Import complete! Saved: {$imported}, Skipped: {$skipped}.";
+            if (!empty($errors)) {
+                return redirect()->route('admin.viewDirectDeliveries')
+                    ->with('success', $message)
+                    ->with('importErrors', $errors);
+            }
+
+            return redirect()->route('admin.viewDirectDeliveries')->with('success', $message);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->withErrors(['error' => 'Import failed: ' . $e->getMessage()]);
+        }
+
+        /*DB::beginTransaction();
+        try {
+            $imported = 0;
+            $skipped  = 0;
+            $errors   = [];
+
+            foreach ($records as $index => $record) {
+                // Skip incomplete rows
+                if (!empty($record['_incomplete'])) {
+                    $skipped++;
+                    continue;
+                }
+
+                try {
+                    DirectDelivery::create([
+                        'delivery_number'    => $request->delivery_number,
+                        'client_id'          => $meta['clientId'],
+                        'station_id'         => $meta['stationId'],
+                        'bay_id'             => $meta['bayId'],
+                        'transporter_id'     => $request->transporter_id,
+                        'driver_name'        => $request->driver_name,
+                        'phone'              => $request->driver_phone,
+                        'registration'       => $request->registration,
+                        'dispatch_date'      => $request->dispatch_date,
+                        'producer_warehouse' => $request->producer_warehouse,
+                        // Excel columns
+                        'invoice_number'     => $record['Invoice Number']    ?? null,
+                        'tea_type'           => $record['Tea Type']           ?? null,
+                        'order_number'       => $record['Order Number']       ?? null,
+                        'garden'             => $record['Garden']             ?? null,
+                        'grade'              => $record['Grade']              ?? null,
+                        'packet'             => $record['Package']            ?? null,
+                        'total_packages'     => $record['Packages']           ?? null,
+                        'package_tare'       => $record['Package Tare']       ?? null,
+                        'gross_weight'       => $record['Gross Weight']       ?? null,
+                        'printed_net_weight' => $record['Printed Net Weight'] ?? null,
+                        'total_tare'         => $record['Total Tare']         ?? null,
+                        'pallet_weight'      => $record['Pallete Weight']     ?? null,
+                        'total_net_weight'   => $record['Actual Net Weight']  ?? null,
+                        'gain_loss'          => $record['Gain/Loss']          ?? null,
+                        'pallet_height'      => $record['Pallete Height']     ?? null,
+                        'warehouse_bay'      => $record['Warehouse Bay']      ?? null,
+                        'production_date'    => $record['Production Date']    ?? null,
+                        'expiry_date'        => $record['Expiry Date']        ?? null,
+                        'sample_received'    => $record['Sample Received']    ?? null,
+                        'ra'                 => $record['RA']                 ?? null,
+                        'user_id'            => auth()->id(),
+                    ]);
+                    $imported++;
+
+                } catch (\Exception $e) {
+                    $errors[] = 'Row ' . ($index + 1) . ': ' . $e->getMessage();
+                }
+            }
+
+            \DB::commit();
+            session()->forget(['import_records', 'import_meta', 'import_headers']);
+
+            $message = "Import complete! Saved: {$imported}, Skipped (incomplete): {$skipped}";
+            if (!empty($errors)) {
+                $message .= ' | Errors: ' . implode('; ', $errors);
+            }
+
+            return redirect()->route('clerk.viewDirectDeliveries')->with('success', $message);
+
+        } catch (\Exception $e) {
+            \DB::rollBack();
+            return back()->withErrors(['error' => 'Import failed: ' . $e->getMessage()]);
+        }*/
+    }
+
+
     public function updateTransporterDetails(Request $request, $id)
     {
         $request->validate([
@@ -4464,6 +4934,18 @@ class AdminController extends Controller
     }
     public function downloadDirectDeliveries($id)
     {
+        list($doNumber, $type) = explode(':', base64_decode($id));
+        $request = new Request([
+            'delivery_number' => $doNumber
+        ]);
+
+        return (new \App\Exports\DirectDeliveryExport($request->only([
+            'dispatch_from', 'dispatch_to',
+            'arrival_from',  'arrival_to',
+            'client_id', 'delivery_number', 'transporter_id',
+        ])))->download();
+
+
         list($doNumber, $type) = explode(':', base64_decode($id));
         $orders = DeliveryOrder::join('clients', 'clients.client_id', '=', 'delivery_orders.client_id')
             ->join('grades', 'grades.grade_id', '=', 'delivery_orders.grade_id')
@@ -6295,7 +6777,7 @@ $warehouses = Warehouse::join('auctions', 'auctions.warehouse_id', '=', 'warehou
     ->orderBy('warehouse_name')
     ->get();
 
-$sales = Auction::select('sale')->groupBy('sale')->orderBy('sale', 'desc')->get();  
+$sales = Auction::select('sale')->groupBy('sale')->orderBy('sale', 'desc')->get();
 
 $clients = Client::join('delivery_orders', 'delivery_orders.client_id', '=', 'clients.client_id')
     ->join('stock_ins', 'stock_ins.delivery_id', '=', 'delivery_orders.delivery_id')
