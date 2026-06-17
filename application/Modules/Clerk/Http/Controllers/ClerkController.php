@@ -3866,7 +3866,7 @@ public function viewExternalTransfers(Request $request)
                         [
                             'transporter_id' => (new CustomIds())->generateId(),
                             'transporter_type' => 1,
-                            'created_type' => \auth()->user()->user_id
+                            'created_by' => \auth()->user()->user_id
                         ]);
                     }else{
                         $transporter = Transporter::where('transporter_id', $request->transporter_id)->first();
@@ -3876,7 +3876,7 @@ public function viewExternalTransfers(Request $request)
                     DeliveryOrder::create([
                         'delivery_id'     => $deliveryId,
                         'delivery_type'   => 2,
-                        'order_number'    => $record['Order Number']       ?? null,
+                        'order_number'    => $record['Order Number'] ?? $record['Delivery Number'],
                         'client_id'       => $client->client_id,
                         'tea_id'          => $teaType,
                         'garden_id'       => $garden->garden_id,
