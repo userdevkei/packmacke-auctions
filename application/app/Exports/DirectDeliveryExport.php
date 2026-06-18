@@ -41,8 +41,8 @@ class DirectDeliveryExport
                 'si.delivery_number',
                 'si.registration',
                 'c.client_name',
-                'w.warehouse_name',        // Factory of Origin (producer warehouse)
-                'st.station_name',         // Warehouse Stored (PHML warehouse)
+                'w.warehouse_name',
+                'st.station_name',
                 't.transporter_name',
                 'do.dispatch_date',
                 DB::raw('FROM_UNIXTIME(si.date_received) as arrival_date'),
@@ -50,9 +50,8 @@ class DirectDeliveryExport
                 'do.invoice_number',
                 'gr.grade_name',
                 'do.packet as packages',
-                'do.package',              // 1=PB, 2=PS
+                'do.package',
                 'do.weight as unit_weight',
-                'do.gross_weight',
                 'si.package_tare',
                 'si.net_weight as actual_net',
                 'do.printed_weight',
@@ -62,7 +61,34 @@ class DirectDeliveryExport
                 'si.ra',
                 'si.sample_received',
                 'si.gain_loss',
-                DB::raw('si.total_pallets * si.package_tare as total_tare')
+                DB::raw('si.total_pallets * si.package_tare as total_tare'),
+                DB::raw('SUM((do.gross_weight * si.total_pallets) + si.pallet_weight) as gross_weight')
+            ])
+            ->groupBy([
+                'si.delivery_number',
+                'si.registration',
+                'c.client_name',
+                'w.warehouse_name',
+                'st.station_name',
+                't.transporter_name',
+                'do.dispatch_date',
+                'si.date_received',
+                'g.garden_name',
+                'do.invoice_number',
+                'gr.grade_name',
+                'do.packet',
+                'do.package',
+                'do.weight',
+                'si.package_tare',
+                'si.net_weight',
+                'do.printed_weight',
+                'si.total_weight',
+                'si.pallet_weight',
+                'do.height',
+                'si.ra',
+                'si.sample_received',
+                'si.gain_loss',
+                'si.total_pallets'
             ]);
 
         if (!empty($this->filters['dispatch_from'])) {

@@ -4604,7 +4604,7 @@ class AdminController extends Controller
                         'package'         => $package,
                         'unit_weight'     => $record['Actual Net Weight'] ?? null,
                         'weight'          => number_format($record['Actual Net Weight']/$record['Packages'], 2, '.', ''),
-                        'gross_weight'    => number_format(($record['Actual Net Weight']/$record['Packages']) + $record['Package Tare'], 2, '.', ''),
+                        'gross_weight'    => number_format(($record['Printed Net Weight']/$record['Packages']) + $record['Package Tare'], 1, '.', ''),
                         'total_weight'    => number_format($record['Actual Net Weight'] + ($record['Packages']   * $record['Package Tare']) + $record['Pallete Weight'], 2, '.', ''),
                         'warehouse_id'    => $warehouse->warehouse_id,
                         'invoice_number'  => $record['Invoice Number']     ?? null,
