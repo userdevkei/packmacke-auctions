@@ -217,7 +217,7 @@ class DirectDeliveryExport
             $ws->setCellValue('E' . $rowNum, $rec->grade_name);
             $ws->setCellValue('F' . $rowNum, (float) ($rec->packages ?? 0));
             $ws->setCellValue('G' . $rowNum, $pkgName);
-            $ws->setCellValue('H' . $rowNum, (float) ($rec->unit_weight ?? 0));
+            $ws->setCellValue('H' . $rowNum, (float) (number_format($rec->unit_weight ?? 0, 0) ?? 0));
             $ws->setCellValue('I' . $rowNum, (float) ($rec->package_tare ?? 0));
             $ws->setCellValue('J' . $rowNum, $rec->sample_received ?? '');
             $ws->getStyle('J' . $rowNum)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
