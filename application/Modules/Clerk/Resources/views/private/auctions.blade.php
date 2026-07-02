@@ -47,7 +47,7 @@
         <div class="card-header">
             <div class="row flex-between-center">
                 <div class="col-6 col-sm-auto d-flex align-items-center pe-0">
-                    <h5 class="fs-9 mb-0 text-nowrap py-0 py-xl-0">View Auction Teas</h5>
+                    <h5 class="fs-9 mb-0 text-nowrap py-0 py-xl-0">View Private Teas</h5>
                 </div>
                 <div class="col-6 col-sm-auto ms-auto text-end ps-0">
                     <div id="table-simple-pagination-replace-element">
@@ -236,7 +236,6 @@
                                     </div>
                                 </div>
                             </div>
-
                         </form>
                     </div>
                 </div>

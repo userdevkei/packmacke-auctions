@@ -4,12 +4,12 @@
         <div class="card-header">
             <div class="row flex-between-center">
                 <div class="col-6 col-sm-auto d-flex align-items-center pe-0">
-                    <h5 class="fs-9 mb-0 text-nowrap py-0 py-xl-0">Auction Sales</h5>
+                    <h5 class="fs-9 mb-0 text-nowrap py-0 py-xl-0">Private Sales</h5>
                 </div>
                 <div class="col-6 col-sm-auto ms-auto text-end ps-0">
                     <div id="table-simple-pagination-replace-element">
-                        @if(in_array(auth()->user()->role_id, [2, 5]) || @canuser('auction.create'))
-                            <a class="btn btn-falcon-default btn-sm" data-bs-toggle="modal" data-bs-target="#staticBackdrop"><span class="fas fa-plus" data-fa-transform="shrink-3 down-2"></span><span class="d-none d-sm-inline-block ms-1">Add Teas To Auction</span></a>
+                        @if(in_array(auth()->user()->role_id, [2, 5]) || @canuser('private.create'))
+                            <a class="btn btn-falcon-default btn-sm" data-bs-toggle="modal" data-bs-target="#staticBackdrop"><span class="fas fa-plus" data-fa-transform="shrink-3 down-2"></span><span class="d-none d-sm-inline-block ms-1">Create Private Sale</span></a>
                         @endif
                     </div>
                 </div>
@@ -21,10 +21,10 @@
                             </div>
                             <div class="modal-body p-0">
                                 <div class="rounded-top-3 bg-body-tertiary py-3 ps-4 pe-6">
-                                    <h5 class="mb-1" id="staticBackdropLabel">Prepare Auction List</h5>
+                                    <h5 class="mb-1" id="staticBackdropLabel">Prepare Private Sale List</h5>
                                 </div>
                                 <div class="p-4">
-                                    <form class="needs-validation" novalidate method="POST" id="myForm" action="{{ route('clerk.prepareAuctionList') }}">
+                                    <form class="needs-validation" novalidate method="POST" id="myForm" action="{{ route('clerk.preparePrivateSaleList') }}">
                                         @csrf
                                         <div class="row row-cols-sm-1 g-2">
 
@@ -67,10 +67,10 @@
                                 <td style="text-align: left !important;">{{ $loop->iteration }}</td>
                                 <td>{{ $transfer->sale }}</td>
                                 <td>
-                                    <a class="link link-info" href="{{ route('clerk.viewSale', base64_encode($transfer->sale)) }}">view sale</a> |
-                                    <a class="link link-secondary" href="{{ route('clerk.downloadAuctionSheet', base64_encode($transfer->sale.':'.'1')) }}" target="_blank"><i class="fa fa-file-pdf"></i> pdf</a> |
-                                    <a class="link link-dark" href="{{ route('clerk.downloadAuctionSheet', base64_encode($transfer->sale.':'.'2')) }}"><i class="fa fa-file-excel"></i> excel</a> |
-                                    <a class="link link-danger" href="{{ route('clerk.downloadAuctionSheetReport', base64_encode($transfer->sale)) }}" target="_blank"><i class="fa fa-file-pdf"></i> sale report</a>
+                                    <a class="link link-info" href="{{ route('clerk.viewPrivateSale', base64_encode($transfer->sale)) }}">view sale</a> |
+                                    <a class="link link-secondary" href="{{ route('clerk.downloadPrivateSaleSheet', base64_encode($transfer->sale.':'.'1')) }}" target="_blank"><i class="fa fa-file-pdf"></i> pdf</a> |
+                                    <a class="link link-dark" href="{{ route('clerk.downloadPrivateSaleSheet', base64_encode($transfer->sale.':'.'2')) }}"><i class="fa fa-file-excel"></i> excel</a> |
+                                    <a class="link link-danger" href="{{ route('clerk.downloadPrivateSaleSheetReport', base64_encode($transfer->sale)) }}" target="_blank"><i class="fa fa-file-pdf"></i> sale report</a>
                                 </td>
                             </tr>
                         @endforeach

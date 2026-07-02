@@ -188,6 +188,18 @@ Route::prefix('clerk')->middleware(['auth', 'web', 'userRoles', 'userRole:2,3,4,
     Route::get('download-auction-sheet/{id}', [ClerkController::class, 'downloadAuctionSheet'])->name('clerk.downloadAuctionSheet');
     Route::get('download-auction-sheet-report/{id}', [ClerkController::class, 'downloadAuctionSheetReport'])->name('clerk.downloadAuctionSheetReport');
 
+    /*Private Sales Routes*/
+    Route::get('private-teas', [ClerkController::class, 'teaPrivateSale'])->name('clerk.teaPrivateSale');
+    Route::post('private-teas', [ClerkController::class, 'teaPrivateSale'])->name('clerk.teaPrivateSale');
+    Route::get('private-teas-sales', [ClerkController::class, 'viewPrivateSales'])->name('clerk.viewPrivateSales');
+    Route::post('prepare-private-sale-list', [ClerkController::class, 'preparePrivateSaleList'])->name('clerk.preparePrivateSaleList');
+    Route::post('store-private-sale-list', [ClerkController::class, 'storePrivateSaleList'])->name('clerk.storePrivateSaleList');
+    Route::get('view-private-sale/{id}', [ClerkController::class, 'viewPrivateSale'])->name('clerk.viewPrivateSale');
+    Route::get('remove-line-from-private-sale/{id}', [ClerkController::class, 'removeLineFromPrivateSale'])->name('clerk.removeLineFromPrivateSale');
+    Route::post('update-private-sale-list/{id}', [ClerkController::class, 'updatePrivateSaleList'])->name('clerk.updatePrivateSaleList');
+    Route::get('download-private-sale-sheet/{id}', [ClerkController::class, 'downloadPrivateSaleSheet'])->name('clerk.downloadPrivateSaleSheet');
+    Route::get('download-private-sale-sheet-report/{id}', [ClerkController::class, 'downloadPrivateSaleSheetReport'])->name('clerk.downloadPrivateSaleSheetReport');
+
     Route::get('delete-blend-balance/{id}', [ClerkController::class, 'deleteBlendBalance'])->name('clerk.deleteBlendBalance');
 
     Route::get('notifications/list', [ClerkController::class, 'list'])->name('clerk.notifications');

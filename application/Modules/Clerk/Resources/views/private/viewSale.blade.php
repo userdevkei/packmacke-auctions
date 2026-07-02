@@ -4,7 +4,7 @@
         <div class="card-header">
             <div class="row flex-between-center">
                 <div class="col-6 col-sm-auto d-flex align-items-center pe-0">
-                    <h5 class="fs-9 mb-0 text-nowrap py-0 py-xl-0">Auction Sale #{{ $sale }}</h5>
+                    <h5 class="fs-9 mb-0 text-nowrap py-0 py-xl-0">Private Sale #{{ $sale }}</h5>
                 </div>
                 <div class="col-6 col-sm-auto ms-auto text-end ps-0">
                     <div id="table-simple-pagination-replace-element">
@@ -28,7 +28,7 @@
                                 <th>Weight</th>
                                 <th>Broker</th>
                                 <th>Buyer</th>
-                                <th>Producer Whs</th>
+                                <th>Warehouse</th>
                                 <th>Sale Date</th>
                                 <th>Prompt Date</th>
                                 <th>Release Date</th>
@@ -41,7 +41,9 @@
                                 <tr>
                                     <td>{{ $loop->iteration }}</td>
                                     <td>{{ $transfer->warrant_number }}</td>
-                                    <td>{{ $transfer->garden_name }}</td>
+                                    <td>
+                                        {{ $transfer->garden_name }}
+                                    </td>
                                     <td>{{ $transfer->grade_name }}</td>
                                     <td>{{ $transfer->invoice_number }}</td>
                                     <td>{{ number_format($transfer->current_stock, 0) }}</td>
@@ -69,7 +71,7 @@
                                                             <h5 class="mb-1" id="staticBackdropLabel">Edit Warrant Number {{ $transfer->warrant_number }}</h5>
                                                         </div>
                                                         <div class="p-4">
-                                                            <form class="needs-validation" novalidate method="POST" id="myForm" action="{{ route('clerk.updateAuctionList', $transfer->auction_id) }}">
+                                                            <form class="needs-validation" novalidate method="POST" id="myForm" action="{{ route('clerk.updatePrivateSaleList', $transfer->auction_id) }}">
                                                                 @csrf
                                                                 <div class="row row-cols-sm-1 g-2">
 
@@ -157,7 +159,7 @@
                             <th>Pks / Weight</th>
                             <th>Broker / Buyer</th>
                             <th>Warehouse</th>
-                            <th>Sale / Prompt </th>
+                            <th>Sale / Prompt</th>
                             <th>Delivery Number / Release Date</th>
                             <th>Status</th>
                             <th></th>
@@ -194,7 +196,6 @@
                                     <div><span class="text-muted">Sale:</span> {{ $transfer->sale_date }}</div>
                                     <div><span class="text-muted">Prompt:</span> {{ $transfer->prompt_date }}</div>
                                 </td>
-
                                 <td class="fs-11">
                                     <div><span class="text-muted">Delivery Number:</span> {{ $transfer->delivery_number }}</div>
                                     <div><span class="text-muted">Release Date:</span> {{ $transfer->release_date }}</div>
@@ -212,7 +213,7 @@
                                         <span class="d-none d-sm-inline-block ms-1"></span>
                                     </a>
                                     @if($transfer->status == 0)
-                                        | <a class="link link-danger" onclick="return confirm('Are you sure you want to delete this line from this sale?')" href="{{ route('clerk.removeLineFromSale', $transfer->auction_id) }}"><i class="fa fa-trash-alt"></i></a>
+                                        | <a class="link link-danger" onclick="return confirm('Are you sure you want to delete this line from this sale?')" href="{{ route('clerk.removeLineFromPrivateSale', $transfer->auction_id) }}"><i class="fa fa-trash-alt"></i></a>
                                     @endif
 
                                     <div class="modal fade" id="staticBackdrop{{ $transfer->auction_id }}" data-bs-keyboard="false" data-bs-backdrop="static" tabindex="-1" aria-labelledby="staticBackdropLabel" aria-hidden="true">
@@ -226,7 +227,7 @@
                                                         <h5 class="mb-1" id="staticBackdropLabel">Edit Warrant Number {{ $transfer->warrant_number }}</h5>
                                                     </div>
                                                     <div class="p-4">
-                                                        <form class="needs-validation" novalidate method="POST" id="myForm" action="{{ route('clerk.updateAuctionList', $transfer->auction_id) }}">
+                                                        <form class="needs-validation" novalidate method="POST" id="myForm" action="{{ route('clerk.updatePrivateSaleList', $transfer->auction_id) }}">
                                                             @csrf
                                                             <div class="row row-cols-sm-1 g-2">
                                                                 <div class="mb-2">
@@ -283,7 +284,7 @@
                                                                 </div>
                                                             </div>
                                                             <div class="d-flex justify-content-center mt-1">
-                                                                <button id="submitButton" type="submit" class="btn btn-success col-8">Show Client Teas </button>
+                                                                <button id="submitButton" type="submit" class="btn btn-success col-8">Update Private Sale List</button>
                                                             </div>
                                                         </form>
                                                     </div>
@@ -307,7 +308,7 @@
     $(document).ready(function () {
         $('#datatable').DataTable({
             order: [0, 'asc'],
-            pageLength: 50
+            pageLength: 100
         });
     });
 

@@ -3047,7 +3047,10 @@ class AdminController extends Controller
             ]);
 
             if (Auction::where(['stock_id' => $transfer->stock_id])->exists()) {
-                Auction::where(['stock_id' => $transfer->stock_id])->update(['release_date' => now()->format('Y-m-d')]);
+                Auction::where(['stock_id' => $transfer->stock_id])->update([
+                    'release_date' => now()->format('Y-m-d'),
+                    'warehouse_id' => $transfer->warehouse_id
+                    ]);
             }
 
             return response()->json([
@@ -6608,52 +6611,53 @@ class AdminController extends Controller
     }
 
     public function teaAuction(Request $request)
-{
-    $query = Auction::join('stock_ins', 'stock_ins.stock_id', '=', 'auctions.stock_id')
-        ->join('delivery_orders', 'delivery_orders.delivery_id', '=', 'stock_ins.delivery_id')
-        ->join('gardens', 'gardens.garden_id', '=', 'delivery_orders.garden_id')
-        ->join('grades', 'grades.grade_id', '=', 'delivery_orders.grade_id')
-        ->join('brokers', 'brokers.broker_id', '=', 'auctions.broker_id')
-        ->join('clients', 'clients.client_id', '=', 'delivery_orders.client_id')
-        ->leftJoin('clients as buyer', 'buyer.client_id', '=', 'auctions.client_id')
-        ->leftJoin('warehouses', 'warehouses.warehouse_id', '=', 'auctions.warehouse_id')
-        ->leftJoin('external_transfers', function ($join) {
-            $join->on('external_transfers.stock_id', '=', 'auctions.stock_id');
-        })
-        ->whereNull('external_transfers.deleted_at')
-        ->whereNull('auctions.deleted_at')
-        ->whereNull('stock_ins.deleted_at')
-        ->whereNull('delivery_orders.deleted_at')
-        ->whereNull('gardens.deleted_at')
-        ->whereNull('grades.deleted_at')
-        ->whereNull('brokers.deleted_at')
-        ->select(
-            'auction_id',
-            'warrant_number',
-            'stock_ins.stock_id',
-            'stock_ins.delivery_id',
-            'garden_name',
-            'grade_name',
-            'invoice_number',
-            'auctions.status',
-            'brokers.broker_name',
-            'brokers.broker_id',
-            'buyer.client_name as buyer_name',
-            'auctions.client_id as buyer_id',
-            'sale',
-            'auctions.sale_date',
-            'auctions.prompt_date',
-            'auctions.warehouse_id',
-            'warehouses.warehouse_name',
-            'external_transfers.release_date',
-            'external_transfers.delivery_number',
-            'stock_ins.total_pallets',
-            'stock_ins.net_weight',
-            'delivery_orders.garden_id',
-            'delivery_orders.grade_id',
-            'delivery_orders.delivery_id',
-            'clients.client_name',
-        );
+    {
+        $query = Auction::join('stock_ins', 'stock_ins.stock_id', '=', 'auctions.stock_id')
+            ->join('delivery_orders', 'delivery_orders.delivery_id', '=', 'stock_ins.delivery_id')
+            ->join('gardens', 'gardens.garden_id', '=', 'delivery_orders.garden_id')
+            ->join('grades', 'grades.grade_id', '=', 'delivery_orders.grade_id')
+            ->join('brokers', 'brokers.broker_id', '=', 'auctions.broker_id')
+            ->join('clients', 'clients.client_id', '=', 'delivery_orders.client_id')
+            ->leftJoin('clients as buyer', 'buyer.client_id', '=', 'auctions.client_id')
+            ->leftJoin('warehouses', 'warehouses.warehouse_id', '=', 'auctions.warehouse_id')
+            ->leftJoin('external_transfers', function ($join) {
+                $join->on('external_transfers.stock_id', '=', 'auctions.stock_id');
+            })
+            ->whereNull('external_transfers.deleted_at')
+            ->whereNull('auctions.deleted_at')
+            ->whereNull('stock_ins.deleted_at')
+            ->whereNull('delivery_orders.deleted_at')
+            ->whereNull('gardens.deleted_at')
+            ->whereNull('grades.deleted_at')
+            ->whereNull('brokers.deleted_at')
+            ->where('auctions.type', 'auction')
+            ->select(
+                'auction_id',
+                'warrant_number',
+                'stock_ins.stock_id',
+                'stock_ins.delivery_id',
+                'garden_name',
+                'grade_name',
+                'invoice_number',
+                'auctions.status',
+                'brokers.broker_name',
+                'brokers.broker_id',
+                'buyer.client_name as buyer_name',
+                'auctions.client_id as buyer_id',
+                'sale',
+                'auctions.sale_date',
+                'auctions.prompt_date',
+                'auctions.warehouse_id',
+                'warehouses.warehouse_name',
+                'external_transfers.release_date',
+                'external_transfers.delivery_number',
+                'stock_ins.total_pallets',
+                'stock_ins.net_weight',
+                'delivery_orders.garden_id',
+                'delivery_orders.grade_id',
+                'delivery_orders.delivery_id',
+                'clients.client_name',
+            );
 
     // --- Warrant / Invoice search ---
     if ($request->filled('warrant_invoice')) {
@@ -6777,7 +6781,7 @@ $warehouses = Warehouse::join('auctions', 'auctions.warehouse_id', '=', 'warehou
     ->orderBy('warehouse_name')
     ->get();
 
-$sales = Auction::select('sale')->groupBy('sale')->orderBy('sale', 'desc')->get();
+$sales = Auction::select('sale')->where('auctions.type', 'auction')->groupBy('sale')->orderBy('sale', 'desc')->get();
 
 $clients = Client::join('delivery_orders', 'delivery_orders.client_id', '=', 'clients.client_id')
     ->join('stock_ins', 'stock_ins.delivery_id', '=', 'delivery_orders.delivery_id')
@@ -6865,7 +6869,12 @@ $clients = Client::join('delivery_orders', 'delivery_orders.client_id', '=', 'cl
     }
     public function viewSales()
     {
-        $auctions = Auction::select('sale')->groupBy('sale')->orderBy('sale', 'desc')->get();
+        $auctions = Auction::select('sale')
+            ->where('auctions.type', 'auction')
+            ->groupBy('sale')
+            ->orderByRaw('CAST(SUBSTRING_INDEX(sale, "/", -1) AS UNSIGNED) DESC')
+            ->orderByRaw('CAST(SUBSTRING_INDEX(sale, "/", 1) AS UNSIGNED) DESC')
+            ->get();
         $clients = Client::all();
         return view('admin::auctions.index', compact('auctions', 'clients'));
     }
@@ -6965,6 +6974,376 @@ $clients = Client::join('delivery_orders', 'delivery_orders.client_id', '=', 'cl
     {
         return $this->AppClass->downloadAuctionSheetReport($id);
     }
+
+    public function teaPrivateSale(Request $request)
+    {
+        $query = Auction::join('stock_ins', 'stock_ins.stock_id', '=', 'auctions.stock_id')
+            ->join('delivery_orders', 'delivery_orders.delivery_id', '=', 'stock_ins.delivery_id')
+            ->join('gardens', 'gardens.garden_id', '=', 'delivery_orders.garden_id')
+            ->join('grades', 'grades.grade_id', '=', 'delivery_orders.grade_id')
+            ->join('brokers', 'brokers.broker_id', '=', 'auctions.broker_id')
+            ->join('clients', 'clients.client_id', '=', 'delivery_orders.client_id')
+            ->leftJoin('clients as buyer', 'buyer.client_id', '=', 'auctions.client_id')
+            ->leftJoin('warehouses', 'warehouses.warehouse_id', '=', 'auctions.warehouse_id')
+            ->leftJoin('external_transfers', function ($join) {
+                $join->on('external_transfers.stock_id', '=', 'auctions.stock_id');
+            })
+            ->whereNull('external_transfers.deleted_at')
+            ->whereNull('auctions.deleted_at')
+            ->whereNull('stock_ins.deleted_at')
+            ->whereNull('delivery_orders.deleted_at')
+            ->whereNull('gardens.deleted_at')
+            ->whereNull('grades.deleted_at')
+            ->whereNull('brokers.deleted_at')
+            ->where('auctions.type', 'private')
+            ->select(
+                'auction_id',
+                'warrant_number',
+                'stock_ins.stock_id',
+                'stock_ins.delivery_id',
+                'garden_name',
+                'grade_name',
+                'invoice_number',
+                'auctions.status',
+                'brokers.broker_name',
+                'brokers.broker_id',
+                'buyer.client_name as buyer_name',
+                'auctions.client_id as buyer_id',
+                'sale',
+                'auctions.sale_date',
+                'auctions.prompt_date',
+                'auctions.warehouse_id',
+                'warehouses.warehouse_name',
+                'external_transfers.release_date',
+                'external_transfers.delivery_number',
+                'stock_ins.total_pallets',
+                'stock_ins.net_weight',
+                'delivery_orders.garden_id',
+                'delivery_orders.grade_id',
+                'delivery_orders.delivery_id',
+                'clients.client_name',
+            );
+
+    // --- Warrant / Invoice search ---
+    if ($request->filled('warrant_invoice')) {
+        $search = $request->warrant_invoice;
+        $query->where(function ($q) use ($search) {
+            $q->where('warrant_number', 'like', "%{$search}%")
+              ->orWhere('invoice_number', 'like', "%{$search}%");
+        });
+    }
+
+    // --- Garden filter ---
+    if ($request->filled('garden')) {
+        $query->where('delivery_orders.garden_id', $request->garden);
+    }
+
+    // --- Grade filter ---
+    if ($request->filled('grade')) {
+        $query->where('delivery_orders.grade_id', $request->grade);
+    }
+
+    // --- Broker filter ---
+    if ($request->filled('broker')) {
+        $query->where('auctions.broker_id', $request->broker);
+    }
+
+    // --- Buyer filter ---
+    if ($request->filled('buyer')) {
+        $query->where('auctions.client_id', $request->buyer);
+    }
+
+    // --- Warehouse filter ---
+    if ($request->filled('warehouse')) {
+        $query->where('auctions.warehouse_id', $request->warehouse);
+    }
+
+    // --- Sale Status filter (0 = On Sale, 1 = Sold) ---
+    if ($request->filled('sale_status') && in_array($request->sale_status, ['0', '1'])) {
+        $query->where('auctions.status', $request->sale_status);
+    }
+
+    // --- Release Status filter ---
+    if ($request->filled('release_status')) {
+        if ($request->release_status === 'released') {
+            $query->whereNotNull('external_transfers.release_date');
+        } elseif ($request->release_status === 'pending') {
+            $query->whereNull('external_transfers.release_date');
+        }
+    }
+
+    if ($request->filled('sale')) {
+        $query->where('sale', $request->sale);
+    }
+
+    // --- Sale Date range ---
+    if ($request->filled('sale_date_from')) {
+        $query->whereDate('auctions.sale_date', '>=', $request->sale_date_from);
+    }
+    if ($request->filled('sale_date_to')) {
+        $query->whereDate('auctions.sale_date', '<=', $request->sale_date_to);
+    }
+
+    // --- Prompt Date range ---
+    if ($request->filled('prompt_date_from')) {
+        $query->whereDate('auctions.prompt_date', '>=', $request->prompt_date_from);
+    }
+    if ($request->filled('prompt_date_to')) {
+        $query->whereDate('auctions.prompt_date', '<=', $request->prompt_date_to);
+    }
+
+    // --- Release Date range ---
+    if ($request->filled('release_date_from')) {
+        $query->whereDate('external_transfers.release_date', '>=', $request->release_date_from);
+    }
+    if ($request->filled('release_date_to')) {
+        $query->whereDate('external_transfers.release_date', '<=', $request->release_date_to);
+    }
+
+    // --- Handle Export ---
+    if ($request->filled('export')) {
+        $auctions = $query->orderBy('warrant_number')->get();
+        return $this->exportAuctions($auctions, $request->export);
+    }
+
+    if ($request->filled('client')) {
+        $query->where('delivery_orders.client_id', $request->client);
+    }
+    $auctions = $query->orderBy('auctions.created_at', 'desc')->get();
+
+    // Dropdown data - scoped to records that exist in auctions
+$gardens = Garden::join('delivery_orders', 'delivery_orders.garden_id', '=', 'gardens.garden_id')
+    ->join('stock_ins', 'stock_ins.delivery_id', '=', 'delivery_orders.delivery_id')
+    ->join('auctions', 'auctions.stock_id', '=', 'stock_ins.stock_id')
+    ->select('gardens.garden_id', 'gardens.garden_name')
+    ->distinct()
+    ->orderBy('garden_name')
+    ->get();
+
+$grades = Grade::join('delivery_orders', 'delivery_orders.grade_id', '=', 'grades.grade_id')
+    ->join('stock_ins', 'stock_ins.delivery_id', '=', 'delivery_orders.delivery_id')
+    ->join('auctions', 'auctions.stock_id', '=', 'stock_ins.stock_id')
+    ->select('grades.grade_id', 'grades.grade_name')
+    ->distinct()
+    ->orderBy('grade_name')
+    ->get();
+
+$brokers = Broker::join('auctions', 'auctions.broker_id', '=', 'brokers.broker_id')
+    ->select('brokers.broker_id', 'brokers.broker_name')
+    ->distinct()
+    ->orderBy('broker_name')
+    ->get();
+
+$buyers = Client::join('auctions', 'auctions.client_id', '=', 'clients.client_id')
+    ->select('clients.client_id', 'clients.client_name')
+    ->distinct()
+    ->orderBy('client_name')
+    ->get();
+
+$warehouses = Warehouse::join('auctions', 'auctions.warehouse_id', '=', 'warehouses.warehouse_id')
+    ->select('warehouses.warehouse_id', 'warehouses.warehouse_name')
+    ->distinct()
+    ->orderBy('warehouse_name')
+    ->get();
+
+$sales = Auction::select('sale')->where('auctions.type', 'private')->groupBy('sale')->orderBy('sale', 'desc')->get();
+
+$clients = Client::join('delivery_orders', 'delivery_orders.client_id', '=', 'clients.client_id')
+    ->join('stock_ins', 'stock_ins.delivery_id', '=', 'delivery_orders.delivery_id')
+    ->join('auctions', 'auctions.stock_id', '=', 'stock_ins.stock_id')
+    ->select('clients.client_id', 'clients.client_name')
+    ->distinct()
+    ->orderBy('client_name')
+    ->get();
+
+    return view('admin::private.auctions', compact(
+        'auctions',
+        'gardens',
+        'grades',
+        'brokers',
+        'buyers',
+        'warehouses',
+        'sales',
+        'clients'
+    ));
+}
+
+/**
+ * Handle export logic for Excel, CSV, PDF
+ */
+    private function exportPrivateSales($auctions, string $format)
+    {
+        $filename = 'tea_auctions_' . now()->format('Ymd_His');
+
+        if ($format === 'csv') {
+            $headers = [
+                'Content-Type'        => 'text/csv',
+                'Content-Disposition' => "attachment; filename={$filename}.csv",
+            ];
+
+            $callback = function () use ($auctions) {
+                $handle = fopen('php://output', 'w');
+
+                // CSV Header row
+                fputcsv($handle, [
+                    '#', 'Warrant No', 'Invoice No', 'Garden', 'Grade',
+                    'Packages', 'Net Weight', 'Broker', 'Buyer',
+                    'Warehouse', 'Sale', 'Sale Date', 'Prompt Date',
+                    'Delivery No', 'Release Date', 'Sale Status', 'Release Status'
+                ]);
+
+                foreach ($auctions as $index => $row) {
+                    fputcsv($handle, [
+                        $index + 1,
+                        $row->warrant_number,
+                        $row->invoice_number,
+                        $row->garden_name,
+                        $row->grade_name,
+                        number_format($row->total_pallets, 0),
+                        number_format($row->net_weight, 2),
+                        $row->broker_name,
+                        $row->buyer_name,
+                        $row->warehouse_name,
+                        "\t" . $row->sale,
+                        $row->sale_date,
+                        $row->prompt_date,
+                        $row->delivery_number,
+                        $row->release_date,
+                        $row->status == 0 ? 'On Sale' : 'Sold',
+                        $row->release_date  ? 'Released' : 'Pending',
+                    ]);
+                }
+
+                fclose($handle);
+            };
+
+            return response()->stream($callback, 200, $headers);
+        }
+
+        if ($format === 'excel') {
+            // Requires maatwebsite/excel — swap class name to match your project
+            return \Excel::download(new \Modules\Admin\Exports\AuctionsExport($auctions), "{$filename}.xlsx");
+        }
+
+        if ($format === 'pdf') {
+            $pdf = \PDF::loadView('admin::auctions.auctions_pdf', ['auctions' => $auctions]);
+            return $pdf->download("{$filename}.pdf");
+        }
+
+        abort(400, 'Unsupported export format');
+    }
+    public function viewPrivateSales()
+    {
+        $auctions = Auction::select('sale')
+            ->where('auctions.type', 'private')
+            ->groupBy('sale')
+            ->orderByRaw('CAST(SUBSTRING_INDEX(sale, "/", -1) AS UNSIGNED) DESC')
+            ->orderByRaw('CAST(SUBSTRING_INDEX(sale, "/", 1) AS UNSIGNED) DESC')
+            ->get();
+
+        $clients = Client::all();
+        return view('admin::private.index', compact('auctions', 'clients'));
+    }
+    public function viewPrivateSale($id)
+    {
+        $sale = base64_decode($id);
+        $teas = Auction::join('currentstock', function ($join) use ($sale) {
+            $join->on('currentstock.stock_id', '=', 'auctions.stock_id')
+                ->on('currentstock.delivery_id', '=', 'auctions.delivery_id');
+        })
+            ->join('stock_ins', function ($join){
+                $join->on('currentstock.stock_id', '=', 'stock_ins.stock_id');
+            })
+            ->join('brokers', 'brokers.broker_id', '=', 'auctions.broker_id')
+            ->leftJoin('clients', 'clients.client_id', '=', 'auctions.client_id')
+            ->leftJoin('warehouses', 'warehouses.warehouse_id', '=', 'auctions.warehouse_id')
+            ->leftJoin('external_transfers', 'external_transfers.stock_id', '=', 'auctions.stock_id')
+            ->select('auction_id', 'currentstock.client_name', 'warrant_number', 'stock_ins.total_pallets as current_stock', 'stock_ins.net_weight as current_weight', 'auctions.status', 'clients.client_name as buyer_name', 'brokers.broker_name', 'invoice_number', 'garden_name', 'grade_name', 'order_number', 'auctions.client_id', 'auctions.broker_id', 'sale', 'auctions.sale_date', 'auctions.prompt_date', 'auctions.warehouse_id', 'warehouses.warehouse_name', 'auctions.release_date', 'external_transfers.delivery_number')
+            ->where('auctions.sale', $sale)
+            ->orderBy('warrant_number')
+            ->get();
+        $clients = Client::all();
+        $brokers = Broker::all();
+        $warehouses = Warehouse::all();
+        return view('admin::private.viewSale', compact('teas', 'sale', 'clients', 'brokers', 'warehouses'));
+    }
+    public function preparePrivateSaleList(Request $request)
+    {
+        $teas = DB::table('currentstock')
+            ->leftJoin('auctions', function ($join) {
+                $join->on('currentstock.delivery_id', '=', 'auctions.delivery_id')
+                    ->on('currentstock.stock_id', '=', 'auctions.stock_id');
+            })
+            ->select('currentstock.stock_id', 'currentstock.delivery_id', 'currentstock.client_name', 'currentstock.client_id', 'invoice_number', 'order_number', 'lot_number', 'current_stock', 'current_weight', 'garden_name', 'grade_name')
+            ->where('current_stock', '>', 0)
+            ->where('current_weight', '>', 0)
+            ->where(['currentstock.client_id' => $request->client])
+            ->whereNull('auctions.warrant_number')
+            ->orderBy('garden_name', 'asc')
+            ->orderBy('invoice_number', 'asc')
+            ->get();
+        $client = Client::where(['client_id' => $request->client])->first();
+        $brokers = Broker::all();
+        return view('admin::private.prepareAuctionList', compact('teas', 'client', 'brokers'));
+    }
+    public function storePrivateSaleList(Request $request)
+    {
+        $teas = json_decode($request->selectedItems);
+        foreach ($teas as $tea){
+            $do = StockIn::where(['stock_id' => $tea->deliveryId])->first();
+            $auction = [
+                'auction_id' => (new CustomIds())->generateId(),
+                'stock_id' => $tea->deliveryId,
+                'delivery_id' => $do->delivery_id,
+                'broker_id' => $tea->brokerId,
+                'sale' => $tea->saleNumber,
+                'warrant_number' => Auction::newWarrantNumber('private'),
+                'status' => 0,
+                'user_id' => auth()->id(),
+                'type' => 'private'
+            ];
+            if(!Auction::where(['stock_id' => $tea->deliveryId])->exists()) {
+                Auction::create($auction);
+                $this->logger->create();
+            }
+        }
+        return redirect()->route('admin.teaPrivateSale')->with('success', 'Auction added successfully');
+    }
+    public function removeLineFromPrivateSale($id)
+    {
+        Auction::find($id)->delete();
+        $this->logger->create();
+        return back()->with('success', 'Line removed successfully');
+    }
+    public function updatePrivateSaleList(Request $request, $id){
+        Auction::where(['auction_id' => $id])->update([
+            'broker_id' => $request->broker,
+            'client_id' => $request->buyer,
+            'status' => $request->status,
+            'sale' => $request->sale,
+            'sale_date' => $request->sale_date,
+            'prompt_date' => $request->prompt_date,
+            'warehouse_id' => $request->warehouse_id
+        ]);
+        $this->logger->create();
+        return back()->with('success', 'Line updated successfully');
+    }
+    public function downloadPrivateSaleSheet (Request $request, $id)
+    {
+        list($saleN, $dType) = explode(':', base64_decode($id));
+        $sale = $saleN;
+        $type = $dType ?? $request->type;
+        $query = [
+
+        ];
+        return $this->AppClass->downloadAuctionSheet($sale, $type, $query);
+    }
+    public function downloadPrivateSaleSheetReport ($id)
+    {
+        return $this->AppClass->downloadAuctionSheetReport($id);
+    }
+
+
     public function editSI($id)
     {
         $si = ShippingInstruction::find($id);

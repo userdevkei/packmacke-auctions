@@ -98,11 +98,29 @@
                     </div>
                   </div>
                     <!-- parent pages--><a class="nav-link" href="{{ route('clerk.teaAuction') }}" role="button" data-bs-toggle="" aria-expanded="false">
-                          <div class="d-flex align-items-center"><span class="nav-link-icon"><span class="fa-solid fa-gavel"></span></span><span class="nav-link-text ps-1">Auction Teas </span>
+                          <div class="d-flex align-items-center"><span class="nav-link-icon"><span class="fa-solid fa-gavel"></span></span><span class="nav-link-text ps-1">Auctioned Teas </span>
                           </div>
                       </a>
                       <!-- parent pages--><a class="nav-link" href="{{ route('clerk.viewSales') }}" role="button" data-bs-toggle="" aria-expanded="false">
-                          <div class="d-flex align-items-center"><span class="nav-link-icon"><span class="fa-solid fa-calendar-week"></span></span><span class="nav-link-text ps-1">Sales </span>
+                          <div class="d-flex align-items-center"><span class="nav-link-icon"><span class="fa-solid fa-calendar-week"></span></span><span class="nav-link-text ps-1">Auction Sales </span>
+                          </div>
+                      </a>
+                </li>
+                <li class="nav-item">
+                  <!-- label-->
+                  <div class="row navbar-vertical-label-wrapper mt-3 mb-2">
+                    <div class="col-auto navbar-vertical-label">Private Sale
+                    </div>
+                    <div class="col ps-0">
+                      <hr class="mb-0 navbar-vertical-divider" />
+                    </div>
+                  </div>
+                    <!-- parent pages--><a class="nav-link" href="{{ route('clerk.teaPrivateSale') }}" role="button" data-bs-toggle="" aria-expanded="false">
+                          <div class="d-flex align-items-center"><span class="nav-link-icon"><span class="fa-solid fa-cart-shopping"></span></span><span class="nav-link-text ps-1">Sold Teas </span>
+                          </div>
+                      </a>
+                      <!-- parent pages--><a class="nav-link" href="{{ route('clerk.viewPrivateSales') }}" role="button" data-bs-toggle="" aria-expanded="false">
+                          <div class="d-flex align-items-center"><span class="nav-link-icon"><span class="fa-solid fa-calendar-day"></span></span><span class="nav-link-text ps-1">Private Sales </span>
                           </div>
                       </a>
                 </li>

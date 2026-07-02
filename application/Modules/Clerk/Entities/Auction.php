@@ -16,12 +16,12 @@ class Auction extends Model
     public $incrementing = false;
     protected $date = 'deleted_at';
 
-    protected $fillable = ['auction_id', 'stock_id', 'delivery_id', 'broker_id', 'sale', 'warrant_number', 'status', 'user_id', 'client_id', 'warehouse_id', 'sale_date', 'release_date', 'prompt_date'];
+    protected $fillable = ['auction_id', 'stock_id', 'delivery_id', 'broker_id', 'sale', 'warrant_number', 'status', 'user_id', 'client_id', 'warehouse_id', 'sale_date', 'release_date', 'prompt_date', 'type'];
 
-    public static function newWarrantNumber()
+    public static function newWarrantNumber($type)
     {
         $year = date('y');
-        $prefix = 'PAH-';
+        $prefix = $type == 'private' ? 'PPS-' : 'PAH-';
         $newID = null;
 
         // Start a transaction

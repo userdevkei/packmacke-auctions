@@ -290,6 +290,18 @@ Route::prefix('admin')->middleware(['auth', 'web', 'userRoles', 'userRole:1', 'd
     Route::get('download-auction-sheet/{id}', [AdminController::class, 'downloadAuctionSheet'])->name('admin.downloadAuctionSheet');
     Route::get('download-auction-sheet-report/{id}', [AdminController::class, 'downloadAuctionSheetReport'])->name('admin.downloadAuctionSheetReport');
 
+    /*Private Sale Routes*/
+    Route::get('private-sales', [AdminController::class, 'teaPrivateSale'])->name('admin.teaPrivateSale');
+    Route::post('private-sales', [AdminController::class, 'teaPrivateSale'])->name('admin.teaPrivateSale');
+    Route::get('view-private-sales', [AdminController::class, 'viewPrivateSales'])->name('admin.viewPrivateSales');
+    Route::post('prepare-private-sale-list', [AdminController::class, 'preparePrivateSaleList'])->name('admin.preparePrivateSaleList');
+    Route::post('store-private-sale-list', [AdminController::class, 'storePrivateSaleList'])->name('admin.storePrivateSaleList');
+    Route::get('view-private-sale/{id}', [AdminController::class, 'viewPrivateSale'])->name('admin.viewPrivateSale');
+    Route::get('remove-line-from-private-sale/{id}', [AdminController::class, 'removeLineFromPrivateSale'])->name('admin.removeLineFromPrivateSale');
+    Route::post('update-private-sale-list/{id}', [AdminController::class, 'updatePrivateSaleList'])->name('admin.updatePrivateSaleList');
+    Route::get('download-private-sale-sheet/{id}', [AdminController::class, 'downloadPrivateSaleSheet'])->name('admin.downloadPrivateSaleSheet');
+    Route::get('download-private-sale-sheet-report/{id}', [AdminController::class, 'downloadPrivateSaleSheetReport'])->name('admin.downloadPrivateSaleSheetReport');
+
     Route::get('notifications/list', [AdminController::class, 'list'])->name('admin.notifications');
     Route::get('notifications/{id}', [AdminController::class, 'details'])->name('admin.viewNotification');
 
