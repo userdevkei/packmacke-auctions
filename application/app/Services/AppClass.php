@@ -3920,7 +3920,8 @@ class AppClass
         } else {
             $finalDate = Carbon::createFromTimestamp($date) ?? Carbon::now();
         }
-        return $finalDate->diffInDays($receivedDate);
+//        return $finalDate->diffInDays($receivedDate);
+        return (int) round($finalDate->diffInDays($receivedDate, true));
     }
     public function getPromptAgingDays($id, $date)
     {

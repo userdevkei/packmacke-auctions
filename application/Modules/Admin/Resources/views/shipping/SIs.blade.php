@@ -1,5 +1,15 @@
 @extends('admin::layouts.default')
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.3.0/css/bootstrap.min.css">
+<style>
+    .filter-panel { background: #f9fafb; border: 1px solid #edf2f9; border-radius: .5rem; padding: 1rem 1rem .75rem; margin-bottom: 1rem; }
+    .filter-panel .form-label { font-size: .72rem; font-weight: 600; color: #5e6e82; text-transform: uppercase; letter-spacing: .02em; margin-bottom: .25rem; }
+    .filter-panel .form-control, .filter-panel .form-select { font-size: .875rem; height: calc(1.5em + .75rem + 2px); }
+    .active-filter-chip { display: inline-flex; align-items: center; gap: .35rem; background: #e7edff; color: #2054C9; border-radius: 2rem; padding: .2rem .6rem .2rem .75rem; font-size: .75rem; font-weight: 500; margin: 0 .35rem .35rem 0; text-decoration: none; }
+    .active-filter-chip .chip-x { font-weight: 700; opacity: .6; }
+    .active-filter-chip .chip-x:hover { opacity: 1; }
+    .toolbar-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .5rem; margin-bottom: .5rem; }
+    .toolbar-row .toolbar-left, .toolbar-row .toolbar-right { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+</style>
 @section('admin::dashboard')
     <div class="card">
         <div class="card-header">
@@ -81,6 +91,105 @@
         <div class="card-body overflow-hidden p-lg-3">
             <div class="row align-items-center">
                 <div class="tab-pane preview-tab-pane active" role="tabpanel" aria-labelledby="tab-dom-c3976e0e-38db-410e-861a-36d04a3a7494" id="dom-c3976e0e-38db-410e-861a-36d04a3a7494">
+                    <div class="toolbar-row">
+                        <div class="toolbar-left">
+                            <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#siFilterPanelCollapse">
+                                <span class="fas fa-filter me-1"></span>Filters
+                                <span class="fas fa-chevron-down ms-1"></span>
+                            </button>
+                            @foreach($activeFilters as $chip)
+                                <a class="active-filter-chip" href="{{ route('admin.viewShippingInstructions', collect($filters)->except($chip['key'])->toArray()) }}">
+                                    <span>{{ $chip['label'] }}: {{ $chip['display'] }}</span>
+                                    <span class="chip-x">&times;</span>
+                                </a>
+                            @endforeach
+                        </div>
+                        <div class="toolbar-right">
+                            @php
+                                $csvUrl = route('admin.exportShippingLines', array_merge($filters, ['format' => 'csv']));
+                                $pdfUrl = route('admin.exportShippingLines', array_merge($filters, ['format' => 'pdf']));
+                                $csvUrlConfirmed = route('admin.exportShippingLines', array_merge($filters, ['format' => 'csv', 'confirm_full' => 1]));
+                                $pdfUrlConfirmed = route('admin.exportShippingLines', array_merge($filters, ['format' => 'pdf', 'confirm_full' => 1]));
+                                $noFilters = empty($filters);
+                            @endphp
+                            <a href="{{ $noFilters ? $csvUrlConfirmed : $csvUrl }}" target="_blank" class="btn btn-sm btn-outline-success"
+                               @if($noFilters) onclick="return confirm('No filters are applied — this will export every shipping line, which can be slow. Continue anyway?')" @endif>
+                                <span class="fas fa-file-excel me-1"></span>Export Excel/CSV
+                            </a>
+                            <a href="{{ $noFilters ? $pdfUrlConfirmed : $pdfUrl }}" target="_blank" class="btn btn-sm btn-outline-danger"
+                               @if($noFilters) onclick="return confirm('No filters are applied — this will export every shipping line, which can be slow. Continue anyway?')" @endif>
+                                <span class="fas fa-file-pdf me-1"></span>Export PDF
+                            </a>
+                        </div>
+                    </div>
+
+                    <div class="collapse @if(!empty($filters)) show @endif" id="siFilterPanelCollapse">
+                        <form method="GET" action="{{ route('admin.viewShippingInstructions') }}" class="filter-panel">
+                            <div class="row g-3">
+                                <div class="col-6 col-md-3">
+                                    <label class="form-label">Date From</label>
+                                    <input type="date" name="date_from" class="form-control" value="{{ $filters['date_from'] ?? '' }}">
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <label class="form-label">Date To</label>
+                                    <input type="date" name="date_to" class="form-control" value="{{ $filters['date_to'] ?? '' }}">
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <label class="form-label">Shipping Number</label>
+                                    <input type="text" name="shipping_number" class="form-control" placeholder="e.g. SH1234" value="{{ $filters['shipping_number'] ?? '' }}">
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <label class="form-label">Client Name</label>
+                                    <select name="client_id" class="form-select js-choice">
+                                        <option value="">All Clients</option>
+                                        @foreach($clients as $clientName => $client)
+                                            <option value="{{ $client[0]->client_id }}" @selected(($filters['client_id'] ?? null) == $client[0]->client_id)>{{ $clientName }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="row g-3 mt-1">
+                                <div class="col-6 col-md-3">
+                                    <label class="form-label">Status</label>
+                                    <select name="status" class="form-select js-choice">
+                                        <option value="">All Statuses</option>
+                                        @foreach($statusLabels as $value => $label)
+                                            <option value="{{ $value }}" @selected(($filters['status'] ?? null) == $value)>{{ $label }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <label class="form-label">Source (Station)</label>
+                                    <select name="source" class="form-select js-choice">
+                                        <option value="">All Sources</option>
+                                        @foreach($stations as $stationName => $station)
+                                            <option value="{{ $station[0]->station_id }}" @selected(($filters['source'] ?? null) == $station[0]->station_id)>{{ $stationName }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <label class="form-label">Destination</label>
+                                    <select name="destination_id" class="form-select js-choice">
+                                        <option value="">All Destinations</option>
+                                        @foreach($destinations as $destination)
+                                            <option value="{{ $destination->destination_id }}" @selected(($filters['destination_id'] ?? null) == $destination->destination_id)>{{ $destination->port_name }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="row mt-3">
+                                <div class="col-12 d-flex justify-content-end gap-2">
+                                    <a href="{{ route('admin.viewShippingInstructions') }}" class="btn btn-sm btn-falcon-default">
+                                        <span class="fas fa-undo me-1"></span>Reset
+                                    </a>
+                                    <button type="submit" class="btn btn-sm btn-primary">
+                                        <span class="fas fa-filter me-1"></span>Apply Filters
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+
                     <table class="table mb-0 table-bordered table-striped" id="datatable">
                         <thead class="bg-200">
                         <tr>

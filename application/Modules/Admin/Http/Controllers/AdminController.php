@@ -3744,7 +3744,7 @@ public function externalTransfersExport(Request $request)
         $this->logger->create();
         return redirect()->back()->with('success', 'Success! Remove tea from transfer request');
     }
-    public function viewShippingInstructions()
+    /*public function viewShippingInstructions()
     {
        $data = ShippingInstruction::join('clients', 'clients.client_id', '=', 'shipping_instructions.client_id')
            ->join('destinations', 'destinations.destination_id', '=', 'shipping_instructions.destination_id')
@@ -3760,6 +3760,240 @@ public function externalTransfersExport(Request $request)
         $registrations = ShippingInstruction::pluck('registration')->toArray();
         $drivers = Driver::all();
         return view('admin::shipping.SIs')->with(['users' => $drivers, 'registrations' =>$registrations, 'shipping' => $shipping, 'clients' => $clients, 'stations' => $stations, 'agents' => $agents, 'transporters' => $transporters]);
+    }*/
+
+    public function viewShippingInstructions(Request $request)
+    {
+        $query = ShippingInstruction::join('clients', 'clients.client_id', '=', 'shipping_instructions.client_id')
+            ->join('destinations', 'destinations.destination_id', '=', 'shipping_instructions.destination_id')
+            ->join('stations', 'stations.station_id', '=', 'shipping_instructions.station_id')
+            ->select('shipping_id', 'client_name', 'shipping_instructions.created_at', 'shipping_instructions.status',
+                'station_name', 'shipping_number', 'vessel_name', 'port_name', 'load_type', 'location_id',
+                'shipping_instructions.si_number', 'shipping_instructions.client_id',
+                'shipping_instructions.destination_id', 'shipping_instructions.station_id')
+            ->whereNull('shipping_instructions.deleted_at')
+            ->latest('shipping_instructions.created_at');
+
+        if ($request->filled('client_id')) {
+            $query->where('shipping_instructions.client_id', $request->client_id);
+        }
+        if ($request->filled('destination_id')) {
+            $query->where('shipping_instructions.destination_id', $request->destination_id);
+        }
+        if ($request->filled('source')) {
+            $query->where('shipping_instructions.station_id', $request->source);
+        }
+        if ($request->filled('status') && $request->status !== '') {
+            $query->where('shipping_instructions.status', $request->status);
+        }
+        if ($request->filled('shipping_number')) {
+            $query->where('shipping_instructions.shipping_number', 'like', "%{$request->shipping_number}%");
+        }
+        if ($request->filled('date_from')) {
+            $query->where('shipping_instructions.created_at', '>=', Carbon::parse($request->date_from)->startOfDay());
+        }
+        if ($request->filled('date_to')) {
+            $query->where('shipping_instructions.created_at', '<=', Carbon::parse($request->date_to)->endOfDay());
+        }
+
+        $shipping = $query->get();
+
+        // Dropdown option sources — unfiltered, so the panel always offers every
+        // client/station regardless of what's currently applied. (Previously this
+        // called ->get() three times off the same filtered $data query — now it's
+        // one query, reused, and no longer shrinks the dropdowns when a filter's active.)
+        $allForOptions = ShippingInstruction::join('clients', 'clients.client_id', '=', 'shipping_instructions.client_id')
+            ->join('stations', 'stations.station_id', '=', 'shipping_instructions.station_id')
+            ->select('client_name', 'shipping_instructions.client_id', 'station_name', 'shipping_instructions.station_id')
+            ->whereNull('shipping_instructions.deleted_at')
+            ->get();
+
+        $clients = $allForOptions->groupBy('client_name');
+        $stations = $allForOptions->groupBy('station_name');
+        $destinations = DB::table('destinations')->select('destination_id', 'port_name')->get();
+
+        $agents = ClearingAgent::all();
+        $transporters = Transporter::all();
+        $registrations = ShippingInstruction::pluck('registration')->toArray();
+        $drivers = Driver::all();
+
+        $statusLabels = [0 => 'SI Created', 1 => 'Teas Updated', 2 => 'SI Updated', 3 => 'Pend. Approval', 4 => 'Shipped'];
+
+        // Only the filters actually present — drives both the form's pre-filled
+        // values and the "×" removal links on the chips.
+        $filters = $request->only(['client_id', 'destination_id', 'source', 'status', 'shipping_number', 'date_from', 'date_to']);
+        $filters = array_filter($filters, fn ($v) => $v !== null && $v !== '');
+
+        $activeFilters = [];
+        if (isset($filters['date_from'])) $activeFilters[] = ['key' => 'date_from', 'label' => 'From', 'display' => $filters['date_from']];
+        if (isset($filters['date_to'])) $activeFilters[] = ['key' => 'date_to', 'label' => 'To', 'display' => $filters['date_to']];
+        if (isset($filters['shipping_number'])) $activeFilters[] = ['key' => 'shipping_number', 'label' => 'Shipping #', 'display' => $filters['shipping_number']];
+        if (isset($filters['client_id'])) {
+            $name = optional($allForOptions->firstWhere('client_id', $filters['client_id']))->client_name;
+            $activeFilters[] = ['key' => 'client_id', 'label' => 'Client', 'display' => $name ?? $filters['client_id']];
+        }
+        if (isset($filters['source'])) {
+            $name = optional($allForOptions->firstWhere('station_id', $filters['source']))->station_name;
+            $activeFilters[] = ['key' => 'source', 'label' => 'Source', 'display' => $name ?? $filters['source']];
+        }
+        if (isset($filters['destination_id'])) {
+            $name = optional($destinations->firstWhere('destination_id', $filters['destination_id']))->port_name;
+            $activeFilters[] = ['key' => 'destination_id', 'label' => 'Destination', 'display' => $name ?? $filters['destination_id']];
+        }
+        if (isset($filters['status'])) {
+            $activeFilters[] = ['key' => 'status', 'label' => 'Status', 'display' => $statusLabels[$filters['status']] ?? $filters['status']];
+        }
+
+        return view('admin::shipping.SIs')->with([
+            'users' => $drivers,
+            'registrations' => $registrations,
+            'shipping' => $shipping,
+            'clients' => $clients,
+            'stations' => $stations,
+            'destinations' => $destinations,
+            'agents' => $agents,
+            'transporters' => $transporters,
+            'filters' => $filters,
+            'activeFilters' => $activeFilters,
+            'statusLabels' => $statusLabels,
+        ]);
+    }
+
+    public function exportShippingLines(Request $request)
+    {
+        $hasDateRange = $request->filled('date_from') || $request->filled('date_to');
+        $hasOtherFilter = $request->filled('client_id') || $request->filled('destination_id')
+            || $request->filled('source') || $request->filled('status') || $request->filled('shipping_number');
+
+        if (!$hasDateRange && !$hasOtherFilter && !$request->boolean('confirm_full')) {
+            return response()->json([
+                'error' => 'no_filters',
+                'message' => 'Exporting every shipping line can be slow and heavy. Please pick a date range (or another filter) before exporting, or confirm you want everything.',
+            ], 422);
+        }
+
+        $format = $request->get('format', 'csv');
+
+        $rows = DB::table('shipments')
+            ->join('shipping_instructions', 'shipping_instructions.shipping_id', '=', 'shipments.shipping_id')
+            ->join('clients', 'clients.client_id', '=', 'shipping_instructions.client_id')
+            ->join('destinations', 'destinations.destination_id', '=', 'shipping_instructions.destination_id')
+            ->join('stations', 'stations.station_id', '=', 'shipping_instructions.station_id')
+            ->leftJoin('delivery_orders', 'delivery_orders.delivery_id', '=', 'shipments.delivery_id')
+            ->leftJoin('grades', 'grades.grade_id', '=', 'delivery_orders.grade_id')
+            ->leftJoin('gardens', 'gardens.garden_id', '=', 'delivery_orders.garden_id')
+            ->whereNull('shipments.deleted_at')
+            ->whereNull('shipping_instructions.deleted_at')
+            ->select([
+                'shipments.shipment_id',
+                'shipments.delivery_id',
+                'shipments.shipped_packages',
+                'shipments.shipped_weight',
+                'shipping_instructions.shipping_number',
+                'shipping_instructions.status',
+                'shipping_instructions.created_at',
+                'clients.client_name',
+                'destinations.port_name as destination_name',
+                'stations.station_name',
+                'delivery_orders.invoice_number',
+                'grades.grade_name',
+                'gardens.garden_name',
+                'shipping_instructions.ship_date'
+            ])
+            ->orderBy('shipments.shipment_id'); // stable, indexed order for chunkById
+
+        if ($request->filled('client_id')) $rows->where('shipping_instructions.client_id', $request->client_id);
+        if ($request->filled('destination_id')) $rows->where('shipping_instructions.destination_id', $request->destination_id);
+        if ($request->filled('source')) $rows->where('shipping_instructions.station_id', $request->source);
+        if ($request->filled('status') && $request->status !== '') $rows->where('shipping_instructions.status', $request->status);
+        if ($request->filled('shipping_number')) $rows->where('shipping_instructions.shipping_number', 'like', "%{$request->shipping_number}%");
+        if ($request->filled('date_from')) $rows->where('shipping_instructions.created_at', '>=', Carbon::parse($request->date_from)->startOfDay());
+        if ($request->filled('date_to')) $rows->where('shipping_instructions.created_at', '<=', Carbon::parse($request->date_to)->endOfDay());
+
+        $agingService = app(\App\Services\AppClass::class);
+        // No per-line release/shipped date exists on `shipments`, so aging is
+        // always measured against "today" — swap in a real column here if one exists.
+        $agingDaysFor = fn ($row) => $agingService->getAgingDays($row->delivery_id, $row->ship_date);
+
+        $statusLabels = [0 => 'SI Created', 1 => 'Teas Updated', 2 => 'SI Updated', 3 => 'Pend. Approval', 4 => 'Shipped'];
+
+        if ($format === 'pdf') {
+            ini_set('pcre.backtrack_limit', '10000000');
+            ini_set('memory_limit', '512M');
+
+            $mpdf = new Mpdf([
+                'format' => 'A4-L', 'orientation' => 'L',
+                'margin_left' => 10, 'margin_right' => 10, 'margin_top' => 10, 'margin_bottom' => 10,
+                'tempDir' => base_path('Files/mpdf'),
+            ]);
+
+            $mpdf->WriteHTML(view('admin::shipping.partials.export-pdf-header')->render());
+
+            $rowNumber = 0;
+            $rows->chunkById(500, function ($chunk) use ($mpdf, $statusLabels, $agingDaysFor, &$rowNumber) {
+                $html = view('admin::shipping.partials.export-pdf-rows', [
+                    'rows' => $chunk,
+                    'statusLabels' => $statusLabels,
+                    'startIndex' => $rowNumber,
+                    'agingDaysFor' => $agingDaysFor,
+                ])->render();
+                $mpdf->WriteHTML($html);
+                $rowNumber += $chunk->count();
+            }, 'shipments.shipment_id', 'shipment_id');
+
+            $mpdf->WriteHTML(view('admin::shipping.partials.export-pdf-footer', ['rowCount' => $rowNumber])->render());
+
+            return response($mpdf->Output(
+                'shipping-lines-' . now()->format('Y-m-d') . '.pdf',
+                \Mpdf\Output\Destination::STRING_RETURN
+            ))->header('Content-Type', 'application/pdf');
+        }
+
+        $filename = 'shipping-lines-' . now()->format('Y-m-d') . '.csv';
+        $headers = [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+        ];
+        $columns = ['#', 'Shipping Number', 'Date Initiated', 'Invoice Number', 'Garden', 'Grade', 'Client Name', 'Packages', 'Weight', 'Source', 'Destination', 'Status', 'Aging Days'];
+
+        $callback = function () use ($rows, $columns, $statusLabels, $agingDaysFor) {
+            $file = fopen('php://output', 'w');
+            fputcsv($file, $columns);
+            $i = 0;
+            try {
+                $rows->chunkById(1000, function ($chunk) use ($file, $statusLabels, $agingDaysFor, &$i) {
+                    foreach ($chunk as $row) {
+                        $i++;
+                        fputcsv($file, [
+                            $i,
+                            $row->shipping_number,
+                            Carbon::parse($row->created_at)->format('d/m/y'),
+                            $row->invoice_number,
+                            $row->garden_name,
+                            $row->grade_name,
+                            $row->client_name,
+                            (int) $this->toNumber($row->shipped_packages),
+                            round($this->toNumber($row->shipped_weight), 2),
+                            $row->station_name,
+                            $row->destination_name,
+                            $statusLabels[$row->status] ?? $row->status,
+                            $agingDaysFor($row) . ' days',
+                        ]);
+                    }
+                    flush();
+                }, 'shipments.shipment_id', 'shipment_id');
+            } catch (\Throwable $e) {
+                \Log::error('[shipping-lines-export] failed mid-stream: ' . $e->getMessage());
+                fputcsv($file, ['ERROR', 'Export failed partway through — see server logs.']);
+            }
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+
+    function toNumber($value): float {
+        return (float) str_replace(',', '', (string) $value);
     }
     public function createSI()
     {

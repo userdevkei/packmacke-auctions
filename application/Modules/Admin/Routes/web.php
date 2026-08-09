@@ -151,6 +151,7 @@ Route::prefix('admin')->middleware(['auth', 'web', 'userRoles', 'userRole:1', 'd
     Route::get('prepare-to-receive-transfer/{id}', [AdminController::class, 'prepareToReceiveTransfer'])->name('admin.prepareToReceiveTransfer');
 
     Route::get('view-shipping-instructions', [AdminController::class, 'viewShippingInstructions'])->name('admin.viewShippingInstructions');
+    Route::get('shipping-lines-export', [AdminController::class, 'exportShippingLines'])->name('admin.exportShippingLines');
     Route::post('add-shipping-instruction', [AdminController::class, 'addShippingInstruction'])->name('admin.addShippingInstruction');
     Route::get('add-teas-to-shipping-instruction/{id}', [AdminController::class, 'addShipmentTeas'])->name('admin.addShipmentTeas');
     Route::post('store-shipping-instruction/{id}', [AdminController::class, 'storeShippingInstruction'])->name('admin.storeShippingInstruction');
