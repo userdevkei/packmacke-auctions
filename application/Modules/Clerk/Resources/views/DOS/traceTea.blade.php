@@ -124,8 +124,8 @@
                      id="dom-c3976e0e-38db-410e-861a-36d04a3a7494">
                     <div class="card">
                         <div class="card-header">
-                            @if(auth()->user()->role_id == 2)
-                                @if($teaDetails['deliveryOrder'])
+                           @if(auth()->user()->role_id == 2 || @canuser('do.edit') || @canuser('do.delete'))
+                                @if($teaDetails['deliveryOrder'] || @canuser('do.edit'))
                                     <div>
                                         <a class="btn btn-sm btn-primary action-btn"
                                            href="{{ route('clerk.getDoToEdit', $teaDetails['deliveryOrder']->delivery_id) }}">

@@ -2921,7 +2921,7 @@ class AppClass
             'format' => 'A4-L', // Landscape
             'orientation' => 'L',
             'margin_top' => 4,
-            'margin_bottom' => 4,
+            'margin_bottom' => 7,
             'margin_left' => 5,
             'margin_right' => 5,
 //            'setAutoTopMargin' => 'stretch',
@@ -3167,7 +3167,7 @@ class AppClass
             ->leftJoin('auctions', function ($join) {
                 $join->on('auctions.delivery_id', '=', 'external_transfers.delivery_id');
             })
-            ->join('clients as buyer', 'buyer.client_id', '=', 'auctions.client_id')
+            ->leftJoin('clients as buyer', 'buyer.client_id', '=', 'auctions.client_id')
             ->leftJoin('stock_ins', 'stock_ins.stock_id', '=', 'external_transfers.stock_id')
             ->leftJoin('stations', 'stations.station_id', '=', 'stock_ins.station_id')
             ->leftJoin('clients', 'clients.client_id', '=', 'delivery_orders.client_id')
@@ -3182,6 +3182,8 @@ class AppClass
             ->where(['external_transfers.delivery_number' => $delNumber, 'lot' => $lot ?: null])
             ->orderBy(DB::raw('COALESCE(gardens.garden_name, blendBalances.garden)'))
             ->orderBy(DB::raw('COALESCE(delivery_orders.invoice_number, blendBalances.blend_number)'))
+            ->whereNull('external_transfers.deleted_at')
+            ->whereNull('auctions.deleted_at')
             ->get();
 
         $details = $orders[0];
@@ -6726,7 +6728,7 @@ class AppClass
             ->groupBy('voucher_number')
             ->get();
 
-    
+
         $combinedResults = collect([])
             ->merge($receipts)
             ->merge($payments)
