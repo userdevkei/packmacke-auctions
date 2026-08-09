@@ -24,6 +24,9 @@
         <th>#</th>
         <th>Date</th>
         <th>Delivery No.</th>
+        <th>Invoice No.</th>
+        <th>Garden</th>
+        <th>Grade</th>
         <th>Client</th>
         <th>Packages</th>
         <th>Net Weight</th>
@@ -31,24 +34,7 @@
         <th>Destination</th>
         <th>Sale Type</th>
         <th>Status</th>
+        <th>Aging</th>
     </tr>
     </thead>
     <tbody>
-    @foreach($rows as $i => $row)
-        <tr>
-            <td>{{ $startIndex + $i + 1 }}</td>
-            <td>{{ \Carbon\Carbon::parse($row->created_at)->format('d/m/y') }}</td>
-            <td>{{ $row->delivery_number . $row->lot }}</td>
-            <td>{{ $row->client_name }}</td>
-            <td>{{ number_format($row->transferred_palettes, 0) }}</td>
-            <td>{{ number_format($row->transferred_weight, 2) }}</td>
-            <td>{{ $row->station_name }}</td>
-            <td>{{ $row->warehouse_name }}</td>
-            <td>{{ $row->sale_type }}</td>
-            <td>{{ $statusLabels[$row->status] ?? 'Released' }}</td>
-        </tr>
-    @endforeach
-    </tbody>
-</table>
-</body>
-</html>
