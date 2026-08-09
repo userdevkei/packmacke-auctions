@@ -4,7 +4,7 @@
         <div class="card-header">
             <div class="row flex-between-center">
                 <div class="col-6 col-sm-auto d-flex align-items-center pe-0">
-                    <h5 class="fs-9 mb-0 text-nowrap py-0 py-xl-0">Prepare Auction List For</h5>
+                    <h5 class="fs-9 mb-0 text-nowrap py-0 py-xl-0">Prepare Private Sale List</h5>
                 </div>
                 <div class="col-6 col-sm-auto ms-auto text-end ps-0">
                     <div id="table-simple-pagination-replace-element">
@@ -60,12 +60,13 @@
                                         </div>
                                     </td>
                                     <td>
-                                        <select class="form-select fs-sm saleNumber" name="deliveries[{{ $transfer->stock_id }}][saleNumber]" id="saleNumber">
+                                        <!-- <select class="form-select fs-sm saleNumber" name="deliveries[{{ $transfer->stock_id }}][saleNumber]" id="saleNumber">
                                             <option disabled selected value="">-- select sale number --</option>
                                             @for($i = 1; $i<=54; $i++)
                                                 <option value="{{ $i.'/'.date('y') }}">{{ $i.'/'.date('y') }}</option>
                                             @endfor
-                                        </select>
+                                        </select> -->
+                                         <input class="form-control fs-sm saleNumber" name="deliveries[{{ $transfer->stock_id }}][saleNumber]" id="saleNumber">
                                     </td>
                                 </tr>
                             @endforeach

@@ -36,6 +36,9 @@ class ClerkPermissionTableSeeder extends Seeder
             ['name' => 'Add Direct Delivery Teas', 'key' => 'direct-deliver-teas.add', 'category' => 'stocks'],
             ['name' => 'Release Teas', 'key' => 'external.release', 'category' => 'stocks'],
 
+            ['name' => 'Edit Delivery Order', 'key' => 'do.edit', 'category' => 'delivery order'],
+            ['name' => 'Delete Delivery Order', 'key' => 'do.delete', 'category' => 'delivery order'],
+
             ['name' => 'Access Inventory', 'key' => 'inventory.access', 'category' => 'inventory'],
             ['name' => 'View Inventory', 'key' => 'inventory.view', 'category' => 'inventory'],
             ['name' => 'Add Inventory Item', 'key' => 'inventoryItem.add', 'category' => 'inventory'],

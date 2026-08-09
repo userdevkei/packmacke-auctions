@@ -3676,7 +3676,7 @@ public function viewExternalTransfers(Request $request)
 
         $required = [
             'Tea Type', 'Garden', 'Grade', 'Package', 'Packages', 'Package Tare', 'Gross Weight', 'Total Tare', 'Pallete Weight', 'Pallete Weight', 'Sample Received',
-            'Printed Net Weight', 'Actual Net Weight', 'Production Date', 'Expiry Date', 'Warehouse Bay', 'Delivery Number', 'Invoice Number', 'Producer Warehouse', 'RA'
+            'Printed Net Weight', 'Actual Net Weight', /*'Production Date', 'Expiry Date',*/ 'Warehouse Bay', 'Delivery Number', 'Invoice Number', 'Producer Warehouse', 'RA'
         ];
 
         $records = [];
@@ -3759,7 +3759,7 @@ public function viewExternalTransfers(Request $request)
 
         $required = [
             'Tea Type', 'Garden', 'Grade', 'Package', 'Packages', 'Package Tare', 'Gross Weight', 'Total Tare', 'Pallete Weight', 'Pallete Weight', 'Sample Received',
-            'Printed Net Weight', 'Actual Net Weight', 'Production Date', 'Expiry Date', 'Warehouse Bay', 'Delivery Number', 'Invoice Number', 'Producer Warehouse', 'RA'
+            'Printed Net Weight', 'Actual Net Weight', /*'Production Date', 'Expiry Date',*/ 'Warehouse Bay', 'Delivery Number', 'Invoice Number', 'Producer Warehouse', 'RA'
         ];
 
         $meta = session('import_meta');
@@ -3893,8 +3893,8 @@ public function viewExternalTransfers(Request $request)
                         'total_weight'    => number_format($record['Actual Net Weight'] + ($record['Packages']   * $record['Package Tare']) + $record['Pallete Weight'], 1, '.', ''),
                         'warehouse_id'    => $warehouse->warehouse_id,
                         'invoice_number'  => $record['Invoice Number'] ?? null,
-                        'production_date' => $productionDate,
-                        'expiry_date'     => $expiryDate,
+                        'production_date' => $productionDate ?? null,
+                        'expiry_date'     => $expiryDate ?? null,
                         'dispatch_date'   => $request->dispatch_date,
                         'printed_weight'  => $record['Printed Net Weight'] ?? null,
                         'height'          => $record['Pallete Height'],
@@ -5018,7 +5018,7 @@ public function viewExternalTransfers(Request $request)
                 'delivery_id' => $do->delivery_id,
                 'broker_id' => $tea->brokerId,
                 'sale' => $tea->saleNumber,
-                'warrant_number' => Auction::newWarrantNumber(),
+                'warrant_number' => Auction::newWarrantNumber('auction'),
                 'status' => 0,
                 'user_id' => auth()->id(),
             ];
@@ -5279,20 +5279,59 @@ public function viewExternalTransfers(Request $request)
     }
     public function preparePrivateSaleList(Request $request)
     {
+        // $teas = DB::table('currentstock')
+        //     ->leftJoin('auctions', function ($join) {
+        //         $join->on('currentstock.delivery_id', '=', 'auctions.delivery_id')
+        //             ->on('currentstock.stock_id', '=', 'auctions.stock_id')
+        //             ->whereNull('auctions.deleted_at');
+        //     })
+        //     ->select('currentstock.stock_id', 'currentstock.delivery_id', 'currentstock.client_name', 'currentstock.client_id', 'invoice_number', 'order_number', 'lot_number', 'current_stock', 'current_weight', 'garden_name', 'grade_name')
+        //     // ->where('current_stock', '>', 0)
+        //     // ->where('current_weight', '>', 0)
+        //     ->where(['currentstock.client_id' => $request->client])
+        //     ->whereNull('auctions.warrant_number')
+        //     ->orderBy('garden_name', 'asc')
+        //     ->orderBy('invoice_number', 'asc')
+        //     ->get();
+
         $teas = DB::table('currentstock')
-            ->leftJoin('auctions', function ($join) {
-                $join->on('currentstock.delivery_id', '=', 'auctions.delivery_id')
-                    ->on('currentstock.stock_id', '=', 'auctions.stock_id')
-                    ->whereNull('auctions.deleted_at');
-            })
-            ->select('currentstock.stock_id', 'currentstock.delivery_id', 'currentstock.client_name', 'currentstock.client_id', 'invoice_number', 'order_number', 'lot_number', 'current_stock', 'current_weight', 'garden_name', 'grade_name')
-            ->where('current_stock', '>', 0)
-            ->where('current_weight', '>', 0)
-            ->where(['currentstock.client_id' => $request->client])
-            ->whereNull('auctions.warrant_number')
-            ->orderBy('garden_name', 'asc')
-            ->orderBy('invoice_number', 'asc')
-            ->get();
+    ->leftJoin('auctions', function ($join) {
+        $join->on('currentstock.delivery_id', '=', 'auctions.delivery_id')
+             ->on('currentstock.stock_id', '=', 'auctions.stock_id');
+    })
+    ->select(
+        'currentstock.stock_id',
+        'currentstock.delivery_id',
+        'currentstock.client_name',
+        'currentstock.client_id',
+        'invoice_number',
+        'order_number',
+        'lot_number',
+        'current_stock',
+        'current_weight',
+        'garden_name',
+        'grade_name'
+    )
+    ->where('currentstock.client_id', $request->client)
+    ->where(function ($query) {
+        $query->where(function ($q) {
+            $q->where('current_stock', '>', 0)
+              ->where('current_weight', '>', 0);
+        })->orWhere(function ($q) {
+            $q->where('current_stock', '<=', 0)
+              ->where('current_weight', '<=', 0)
+              ->whereNotExists(function ($sub) {
+                  $sub->select(DB::raw(1))
+                      ->from('auctions as a')
+                      ->whereColumn('a.stock_id', 'currentstock.stock_id');
+              });
+        });
+    })
+    ->whereNull('auctions.warrant_number')
+    ->orderBy('garden_name', 'asc')
+    ->orderBy('invoice_number', 'asc')
+    ->get();
+
         $client = Client::where(['client_id' => $request->client])->first();
         $brokers = Broker::all();
         return view('clerk::private.prepareAuctionList', compact('teas', 'client', 'brokers'));
