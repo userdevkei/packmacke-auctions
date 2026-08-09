@@ -2540,7 +2540,7 @@ class AdminController extends Controller
 
         return view('admin::transfers.viewExternalTransfer')->with(['transfers' => $transfers, 'teas' => $teas]);
     }
-    public function viewExternalTransfers(Request $request)
+    /*public function viewExternalTransfers(Request $request)
     {
         $from = $request->get('from') ?? Carbon::now()->startOfMonth();
         $to = $request->get('to') ?? Carbon::now();
@@ -2618,7 +2618,327 @@ class AdminController extends Controller
         $clients = Client::all();
         $users = Driver::all();
         return view('admin::transfers.externalTransfers')->with(['transfers' => $transfers, 'warehouses' => $warehouses, 'from' => $from, 'to' => $to, 'clients' => $clients, 'transporters' => $transporters, 'users' => $users]);
+    }*/
+
+    public function viewExternalTransfers(Request $request)
+    {
+        $warehouses = Warehouse::all();
+        $transporters = Transporter::all();
+        $clients = Client::all();
+        $users = Driver::all();
+        $stations = \App\Models\Station::where('status', 1)->get();
+
+        // No default date filter on first load — table shows everything until the user applies a filter
+        $from = $request->get('from') ?? null;
+        $to = $request->get('to') ?? null;
+
+        return view('admin::transfers.externalTransfers')->with([
+            'warehouses' => $warehouses,
+            'transporters' => $transporters,
+            'clients' => $clients,
+            'users' => $users,
+            'stations' => $stations,
+            'from' => $from,
+            'to' => $to,
+        ]);
     }
+
+    /**
+     * Shared query builder for both the grouped (list view) and ungrouped (export) datasets.
+     * All WHERE filters run BEFORE grouping/aggregation wherever the column allows it (indexed,
+     * non-aggregated columns on external_transfers), which lets MySQL use indexes and avoid
+     * scanning + joining rows it would just discard after grouping anyway.
+     */
+    private function externalTransfersBaseQuery(Request $request)
+    {
+        $query = DB::table('external_transfers')
+            ->leftJoin('blendBalances', function ($join) {
+                $join->on('blendBalances.blend_balance_id', '=', 'external_transfers.stock_id')
+                    ->on('blendBalances.blend_id', '=', 'external_transfers.delivery_id');
+            })
+            ->leftJoin(DB::raw('(
+                SELECT delivery_id, MIN(client_id) as client_id
+                FROM delivery_orders
+                WHERE deleted_at IS NULL
+                GROUP BY delivery_id
+            ) as delivery_orders'), 'delivery_orders.delivery_id', '=', 'external_transfers.delivery_id')
+            ->leftJoin('clients', 'clients.client_id', '=', 'delivery_orders.client_id')
+            ->leftJoin(DB::raw('(
+                SELECT delivery_id, MIN(client_id) as client_id, MIN(type) as type
+                FROM auctions
+                WHERE deleted_at IS NULL
+                GROUP BY delivery_id
+            ) as auctions'), 'auctions.delivery_id', '=', 'external_transfers.delivery_id')
+            ->leftJoin('clients as buyer', 'buyer.client_id', '=', 'auctions.client_id')
+            ->leftJoin(DB::raw('(
+                SELECT stock_id, MIN(station_id) as station_id
+                FROM stock_ins
+                GROUP BY stock_id
+            ) as stock_ins'), 'stock_ins.stock_id', '=', 'external_transfers.stock_id')
+            ->leftJoin('stations', 'stations.station_id', '=', 'stock_ins.station_id')
+            ->leftJoin('warehouse_locations', 'warehouse_locations.location_id', '=', 'stations.location_id')
+            ->leftJoin('warehouses', 'warehouses.warehouse_id', '=', 'external_transfers.warehouse_id')
+            ->leftJoin('other_destinations', 'other_destinations.warehouse_id', '=', 'external_transfers.warehouse_id')
+            ->leftJoin('transporters', 'transporters.transporter_id', '=', 'external_transfers.transporter_id')
+            ->leftJoin('other_transporters', 'other_transporters.transporter_id', '=', 'external_transfers.transporter_id')
+            ->leftJoin('drivers', 'drivers.driver_id', '=', 'external_transfers.driver_id')
+            ->whereNull('external_transfers.deleted_at');
+
+        // ---- Filters applied pre-group, directly on indexed/base columns ----
+        if ($request->filled('date_from')) {
+            $query->where('external_transfers.created_at', '>=', Carbon::parse($request->date_from)->startOfDay());
+        }
+
+        if ($request->filled('date_to')) {
+            $query->where('external_transfers.created_at', '<=', Carbon::parse($request->date_to)->endOfDay());
+        }
+
+        if ($request->filled('status') && $request->status !== '') {
+            $query->where('external_transfers.status', $request->status);
+        }
+
+        if ($request->filled('destination')) {
+            $query->where('external_transfers.warehouse_id', $request->destination);
+        }
+
+        if ($request->filled('source')) {
+            $query->where('warehouse_locations.location_id', $request->source);
+        }
+
+        if ($request->filled('delivery_number')) {
+            $query->where('external_transfers.delivery_number', 'like', "%{$request->delivery_number}%");
+        }
+
+        if ($request->filled('client_name')) {
+            $clientName = $request->client_name;
+            $query->where(function ($q) use ($clientName) {
+                $q->where('clients.client_name', 'like', "%{$clientName}%")
+                    ->orWhere('blendBalances.client_name', 'like', "%{$clientName}%")
+                    ->orWhere('buyer.client_name', 'like', "%{$clientName}%");
+            });
+        }
+
+        return $query;
+    }
+
+    public function externalTransfersData(Request $request)
+    {
+        $query = $this->externalTransfersBaseQuery($request)
+            ->select([
+                'external_transfers.delivery_number',
+                'external_transfers.lot',
+                DB::raw('MIN(external_transfers.delivery_id) as delivery_id'),
+                DB::raw('MIN(external_transfers.status) as status'),
+                DB::raw('MIN(external_transfers.warehouse_id) as warehouse_id'),
+                DB::raw('MIN(external_transfers.registration) as registration'),
+                DB::raw('MIN(external_transfers.release_date) as release_date'),
+                DB::raw('MIN(external_transfers.created_at) as created_at'),
+                DB::raw('MIN(warehouse_locations.location_id) as location_id'),
+
+                DB::raw("COALESCE(MIN(clients.client_name), MIN(blendBalances.client_name), '') as client_name"),
+                DB::raw("COALESCE(MIN(warehouses.warehouse_name), MIN(other_destinations.warehouse_name), '') as warehouse_name"),
+                DB::raw("COALESCE(MIN(stations.station_name), MIN(blendBalances.station_name), '') as station_name"),
+                DB::raw('COALESCE(MIN(transporters.transporter_id), MIN(other_transporters.transporter_id)) as transporter_id'),
+                DB::raw("COALESCE(MIN(transporters.transporter_name), MIN(other_transporters.transporter_name), '') as transporter_name"),
+
+                DB::raw('MIN(buyer.client_name) as buyer_name'),
+                DB::raw('MIN(drivers.driver_id) as driver_id'),
+                DB::raw('MIN(drivers.driver_name) as driver_name'),
+                DB::raw('MIN(drivers.phone) as phone'),
+                DB::raw('MIN(drivers.id_number) as id_number'),
+
+                DB::raw("CASE
+                    WHEN MIN(auctions.delivery_id) IS NULL THEN 'Other'
+                    WHEN MIN(auctions.type) = 'auction' THEN 'Auction'
+                    WHEN MIN(auctions.type) = 'private' THEN 'Private'
+                    ELSE 'Other'
+                END as sale_type"),
+
+                DB::raw('SUM(external_transfers.transferred_palettes) as total_palettes'),
+                DB::raw('SUM(external_transfers.transferred_weight) as total_weight')
+            ])
+            ->groupBy([
+                'external_transfers.delivery_number',
+                'external_transfers.lot',
+            ]);
+
+        // ---- Post-group filters (on aggregated/derived columns only) ----
+        if ($request->filled('sale_type')) {
+            $saleType = ucfirst(strtolower($request->sale_type));
+            $query->havingRaw("CASE
+                WHEN MIN(auctions.delivery_id) IS NULL THEN 'Other'
+                WHEN MIN(auctions.type) = 'auction' THEN 'Auction'
+                WHEN MIN(auctions.type) = 'private' THEN 'Private'
+                ELSE 'Other'
+            END = ?", [$saleType]);
+        }
+
+        if ($request->filled('search.value')) {
+            $s = '%' . $request->input('search.value') . '%';
+            $query->havingRaw("(external_transfers.delivery_number LIKE ?
+                OR COALESCE(MIN(clients.client_name), MIN(blendBalances.client_name), '') LIKE ?
+                OR MIN(buyer.client_name) LIKE ?
+                OR COALESCE(MIN(warehouses.warehouse_name), MIN(other_destinations.warehouse_name), '') LIKE ?
+                OR COALESCE(MIN(stations.station_name), MIN(blendBalances.station_name), '') LIKE ?)",
+                [$s, $s, $s, $s, $s]);
+        }
+
+        // recordsTotal: count of groups matching the pre-group WHERE filters only (no search/sale_type),
+        // computed once via a lightweight count query rather than re-running the full select+joins.
+        $recordsTotal = (clone $query)->getCountForPagination();
+
+        $recordsFiltered = $recordsTotal;
+        if ($request->filled('search.value') || $request->filled('sale_type')) {
+            $recordsFiltered = (clone $query)->getCountForPagination();
+        }
+
+        $orderColumns = [
+            1 => 'created_at',
+            2 => 'delivery_number',
+            3 => 'client_name',
+            4 => 'total_palettes',
+            5 => 'total_weight',
+            6 => 'station_name',
+            7 => 'warehouse_name',
+            8 => 'status',
+        ];
+
+        $orderIndex = $request->input('order.0.column');
+        $orderDir = $request->input('order.0.dir', 'desc');
+
+        if ($orderIndex !== null && isset($orderColumns[$orderIndex])) {
+            $query->orderBy($orderColumns[$orderIndex], $orderDir);
+        } else {
+            $query->orderBy('created_at', 'desc');
+        }
+
+        $start = (int) $request->input('start', 0);
+        $length = (int) $request->input('length', 50);
+
+        $transfers = $length == -1
+            ? $query->get()
+            : $query->skip($start)->take($length)->get();
+
+        $statusBadges = [
+            0 => '<span class="badge bg-warning">Created</span>',
+            1 => '<span class="badge bg-danger">Pending Approval</span>',
+            2 => '<span class="badge bg-info">Approved (Ops)</span>',
+            3 => '<span class="badge bg-dark">Approved (Fin)</span>',
+        ];
+
+        $data = [];
+        foreach ($transfers as $i => $transfer) {
+            $data[] = [
+                'DT_RowIndex' => $start + $i + 1,
+                'date_initiated' => Carbon::parse($transfer->created_at)->format('d/m/y'),
+                'delivery_number' => $transfer->delivery_number . $transfer->lot,
+                'client_name' => $transfer->client_name,
+                'packages' => number_format($transfer->total_palettes, 0),
+                'net_weight' => number_format($transfer->total_weight, 2),
+                'transfer_from' => $transfer->station_name,
+                'destination' => $transfer->warehouse_name,
+                'sale_type' => $transfer->sale_type,
+                'status' => $statusBadges[$transfer->status] ?? '<span class="badge bg-success">Released</span>',
+                'actions' => view('admin::transfers.partials.actions', compact('transfer'))->render(),
+            ];
+        }
+
+        return response()->json([
+            'draw' => intval($request->input('draw')),
+            'recordsTotal' => $recordsTotal,
+            'recordsFiltered' => $recordsFiltered,
+            'data' => $data,
+        ]);
+    }
+
+    public function externalTransfersExport(Request $request)
+    {
+        // Export lists INDIVIDUAL transfer lines (one row per stock_id/pallet), not grouped by delivery+lot,
+        // so the exported file matches the underlying transaction detail rather than the summary view.
+        $rows = $this->externalTransfersBaseQuery($request)
+            ->select([
+                'external_transfers.delivery_number',
+                'external_transfers.lot',
+                'external_transfers.status',
+                'external_transfers.created_at',
+                'external_transfers.transferred_palettes',
+                'external_transfers.transferred_weight',
+                'external_transfers.stock_id',
+
+                DB::raw("COALESCE(clients.client_name, blendBalances.client_name, '') as client_name"),
+                DB::raw("COALESCE(warehouses.warehouse_name, other_destinations.warehouse_name, '') as warehouse_name"),
+                DB::raw("COALESCE(stations.station_name, blendBalances.station_name, '') as station_name"),
+
+                DB::raw("CASE
+                    WHEN auctions.delivery_id IS NULL THEN 'Other'
+                    WHEN auctions.type = 'auction' THEN 'Auction'
+                    WHEN auctions.type = 'private' THEN 'Private'
+                    ELSE 'Other'
+                END as sale_type"),
+            ])
+            ->orderByDesc('external_transfers.delivery_number')
+            ->orderBy('external_transfers.stock_id');
+
+        if ($request->filled('sale_type')) {
+            $saleType = ucfirst(strtolower($request->sale_type));
+            $rows->havingRaw("CASE
+                WHEN auctions.delivery_id IS NULL THEN 'Other'
+                WHEN auctions.type = 'auction' THEN 'Auction'
+                WHEN auctions.type = 'private' THEN 'Private'
+                ELSE 'Other'
+            END = ?", [$saleType]);
+        }
+
+        $rows = $rows->get();
+
+        $statusLabels = [
+            0 => 'Created',
+            1 => 'Pending Approval',
+            2 => 'Approved (Ops)',
+            3 => 'Approved (Fin)',
+        ];
+
+        $format = $request->get('format', 'csv'); // csv or pdf
+
+        if ($format === 'pdf') {
+            $pdf = \PDF::loadView('admin::transfers.partials.export-pdf', [
+                'rows' => $rows,
+                'statusLabels' => $statusLabels,
+            ]);
+            return $pdf->download('external-transfers-' . now()->format('Y-m-d') . '.pdf');
+        }
+
+        $filename = 'external-transfers-' . now()->format('Y-m-d') . '.csv';
+        $headers = [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+        ];
+
+        $columns = ['#', 'Date Initiated', 'Delivery Number', 'Client Name', 'Packages', 'Net Weight', 'Transfer From', 'Destination', 'Sale Type', 'Status'];
+
+        $callback = function () use ($rows, $columns, $statusLabels) {
+            $file = fopen('php://output', 'w');
+            fputcsv($file, $columns);
+            foreach ($rows as $i => $row) {
+                fputcsv($file, [
+                    $i + 1,
+                    Carbon::parse($row->created_at)->format('d/m/y'),
+                    $row->delivery_number . $row->lot,
+                    $row->client_name,
+                    number_format($row->transferred_palettes, 0),
+                    number_format($row->transferred_weight, 2),
+                    $row->station_name,
+                    $row->warehouse_name,
+                    $row->sale_type,
+                    $statusLabels[$row->status] ?? 'Released',
+                ]);
+            }
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+
     public function prepareExternalTransfer(Request $request)
     {
         $teas = DB::table('currentstock')->where('current_stock', '>', 0)

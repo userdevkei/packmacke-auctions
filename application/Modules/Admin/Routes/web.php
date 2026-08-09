@@ -115,7 +115,9 @@ Route::prefix('admin')->middleware(['auth', 'web', 'userRoles', 'userRole:1', 'd
     Route::post('internal-transfers', [AdminController::class, 'viewInternalTransfers'])->name('admin.viewInternalTransfers');
 
     Route::get('external-transfers', [AdminController::class, 'viewExternalTransfers'])->name('admin.viewExternalTransfers');
-    Route::post('external-transfers', [AdminController::class, 'viewExternalTransfers'])->name('admin.viewExternalTransfers');
+//    Route::post('external-transfers', [AdminController::class, 'viewExternalTransfers'])->name('admin.viewExternalTransfers');
+    Route::get('external-transfers-data', [AdminController::class, 'externalTransfersData'])->name('admin.externalTransfersData');
+    Route::get('external-transfers-export', [AdminController::class, 'externalTransfersExport'])->name('admin.externalTransfersExport');
 
     Route::get('filter-clients-per-warehouse', [AdminController::class, 'selectClients'])->name('admin.selectClients');
     Route::get('filter-client-per-warehouse', [AdminController::class, 'selectClient'])->name('admin.selectClient');

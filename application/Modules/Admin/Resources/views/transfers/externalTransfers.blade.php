@@ -1,12 +1,69 @@
 @extends('admin::layouts.default')
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.3.0/css/bootstrap.min.css">
 <link rel="stylesheet" href="https://cdn.datatables.net/2.1.5/css/dataTables.dataTables.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/buttons/3.1.2/css/buttons.dataTables.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css">
+<script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
+<meta name="csrf-token" content="{{ csrf_token() }}">
+
+<style>
+    .filter-panel {
+        background: #f9fafb;
+        border: 1px solid #edf2f9;
+        border-radius: .5rem;
+        padding: 1rem 1rem .75rem;
+        margin-bottom: 1rem;
+    }
+    .filter-panel .form-label {
+        font-size: .72rem;
+        font-weight: 600;
+        color: #5e6e82;
+        text-transform: uppercase;
+        letter-spacing: .02em;
+        margin-bottom: .25rem;
+    }
+    .filter-panel .choices { margin-bottom: 0; font-size: .875rem; }
+    .filter-panel .choices__inner {
+        min-height: calc(1.5em + 1rem + 2px);
+        padding: .3rem .75rem;
+        background-color: #fff;
+        border-radius: .375rem;
+    }
+    .filter-panel .form-control,
+    .filter-panel .form-select {
+        font-size: .875rem;
+    }
+    .active-filter-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: .35rem;
+        background: #e7edff;
+        color: #2054C9;
+        border-radius: 2rem;
+        padding: .2rem .6rem .2rem .75rem;
+        font-size: .75rem;
+        font-weight: 500;
+        margin: 0 .35rem .35rem 0;
+    }
+    .active-filter-chip .chip-x {
+        cursor: pointer;
+        font-weight: 700;
+        opacity: .6;
+    }
+    .active-filter-chip .chip-x:hover { opacity: 1; }
+    .table-responsive::-webkit-scrollbar { height: 6px; }
+    .table-responsive::-webkit-scrollbar-thumb { background: #d8e2ef; border-radius: 3px; }
+    .table-responsive::-webkit-scrollbar-track { background: transparent; }
+    .dt-buttons .btn { font-size: .8rem; }
+    #activeFilters:empty { display: none; }
+</style>
+
 @section('admin::dashboard')
     <div class="card">
         <div class="card-header">
             <div class="row flex-between-center">
                 <div class="col-6 col-sm-auto d-flex align-items-center pe-0">
-                    <h5 class="fs-9 mb-0 text-nowrap py-0 py-xl-0">External Tea Transfers </h5>
+                    <h5 class="fs-9 mb-0 text-nowrap py-0 py-xl-0">External Tea Transfers</h5>
                 </div>
                 <div class="col-6 col-sm-auto ms-auto text-end ps-0">
                     <div id="table-simple-pagination-replace-element">
@@ -28,11 +85,8 @@
                                     <form method="POST" id="myForm" action="{{ route('admin.prepareExternalTransfer') }}">
                                         @csrf
                                         <div class="row row-cols-sm-2 g-2">
-                                            @php
-                                                $stations = \App\Models\Station::where('status', 1)->get();
-                                            @endphp
-                                            <div class=" mb-4">
-                                                <label class="fs-sm fw-bold my-2" style="font-size: 85% !important;"> RECEIVING WAREHOUSE </label>
+                                            <div class="mb-4">
+                                                <label class="fs-sm fw-bold my-2" style="font-size: 85% !important;">RECEIVING WAREHOUSE</label>
                                                 <select name="location" class="form-select js-choice" id="selectWarehouse">
                                                     <option disabled selected>-- select station --</option>
                                                     @foreach($stations as $station)
@@ -40,8 +94,8 @@
                                                     @endforeach
                                                 </select>
                                             </div>
-                                            <div class=" mb-4">
-                                                <label class="fs-sm fw-bold my-2" style="font-size: 85% !important;"> CLIENT NAME</label>
+                                            <div class="mb-4">
+                                                <label class="fs-sm fw-bold my-2" style="font-size: 85% !important;">CLIENT NAME</label>
                                                 <select name="client" class="form-select" id="selectClients" style="height: 58% !important;">
                                                     <option disabled selected>-- select client --</option>
                                                 </select>
@@ -49,7 +103,7 @@
                                         </div>
 
                                         <div class="d-flex justify-content-center mt-1">
-                                            <button id="submitButton" type="submit" class="btn btn-success col-8">PREPARE TRANSFER REQUEST </button>
+                                            <button id="submitButton" type="submit" class="btn btn-success col-8">PREPARE TRANSFER REQUEST</button>
                                         </div>
                                     </form>
                                 </div>
@@ -57,154 +111,415 @@
                         </div>
                     </div>
                 </div>
-
             </div>
         </div>
+
         <div class="card-body overflow-hidden p-lg-3">
-            <div class="">
-                <form method="POST" action="">
-                    @csrf
-                    <div class="row row-cols-3">
-                        <div class="">
-                            <input type="date" class="form-control" name="from" value="{{ Carbon\Carbon::parse($from)->format('Y-m-d') }}">
+
+            <!-- FILTER PANEL -->
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#filterPanelCollapse" aria-expanded="false" aria-controls="filterPanelCollapse">
+                    <span class="fas fa-filter me-1"></span>Filters
+                    <span class="fas fa-chevron-down ms-1" id="filterChevron"></span>
+                </button>
+                <div id="activeFiltersOutside" class="d-flex flex-wrap"></div>
+            </div>
+
+            <div class="collapse" id="filterPanelCollapse">
+                <div class="filter-panel">
+                    <div class="row g-3">
+                        <div class="col-6 col-md-3">
+                            <label class="form-label">Date From</label>
+                            <input type="date" id="filter-date-from" class="form-control form-control-sm" value="{{ $from }}">
                         </div>
-                        <div class="">
-                            <input type="date" class="form-control" name="to" value="{{ Carbon\Carbon::parse($to)->format('Y-m-d') }}">
+                        <div class="col-6 col-md-3">
+                            <label class="form-label">Date To</label>
+                            <input type="date" id="filter-date-to" class="form-control form-control-sm" value="{{ $to }}">
                         </div>
-                        <div class="">
-                            <button type="submit" class="btn btn-sm btn-info">filter</button>
+                        <div class="col-6 col-md-3">
+                            <label class="form-label">Delivery Number</label>
+                            <input type="text" id="filter-delivery-number" class="form-control form-control-sm" placeholder="e.g. DN1234">
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <label class="form-label">Client / Buyer Name</label>
+                            <select id="filter-client-name" class="form-select js-choice" data-placeholder="All Clients">
+                                <option value="">All Clients</option>
+                                @foreach($clients as $client)
+                                    <option value="{{ $client->client_name }}">{{ $client->client_name }}</option>
+                                @endforeach
+                            </select>
                         </div>
                     </div>
-                </form>
-            </div>
-            <div class="row align-items-center">
-                <div class="tab-pane preview-tab-pane active" role="tabpanel" aria-labelledby="tab-dom-c3976e0e-38db-410e-861a-36d04a3a7494" id="dom-c3976e0e-38db-410e-861a-36d04a3a7494">
-                    <table class="table mb-0 table-bordered table-striped" id="datatable">
-                        <thead class="bg-200">
-                        <tr>
-                            <th>#</th>
-                            <th>Date Initiated </th>
-                            <th>Delivery Number </th>
-                            <th>Client Name</th>
-                            <th>Packages</th>
-                            <th>Net Weight</th>
-                            <th>Transfer From</th>
-                            <th>Destination</th>
-                            <th nowrap="">Status</th>
-                            <th></th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        @foreach($transfers as $transfer)
-                            <tr>
-                                <td>{{ $loop->iteration }}</td>
-                                <td>{{ \Carbon\Carbon::parse($transfer->created_at)->format('d/m/y') }}</td>
-                                <td>{{ $transfer->delivery_number }}{{ $transfer->lot }}</td>
-                                <td nowrap="">{{ $transfer->client_name }}</td>
-                                <td>{{ number_format($transfer->total_palettes, 0) }}</td>
-                                <td>{{ number_format($transfer->total_weight, 2) }}</td>
-                                <td nowrap="">{{ $transfer->station_name }}</td>
-                                <td nowrap="">{{ $transfer->warehouse_name }}</td>
-                                <td>
-                                    {!! $transfer->status === 0 ? '<span class="badge bg-warning"> Created </span>' : ($transfer->status == 1 ?  '<span class="badge bg-danger"> Pending Approval </span>' :($transfer->status == 2 ? '<span class="badge bg-info"> Approved (Ops) </span>' : ($transfer->status == 3 ? '<span class="badge bg-dark"> Approved (Fin) </span>' : '<span class="badge bg-success"> Released </span>'))) !!}
-                                </td>
-                                <td nowrap="">
-                                    <div class="d-flex align-items-center">
-                                        <!-- Trace Tea Icon -->
-                                            @if($transfer->status === 0)
-                                            <a class="link text-info" data-bs-toggle="tooltip" data-bs-placement="left" title="Initiate external transfer" onclick="return confirm('Are you sure you want to initiate this transfer request?')" href="{{ route('admin.initiateExternalTransfer', base64_encode($transfer->delivery_number)) }}"> <span class="fa-solid fa-check-circle"> </span></a>
-                                            @elseif($transfer->status == 1)
-                                            <a class="link text-dark" data-bs-toggle="tooltip" data-bs-placement="left" title="Approve transfer, operations dept" onclick="return confirm('Are you sure you want to approve this transfer request?')" href="{{ route('admin.approveExternalTransfer', base64_encode($transfer->delivery_number)) }}"> <span class="fa-solid fa-check"> </span></a>
-                                            @elseif($transfer->status == 2)
-                                            <a class="link text-secondary" data-bs-toggle="tooltip" data-bs-placement="left" title="Approve transfer, finance dept" onclick="return confirm('Are you sure you want to approve this transfer request?')" href="{{ route('admin.approveExternalTransfer', base64_encode($transfer->delivery_number)) }}"> <span class="fa-solid fa-check-double"> </span></a>
-                                            @elseif($transfer->status == 3)
-                                            @if ($transfer->release_date != null)
-                                                <a class="link link-danger release-btn"
-                                                   title="Transfer approved, pending release"
-                                                   data-delivery="{{ $transfer->delivery_number }}"
-                                                   data-url="{{ route('admin.releaseForm', base64_encode($transfer->delivery_number.':'.($transfer->lot ?? ''))) }}"
-                                                   data-client="{{ $transfer->client_name }}"
-                                                   href="#">
-                                                    <span class="fa-solid fa-truck-arrow-right"></span>
-                                                </a>
-                                           @else
-                                                <a class="link text-secondary" data-bs-toggle="tooltip" data-bs-placement="left" title="Transfer approved, pending release"> <span class="fa-solid fa-truck-field"></span> </a>
-                                            @endif
-                                              
-                                            @else
-                                                <a class="link text-success" data-bs-toggle="tooltip" data-bs-placement="left" title="Transfer released, and stock updated"> <span class="fa-solid fa-truck-fast"></span> </a>
-                                            @endif
-                                        <!-- Dropdown Icon -->
-                                        <div class="dropdown font-sans-serif position-static" >
-                                            <a class="link text-600 btn-sm dropdown-toggle btn-reveal" type="button" data-bs-toggle="dropdown" data-boundary="window" aria-haspopup="true" aria-expanded="false">
-                                                <span class="fas fa-ellipsis-h fs-10"></span>
-                                            </a>
-                                            <div class="dropdown-menu dropdown-menu-end border py-0">
-                                                <div class="py-2">
-                                                    <a class="dropdown-item text-info" href="{{ route('admin.viewExternalTransferDetails', base64_encode($transfer->delivery_number)) }}">View Transfer</a>
-                                                    @if($transfer->buyer_name == null)
-                                                        <a class="dropdown-item text-primary" href="{{ route('admin.downloadExtraDelNote', base64_encode($transfer->delivery_number.':'.$transfer->lot)) }}" target="_blank">Download Transfer</a>
-                                                    @else
-                                                        <a class="dropdown-item text-danger" href="{{ route('admin.downloadDelNote', base64_encode($transfer->delivery_number.':'.$transfer->lot)) }}" target="_blank">Download Del Note</a>
-                                                    @endif
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </td>
-                            </tr>
-                        @endforeach
-                        </tbody>
-                    </table>
-                    <div class="modal fade" id="releaseModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
-                        <div class="modal-dialog modal-dialog-centered modal-xl">
-                            <div class="modal-content">
-                                <div class="modal-header">
-                                    <h1 class="modal-title fs-1" id="releaseModalLabel">Release Transfer</h1>
-                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                </div>
-                                <div class="modal-body" id="releaseModalBody">
-                                    <div class="text-center py-4">
-                                        <div class="spinner-border text-primary" role="status"></div>
-                                        <p class="mt-2">Loading...</p>
-                                    </div>
-                                </div>
+
+                    <div class="row g-3 mt-1">
+                        <div class="col-6 col-md-3">
+                            <label class="form-label">Status</label>
+                            <select id="filter-status" class="form-select js-choice" data-placeholder="All Statuses">
+                                <option value="">All Statuses</option>
+                                <option value="0">Created</option>
+                                <option value="1">Pending Approval</option>
+                                <option value="2">Approved (Ops)</option>
+                                <option value="3">Approved (Fin)</option>
+                                <option value="4">Released</option>
+                            </select>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <label class="form-label">Source (Station)</label>
+                            <select id="filter-source" class="form-select js-choice" data-placeholder="All Sources">
+                                <option value="">All Sources</option>
+                                @foreach($stations as $station)
+                                    <option value="{{ $station->location_id ?? $station->station_id }}">{{ $station->station_name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <label class="form-label">Destination</label>
+                            <select id="filter-destination" class="form-select js-choice" data-placeholder="All Destinations">
+                                <option value="">All Destinations</option>
+                                @foreach($warehouses as $warehouse)
+                                    <option value="{{ $warehouse->warehouse_id }}">{{ $warehouse->warehouse_name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <label class="form-label">Sold Via</label>
+                            <select id="filter-sale-type" class="form-select js-choice" data-placeholder="All">
+                                <option value="">All</option>
+                                <option value="auction">Auction</option>
+                                <option value="private">Private</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="row mt-3">
+                        <div class="col-12 d-flex flex-wrap align-items-center justify-content-between">
+                            <div id="activeFilters" class="d-flex flex-wrap"></div>
+                            <div class="d-flex gap-2 ms-auto">
+                                <button id="btn-reset-filter" class="btn btn-sm btn-falcon-default">
+                                    <span class="fas fa-rotate-left me-1"></span>Reset
+                                </button>
+                                <button id="btn-filter" class="btn btn-sm btn-primary">
+                                    <span class="fas fa-filter me-1"></span>Apply Filters
+                                </button>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
+
+            <!-- EXPORT BUTTONS -->
+            <div class="d-flex justify-content-end mb-2 gap-2">
+                <button id="btn-export-csv" class="btn btn-sm btn-outline-success">
+                    <span class="fas fa-file-excel me-1"></span>Export Excel/CSV
+                </button>
+                <button id="btn-export-pdf" class="btn btn-sm btn-outline-danger">
+                    <span class="fas fa-file-pdf me-1"></span>Export PDF
+                </button>
+            </div>
+
+            <div class="row align-items-center">
+                <div class="tab-pane preview-tab-pane active" role="tabpanel">
+                    <div class="table-responsive">
+                        <table class="table mb-0 table-bordered table-striped" id="datatable" style="width:100%">
+                            <thead class="bg-200">
+                            <tr>
+                                <th>#</th>
+                                <th>Date Initiated</th>
+                                <th>Delivery Number</th>
+                                <th>Client Name</th>
+                                <th>Packages</th>
+                                <th>Net Weight</th>
+                                <th>Transfer From</th>
+                                <th>Destination</th>
+                                <th>Sold Via</th>
+                                <th nowrap="">Status</th>
+                                <th></th>
+                            </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal fade" id="releaseModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
+                <div class="modal-dialog modal-dialog-centered modal-xl">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h1 class="modal-title fs-1" id="releaseModalLabel">Release Transfer</h1>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body" id="releaseModalBody">
+                            <div class="text-center py-4">
+                                <div class="spinner-border text-primary" role="status"></div>
+                                <p class="mt-2">Loading...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </div>
 @endsection
-<script src="https://code.jquery.com/jquery-3.7.1.js"></script>
-<script src="https://cdn.datatables.net/2.1.5/js/dataTables.js"></script>
+
 <script>
-    $(document).ready(function() {
-        $('#datatable').DataTable({
-            order: [0, 'asc'],
-            pageLength: 50
+    // Avoid loading a second jQuery / DataTables instance if the admin layout already includes them —
+    // duplicate jQuery is the #1 cause of "DataTable looks static, no processing indicator" symptoms,
+    // since $('#datatable').DataTable(...) can end up attached to a different jQuery than the DOM uses.
+    if (typeof window.jQuery === 'undefined') {
+        document.write('<script src="https://code.jquery.com/jquery-3.7.1.js"><\/script>');
+    }
+</script>
+<script>
+    if (typeof window.jQuery === 'undefined' || typeof window.jQuery.fn.DataTable === 'undefined') {
+        document.write('<script src="https://cdn.datatables.net/2.1.5/js/dataTables.js"><\/script>');
+    }
+</script>
+<script>
+    $(document).ready(function () {
+        console.log('[external-transfers] jQuery version in use:', $.fn.jquery);
+        console.log('[external-transfers] DataTables loaded:', typeof $.fn.DataTable !== 'undefined');
+
+        // ---------- CHOICES.JS INIT FOR FILTER DROPDOWNS ----------
+        var choicesInstances = {};
+        document.querySelectorAll('.filter-panel select.js-choice').forEach(function (el) {
+            choicesInstances[el.id] = new Choices(el, {
+                searchEnabled: true,
+                itemSelectText: '',
+                shouldSort: false,
+                placeholder: true,
+                placeholderValue: el.dataset.placeholder || 'All',
+            });
         });
 
+        function setFilterValue(selector, value) {
+            var id = selector.replace('#', '');
+            if (choicesInstances[id]) {
+                choicesInstances[id].setChoiceByValue(value || '');
+            } else {
+                $(selector).val(value || '').trigger('change');
+            }
+        }
+
+        // ---------- FILTER STATE HELPERS ----------
+        function getFilters() {
+            return {
+                date_from: $('#filter-date-from').val(),
+                date_to: $('#filter-date-to').val(),
+                delivery_number: $('#filter-delivery-number').val(),
+                client_name: $('#filter-client-name').val(),
+                status: $('#filter-status').val(),
+                source: $('#filter-source').val(),
+                destination: $('#filter-destination').val(),
+                sale_type: $('#filter-sale-type').val(),
+            };
+        }
+
+        function filterLabels() {
+            return {
+                date_from: 'From',
+                date_to: 'To',
+                delivery_number: 'Delivery #',
+                client_name: 'Client',
+                status: 'Status',
+                source: 'Source',
+                destination: 'Destination',
+                sale_type: 'Sold Via',
+            };
+        }
+
+        function optionText(selector, value) {
+            return $(selector + ' option[value="' + value + '"]').text() || value;
+        }
+
+        function renderActiveFilters() {
+            var filters = getFilters();
+            var labels = filterLabels();
+            var $container = $('#activeFilters').empty();
+            var $outside = $('#activeFiltersOutside').empty();
+
+            Object.keys(filters).forEach(function (key) {
+                var val = filters[key];
+                if (!val) return;
+
+                var display = val;
+                if (key === 'status') display = optionText('#filter-status', val);
+                if (key === 'source') display = optionText('#filter-source', val);
+                if (key === 'destination') display = optionText('#filter-destination', val);
+                if (key === 'sale_type') display = optionText('#filter-sale-type', val);
+
+                var $chip = $('<span class="active-filter-chip"></span>')
+                    .append('<span>' + labels[key] + ': ' + display + '</span>')
+                    .append('<span class="chip-x" data-key="' + key + '">&times;</span>');
+                $container.append($chip);
+
+                var $chipOutside = $chip.clone(true);
+                $outside.append($chipOutside);
+            });
+        }
+
+        $('#filterPanelCollapse').on('shown.bs.collapse', function () {
+            $('#filterChevron').removeClass('fa-chevron-down').addClass('fa-chevron-up');
+        });
+        $('#filterPanelCollapse').on('hidden.bs.collapse', function () {
+            $('#filterChevron').removeClass('fa-chevron-up').addClass('fa-chevron-down');
+        });
+
+        var fieldMap = {
+            date_from: '#filter-date-from',
+            date_to: '#filter-date-to',
+            delivery_number: '#filter-delivery-number',
+            client_name: '#filter-client-name',
+            status: '#filter-status',
+            source: '#filter-source',
+            destination: '#filter-destination',
+            sale_type: '#filter-sale-type',
+        };
+
+        $(document).on('click', '.chip-x', function () {
+            var key = $(this).data('key');
+            var selector = fieldMap[key];
+            if (selector === '#filter-date-from' || selector === '#filter-date-to' || selector === '#filter-delivery-number') {
+                $(selector).val('').trigger('change');
+            } else {
+                setFilterValue(selector, '');
+            }
+            table.ajax.reload();
+            renderActiveFilters();
+        });
+
+        // ---------- DATATABLE ----------
+        var table;
+        try {
+            table = $('#datatable').DataTable({
+                processing: true,
+                serverSide: true,
+                pageLength: 50,
+                lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, 'All']],
+                order: [[1, 'desc']],
+                dom: '<"row align-items-center mb-2"<"col-sm-6"l><"col-sm-6"f>><"row"<"col-sm-12"t>><"row align-items-center mt-2"<"col-sm-6"i><"col-sm-6"p>>',
+                ajax: {
+                    url: "{{ route('admin.externalTransfersData') }}",
+                    data: function (d) {
+                        Object.assign(d, getFilters());
+                    },
+                    error: function (xhr) {
+                        console.error('[external-transfers] AJAX load failed:', xhr.status, xhr.responseText);
+                        $('#datatable-error-banner').remove();
+                        $('#datatable_wrapper').before(
+                            '<div id="datatable-error-banner" class="alert alert-danger">Failed to load transfers (HTTP ' + xhr.status + '). Check console for details.</div>'
+                        );
+                    }
+                },
+                columns: [
+                    { data: 'DT_RowIndex', orderable: false, searchable: false },
+                    { data: 'date_initiated' },
+                    { data: 'delivery_number' },
+                    { data: 'client_name' },
+                    { data: 'packages' },
+                    { data: 'net_weight' },
+                    { data: 'transfer_from' },
+                    { data: 'destination' },
+                    { data: 'sale_type' },
+                    { data: 'status', orderable: false, searchable: false },
+                    { data: 'actions', orderable: false, searchable: false },
+                ],
+                language: {
+                    emptyTable: "No transfers match your filters.",
+                    zeroRecords: "No transfers match your filters. Try adjusting them.",
+                    processing: '<div class="d-flex align-items-center justify-content-center gap-2 py-2"><div class="spinner-border spinner-border-sm text-primary" role="status"></div><span>Loading…</span></div>',
+                    search: '',
+                    searchPlaceholder: 'search…',
+                    lengthMenu: 'Show _MENU_ entries',
+                }
+            });
+            console.log('[external-transfers] DataTable initialized successfully.');
+        } catch (err) {
+            console.error('[external-transfers] DataTable init threw an error:', err);
+            $('#datatable').before(
+                '<div class="alert alert-danger">Could not initialize the data table (' + err.message + '). This usually means jQuery/DataTables loaded twice or a JS error ran earlier on the page — check the browser console.</div>'
+            );
+        }
+
+        if (table) {
+            table.on('processing.dt', function (e, settings, processing) {
+                if (processing) {
+                    $('#datatable_wrapper').css('opacity', 0.55);
+                } else {
+                    $('#datatable_wrapper').css('opacity', 1);
+                }
+            });
+        }
+
+        function safeReload() {
+            if (table && table.ajax) {
+                table.ajax.reload();
+            } else {
+                console.warn('[external-transfers] Reload skipped — table failed to initialize.');
+            }
+        }
+
+        renderActiveFilters();
+
+        $('.filter-panel select.js-choice, #filter-date-from, #filter-date-to, #filter-delivery-number').on('change', function () {
+            renderActiveFilters();
+        });
+
+        $('#btn-filter').on('click', function () {
+            safeReload();
+            renderActiveFilters();
+        });
+
+        // Enter key in text inputs triggers filter too
+        $('#filter-delivery-number, #filter-client-name').on('keyup', function (e) {
+            if (e.key === 'Enter') {
+                safeReload();
+                renderActiveFilters();
+            }
+        });
+
+        $('#btn-reset-filter').on('click', function () {
+            $('#filter-date-from, #filter-date-to, #filter-delivery-number').val('');
+            ['filter-client-name', 'filter-status', 'filter-source', 'filter-destination', 'filter-sale-type'].forEach(function (id) {
+                setFilterValue('#' + id, '');
+            });
+            safeReload();
+            renderActiveFilters();
+        });
+
+        // ---------- EXPORT ----------
+        function buildExportUrl(format) {
+            var filters = getFilters();
+            var params = new URLSearchParams(filters);
+            params.set('format', format);
+            return "{{ route('admin.externalTransfersExport') }}?" + params.toString();
+        }
+
+        $('#btn-export-csv').on('click', function () {
+            window.location.href = buildExportUrl('csv');
+        });
+
+        $('#btn-export-pdf').on('click', function () {
+            window.location.href = buildExportUrl('pdf');
+        });
+
+        // ---------- EXISTING PAGE BEHAVIOUR (unchanged) ----------
         $('#selectWarehouse').change(function () {
             var warehouseId = $(this).val();
             $.ajax({
                 type: 'GET',
                 url: '{{ route('admin.selectClients') }}',
                 data: { warehouseId },
-                success:function (response) {
-                    console.log(response)
-
+                success: function (response) {
                     $('#selectClients').empty();
-
                     $('#selectClients').append('<option value="" selected disabled class="text-center"> -- select client --');
-
                     $.each(response, function (index, client) {
                         $('#selectClients').append('<option value="' + client.client_id + '">' + client.client_name + '</option>');
                     });
                 }
-            })
-
+            });
         });
 
         $(document).on('input', '.idSelect', function () {
@@ -225,7 +540,7 @@
             });
         });
 
-        document.addEventListener('click', function(e) {
+        document.addEventListener('click', function (e) {
             const btn = e.target.closest('.release-btn');
             if (!btn) return;
 
@@ -236,8 +551,6 @@
             const modal = new bootstrap.Modal(document.getElementById('releaseModal'));
             const url = btn.dataset.url;
 
-
-            // Reset modal body
             document.getElementById('releaseModalLabel').textContent = `Release ${delivery} - ${client}`;
             document.getElementById('releaseModalBody').innerHTML = `
             <div class="text-center py-4">
@@ -247,18 +560,16 @@
 
             modal.show();
 
-            // Fetch form content
             fetch(url)
                 .then(res => res.text())
                 .then(html => {
                     document.getElementById('releaseModalBody').innerHTML = html;
-                    document.querySelectorAll('#releaseModalBody .js-choice').forEach(function(el) {
+                    document.querySelectorAll('#releaseModalBody .js-choice').forEach(function (el) {
                         const choicesInstance = new Choices(el, {
                             searchEnabled: true,
                             itemSelectText: '',
                         });
 
-                        // ✅ Handle "Other" option specifically for transporterSelect2
                         if (el.id === 'transporterSelect2') {
                             el.addEventListener('change', function () {
                                 const otherInput = document.getElementById('otherTransporterInput2');
