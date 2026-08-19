@@ -5675,6 +5675,10 @@ public function externalTransfersExport(Request $request)
     {
         return $this->AppClass->downloadExternalDelNote($id);
     }
+    public function downloadLocalDeliveryNote($id)
+    {
+        return $this->AppClass->downloadLocalDeliveryNote($id);
+    }
     public function exportBlendsReport(Request $request)
     {
        $sheets = DB::table('blend_sheets')
@@ -7486,6 +7490,8 @@ $clients = Client::join('delivery_orders', 'delivery_orders.client_id', '=', 'cl
             'sale' => $request->sale,
             'sale_date' => $request->sale_date,
             'prompt_date' => $request->prompt_date,
+            'do_number' => $request->do_number,
+            'lot_number' => $request->lot_number,
             'warehouse_id' => $request->warehouse_id
         ]);
         $this->logger->create();

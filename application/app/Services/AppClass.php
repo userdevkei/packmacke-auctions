@@ -3242,6 +3242,103 @@ class AppClass
             'Content-Disposition' => 'inline; filename="' . $pdfFileName . '"',
         ]);
     }
+
+    public function downloadLocalDeliveryNote($id)
+    {
+        list($delNumber, $lot) = explode(':', base64_decode($id));
+
+        $orders = ExternalTransfer::leftJoin('blendBalances', function ($join) {
+            $join->on('blendBalances.blend_balance_id', '=', 'external_transfers.stock_id')
+                ->on('blendBalances.blend_id', '=', 'external_transfers.delivery_id');
+        })
+            ->leftJoin('delivery_orders', function ($join) {
+                $join->on('delivery_orders.delivery_id', '=', 'external_transfers.delivery_id');
+            })
+            ->leftJoin('auctions', function ($join) {
+                $join->on('auctions.delivery_id', '=', 'external_transfers.delivery_id');
+            })
+            ->leftJoin('clients as buyer', 'buyer.client_id', '=', 'auctions.client_id')
+            ->leftJoin('stock_ins', 'stock_ins.stock_id', '=', 'external_transfers.stock_id')
+            ->leftJoin('stations', 'stations.station_id', '=', 'stock_ins.station_id')
+            ->leftJoin('clients', 'clients.client_id', '=', 'delivery_orders.client_id')
+            ->leftjoin('warehouses', 'warehouses.warehouse_id', '=', 'external_transfers.warehouse_id')
+            ->leftJoin('transporters', 'transporters.transporter_id', '=', 'external_transfers.transporter_id')
+            ->leftJoin('other_destinations', 'other_destinations.warehouse_id', '=', 'external_transfers.warehouse_id')
+            ->leftJoin('other_transporters', 'other_transporters.transporter_id', '=', 'external_transfers.transporter_id')
+            ->leftJoin('gardens', 'gardens.garden_id', '=', 'delivery_orders.garden_id')
+            ->leftJoin('grades', 'grades.grade_id', '=', 'delivery_orders.grade_id')
+            ->leftJoin('drivers', 'drivers.driver_id', '=', 'external_transfers.driver_id')
+            ->select('ex_transfer_id', 'external_transfers.status', DB::raw('COALESCE(clients.client_name, blendBalances.client_name) as client_name'), DB::raw('COALESCE(warehouses.warehouse_name, other_destinations.warehouse_name) as warehouse_name'), DB::raw('COALESCE(transporters.transporter_name, other_transporters.transporter_name) as transporter_name'), DB::raw('COALESCE(stations.station_name, blendBalances.station_name) as station_name'), 'external_transfers.delivery_number', DB::raw('DATE(external_transfers.created_at) as created_at'), 'location_id', DB::raw('COALESCE(gardens.garden_name, blendBalances.garden) as garden_name'),DB::raw('COALESCE(grades.grade_name, blendBalances.grade) as grade_name'), DB::raw('COALESCE(delivery_orders.invoice_number, blendBalances.blend_number) as invoice_number'), 'external_transfers.transferred_palettes', 'external_transfers.transferred_weight', 'delivery_orders.lot_number', 'external_transfers.created_by', 'external_transfers.updated_at', 'external_transfers.delivery_id', 'drivers.driver_name', 'drivers.phone', 'external_transfers.registration', 'drivers.id_number', 'buyer.client_name as buyer_name', 'external_transfers.loading_number', 'lot', 'external_transfers.release_date', 'do_number', 'auctions.sale', 'auctions.lot_number', 'stock_ins.pallet_weight')
+            ->where(['external_transfers.delivery_number' => $delNumber, 'lot' => $lot ?: null])
+            ->orderBy(DB::raw('COALESCE(gardens.garden_name, blendBalances.garden)'))
+            ->orderBy(DB::raw('COALESCE(delivery_orders.invoice_number, blendBalances.blend_number)'))
+            ->whereNull('external_transfers.deleted_at')
+            ->whereNull('auctions.deleted_at')
+            ->get();
+
+        $details = $orders[0];
+
+        $prepared = UserInfo::where('user_id', $details['created_by'])->first();
+
+        $user = $prepared->first_name.' '.$prepared->surname;
+        $printed = auth()->user()->user;
+        $by = $printed ? ($printed->first_name.' '.$printed->surname) : auth()->user()->username;
+
+        $approvals = Approval::join('user_infos', 'user_infos.user_id', '=', 'approvals.user_id')
+            ->leftJoin('signatories', 'signatories.user_id', 'approvals.user_id')
+            ->select(DB::raw("CONCAT(COALESCE(surname, ''),' ', COALESCE(first_name, '')) as full_name"), DB::raw("FROM_UNIXTIME(approval_date) as approval_date"), 'signature')
+            ->where(['job_id' => $delNumber])
+            ->orderBy('order', 'asc')
+            ->get();
+
+        $signatories = Signatory::join('departments', 'departments.department_id', '=', 'signatories.department_id')->get();
+        // Render Blade view
+        $html = View::make('clerk::downloads.external_transfer_ldn', compact('orders', 'details', 'user', 'by', 'printed', 'approvals', 'signatories'))->render();
+
+        // Initialize mPDF with settings
+        $mpdf = new Mpdf([
+            'tempDir' => storage_path('app/mpdf_temp'),
+            'mode'        => 'utf-8',
+            'format'      => 'A4-L', // Landscape
+            'orientation' => 'P',
+            'margin_top'    => 2,
+            'margin_bottom' => 7,
+            'margin_left'   => 5,
+            'margin_right'  => 5,
+//            'setAutoTopMargin' => 'stretch',
+            'setAutoBottomMargin' => 'stretch',
+        ]);
+
+        // Set footer for all pages
+        $mpdf->SetHTMLFooter('
+            <table width="100%">
+                <tr>
+                    <td align="left">Printed by: <strong>' . $by . '</strong></td>
+                    <td align="center">Page {PAGENO} of {nbpg}</td>
+                    <td align="right">Prepared by: <strong>' . $user . '</strong></td>
+                </tr>
+            </table>
+        ');
+
+        // Write HTML content
+        $mpdf->WriteHTML($html);
+
+        // Generate PDF filename
+        $pdfFileName = $details->delivery_number.'.pdf';
+
+        // Output PDF as downloadable file
+        return Response::make($mpdf->Output($pdfFileName, PdfDestination::INLINE), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="' . $pdfFileName . '"',
+        ]);
+    }
+
+    public function arrivalDate($id)
+    {
+        $stock = StockIn::where('delivery_id', $id)->orderBy('date_received', 'asc')->first();
+        return Carbon::createFromTimestamp($stock->date_received)->format('d-m-Y');
+    }
+
     public function downloadStraightLine($id)
     {
         $shippings = ShippingInstruction::join('clients', 'clients.client_id', '=', 'shipping_instructions.client_id')

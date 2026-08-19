@@ -73,7 +73,7 @@
                                                             @csrf
                                                             <div class="row row-cols-sm-1 g-2">
 
-                                                                <div class=" mb-2">
+                                                                <div class=" mb-1">
                                                                     <label class="fs-sm fw-bold my-2" style="font-size: 85% !important;"> Broker Name</label>
                                                                     <select name="broker" class="form-select js-choice" style="height: 57% !important;" required>
                                                                         <option disabled selected value="">-- select broker --</option>
@@ -82,7 +82,7 @@
                                                                         @endforeach
                                                                     </select>
                                                                 </div>
-                                                                <div class=" mb-2">
+                                                                <div class=" mb-1">
                                                                     <label class="fs-sm fw-bold my-2" style="font-size: 85% !important;"> Sale</label>
                                                                     <select name="sale" class="form-select js-choice" style="height: 57% !important;" required>
                                                                         <option disabled selected value="{{ $transfer->sale }}">{{ $transfer->sale }}</option>
@@ -92,7 +92,7 @@
                                                                     </select>
                                                                 </div>
 
-                                                                <div class=" mb-2">
+                                                                <div class=" mb-1">
                                                                     <label class="fs-sm fw-bold my-2" style="font-size: 85% !important;"> Buyer Name</label>
                                                                     <select name="buyer" class="form-select js-choice" style="height: 57% !important;">
                                                                         <option disabled selected value="">-- select buyer --</option>
@@ -102,7 +102,7 @@
                                                                     </select>
                                                                 </div>
 
-                                                                <div class=" mb-2">
+                                                                <div class=" mb-1">
                                                                     <label class="fs-sm fw-bold my-2" style="font-size: 85% !important;"> Producer Warehouse</label>
                                                                     <select name="warehouse_id" class="form-select js-choice" style="height: 57% !important;">
                                                                         <option disabled selected value="">-- select buyer --</option>
@@ -113,17 +113,27 @@
                                                                 </div>
 
 
-                                                                <div class="mb-2">
+                                                                <div class="mb-1">
                                                                     <label class="fs-sm fw-bold my-2" style="font-size: 85% !important;">Sale Date</label>
                                                                     <input type="date" class="form-control" value="{{ $transfer->sale_date !== null ? Carbon\Carbon::parse($transfer->sale_date)->format('Y-m-d') : '' }}" name="sale_date" style="height: 62% !important;">
                                                                 </div>
 
-                                                                <div class="mb-2">
+                                                                <div class="mb-1">
                                                                     <label class="fs-sm fw-bold my-2" style="font-size: 85% !important;">Prompt Date</label>
                                                                     <input type="date" class="form-control" value="{{ $transfer->sale_date !== null ? Carbon\Carbon::parse($transfer->prompt_date)->format('Y-m-d') : '' }}" name="prompt_date" style="height: 62% !important;">
                                                                 </div>
 
-                                                                <div class="mb-2">
+                                                                <div class="mb-1">
+                                                                    <label class="fs-sm fw-bold my-2" style="font-size: 85% !important;">DO Number</label>
+                                                                    <input type="text" class="form-control" value="{{ $transfer->do_number ?? '' }}" name="do_number" style="height: 62% !important;">
+                                                                </div>
+
+                                                                <div class="mb-1">
+                                                                    <label class="fs-sm fw-bold my-2" style="font-size: 85% !important;">Lot Number</label>
+                                                                    <input type="text" class="form-control" value="{{ $transfer->lot_number ?? '' }}" name="lot_number" style="height: 62% !important;">
+                                                                </div>
+
+                                                                <div class="mb-1">
                                                                     <label class="fs-sm fw-bold my-2" style="font-size: 85% !important;">Sale Status</label>
                                                                     <select name="status" class="form-select js-choice">
                                                                         <option selected value="">-- select status </option>

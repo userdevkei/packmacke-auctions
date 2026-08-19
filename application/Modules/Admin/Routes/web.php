@@ -138,6 +138,7 @@ Route::prefix('admin')->middleware(['auth', 'web', 'userRoles', 'userRole:1', 'd
     Route::get('remove-tea-from-external-transfer-request/{id}', [AdminController::class, 'removeExTransferRequestTea'])->name('admin.removeExTransferRequestTea');
     Route::get('download-extra-transfer-delivery-note/{id}', [AdminController::class, 'downloadExtraDelNote'])->name('admin.downloadExtraDelNote');
     Route::get('download-extra-delivery-note/{id}', [AdminController::class, 'downloadDelNote'])->name('admin.downloadDelNote');
+    Route::get('download-local-delivery-note/{id}', [AdminController::class, 'downloadLocalDeliveryNote'])->name('admin.downloadLocalDeliveryNote');
     Route::any('prepare-internal-transfer', [AdminController::class, 'prepareInternalTransfer'])->name('admin.prepareInternalTransfer');
     Route::any('prepare-external-transfer', [AdminController::class, 'prepareExternalTransfer'])->name('admin.prepareExternalTransfer');
     Route::get('view-external-transfer-details/{id}', [AdminController::class, 'viewExternalTransferDetails'])->name('admin.viewExternalTransferDetails');
