@@ -46,6 +46,12 @@ use Modules\Account\Entities\ScheduledJournal;
 use Mpdf\Output\Destination as PdfDestination;
 use Modules\Account\Entities\AdjustmentJournal;
 use PhpOffice\PhpSpreadsheet\Calculation\Financial\CashFlow\Constant\Periodic\Payments;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Border;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Worksheet\Drawing;
 
 class AppClass
 {
@@ -2459,221 +2465,256 @@ class AppClass
 
         }elseif ($request->request_type == 6){
 
-            $data = DeliveryOrder::join('stock_ins', function ($join) {
-            $join->on('stock_ins.delivery_id', '=', 'delivery_orders.delivery_id')
-                ->where(function ($query) {
-                    $query->where('stock_ins.delivery_type', 1)
-                        ->orWhereNull('stock_ins.delivery_type');
-                })
-                ->whereNull('stock_ins.deleted_at');
+
+        $data = DeliveryOrder::join('stock_ins', function ($join) {
+    $join->on('stock_ins.delivery_id', '=', 'delivery_orders.delivery_id')
+        ->where(function ($query) {
+            $query->where('stock_ins.delivery_type', 1)
+                ->orWhereNull('stock_ins.delivery_type');
         })
-            ->join('clients', 'clients.client_id', '=', 'delivery_orders.client_id')
-            ->join('warehouses', 'warehouses.warehouse_id', '=', 'delivery_orders.warehouse_id')
-            ->join('gardens', 'gardens.garden_id', '=', 'delivery_orders.garden_id')
-            ->join('grades', 'grades.grade_id', '=', 'delivery_orders.grade_id')
-            ->leftJoin('tea_samples', function ($join) {
-                $join->on('tea_samples.delivery_id', '=', 'delivery_orders.delivery_id')
-                    ->whereNull('tea_samples.deleted_at');
-            })
-            ->leftJoin('loading_instructions', function ($join) {
-                $join->on('loading_instructions.delivery_id', '=', 'delivery_orders.delivery_id')
-                    ->whereNull('loading_instructions.deleted_at');
-            })
-                ->select([
-                    'clients.client_name',
-                    'clients.client_id',
-                    'delivery_orders.sale_number',
-                    'warehouses.warehouse_name',
-                    'gardens.garden_name',
-                    'grades.grade_name',
-                    'delivery_orders.delivery_type',
-                    'delivery_orders.invoice_number',
-                    'delivery_orders.lot_number',
-                    'delivery_orders.order_number',
-                    'delivery_orders.packet',
-                    'delivery_orders.weight',
-                    'delivery_orders.unit_weight',
-                    'delivery_orders.status',
-                    'tea_samples.sample_weight',
-                    DB::raw("
-                        CASE
-                            WHEN tea_samples.type = 1 THEN 'Sampled'
-                            WHEN tea_samples.type = 2 THEN 'Damage'
-                            WHEN tea_samples.type = 3 THEN 'Loss'
-                            ELSE ''
-                        END AS difference
-                    "),
-                    'stock_ins.date_received', 'stock_ins.stock_id'
-                ])
-                ->groupBy('delivery_orders.delivery_id', 'stock_ins.stock_id')
-                ->where('clients.client_id', $request->client_id)
-                ->where('delivery_orders.status', '=', 2)
-                ->orderBy('gardens.garden_name', 'asc')
-                ->orderBy('stock_ins.date_received', 'asc');
+        ->whereNull('stock_ins.deleted_at');
+})
+    ->join('clients', 'clients.client_id', '=', 'delivery_orders.client_id')
+    ->join('warehouses', 'warehouses.warehouse_id', '=', 'delivery_orders.warehouse_id')
+    ->join('gardens', 'gardens.garden_id', '=', 'delivery_orders.garden_id')
+    ->join('grades', 'grades.grade_id', '=', 'delivery_orders.grade_id')
+    ->leftJoin('tea_samples', function ($join) {
+        $join->on('tea_samples.delivery_id', '=', 'delivery_orders.delivery_id')
+            ->whereNull('tea_samples.deleted_at');
+    })
+    ->leftJoin('loading_instructions', function ($join) {
+        $join->on('loading_instructions.delivery_id', '=', 'delivery_orders.delivery_id')
+            ->whereNull('loading_instructions.deleted_at');
+    })
+    ->select([
+        'clients.client_name',
+        'clients.client_id',
+        'delivery_orders.sale_number',
+        'warehouses.warehouse_name',
+        'gardens.garden_name',
+        'grades.grade_name',
+        'delivery_orders.delivery_type',
+        'delivery_orders.invoice_number',
+        'delivery_orders.lot_number',
+        'delivery_orders.order_number',
+        'delivery_orders.packet',
+        'delivery_orders.weight',
+        'delivery_orders.unit_weight',
+        'delivery_orders.status',
+        'tea_samples.sample_weight',
+        DB::raw("
+            CASE
+                WHEN tea_samples.type = 1 THEN 'Sampled'
+                WHEN tea_samples.type = 2 THEN 'Damage'
+                WHEN tea_samples.type = 3 THEN 'Loss'
+                ELSE ''
+            END AS difference
+        "),
+        'stock_ins.date_received', 'stock_ins.stock_id'
+    ])
+    ->groupBy('delivery_orders.delivery_id', 'stock_ins.stock_id')
+    ->where('clients.client_id', $request->client_id)
+    ->where('delivery_orders.status', '=', 2)
+    ->orderBy('gardens.garden_name', 'asc')
+    ->orderBy('stock_ins.date_received', 'asc');
 
-            if ($request->request_number !== null){
-                $data->where('invoice_number', $request->request_number);
-            }
+if ($request->request_number !== null) {
+    $data->where('invoice_number', $request->request_number);
+}
 
-            if ($request->date_from !== null){
-                $data->where('delivery_orders.created_at', '>=', $request->date_from);
-            }
+if ($request->date_from !== null) {
+    $data->where('delivery_orders.created_at', '>=', $request->date_from);
+}
 
-            if ($request->date_to !== null){
-                $data->where('delivery_orders.created_at', '<=', $request->date_to);
-            }
+if ($request->date_to !== null) {
+    $data->where('delivery_orders.created_at', '<=', $request->date_to);
+}
 
-            $reports = $data->get();
-            if ($reports->count() == 0){
-                return back()->with('success', 'No items found');
-            }
-            $totalPackets = $reports->sum('packet');
-            $totalWeight = $reports->sum('weight');
+$reports = $data->get();
+if ($reports->count() == 0) {
+    return back()->with('success', 'No items found');
+}
+$totalPackets = $reports->sum('packet');
+$totalWeight = $reports->sum('weight');
 
-            $date = date('D, d-m-Y, h:i:s');
-            $printed = auth()->user()->user;
-            $by = $printed->first_name.' '.$printed->surname;
+$date = date('D, d-m-Y, h:i:s');
+$printed = auth()->user()->user;
+$by = $printed->first_name . ' ' . $printed->surname;
 
-            if ($request->date_from == null){
-                $period = 'FULL STATEMENT UPTO '.$request->date_to;
-            }else{
-                $period = 'FOR PERIOD BETWEEN '.$request->date_from.' AND '.$request->date_to;
-            }
-            if ($request->approved_by !== null){
-                $approved = UserInfo::find($request->approved_by);
-                \QrCode::size(300)
-                    ->format('png')
-                    ->generate('REQUEST NUMBER: ' . $request->service_number . "\n" .
-                        'REPORT TYPE: ' . 'TEA ARRIVAL REPORT' . "\n" .
-                        'CLIENT NAME: ' . $reports->first()->client_name. "\n" .
-                        'REPORTING: ' . $period . "\n" .
-                        'TOTAL PACKAGES: ' . number_format($totalPackets, 2). "\n" .
-                        'TOTAL NET WEIGHT: ' . number_format($totalWeight, 2). "\n" .
-                        'REPORT APPROVED BY: ' . $approved->first_name.' '.$approved->surname . "\n",
-                        'Files/QrCodes/'.$image);
-            }
-            $qrCodePath = 'Files/QrCodes/'.$image;
-            $mpdf = new \Mpdf\Mpdf([
-                'mode' => 'utf-8',
-                'format' => 'A4-L', // Landscape
-                'orientation' => 'L',
-                'margin_top' => 2,
-                'margin_bottom' => 7,
-                'margin_left' => 5,
-                'margin_right' => 5,
-                'setAutoBottomMargin' => 'stretch',
-                'tempDir' => storage_path('app/mpdf_temp'),
-                'pcre.backtrack_limit' => '10000000' // Increase backtrack limit
-            ]);
-            // Set footer
-            $mpdf->SetHTMLFooter('
-                <table width="100%">
-                    <tr>
-                        <td align="left">Printed On : <strong>' . $date . '</strong></td>
-                        <td align="center">Page {PAGENO} of {nbpg}</td>
-                        <td align="right">Prepared by : <strong>' . $by . '</strong></td>
-                    </tr>
-                </table>
-            ');
+if ($request->date_from == null) {
+    $period = 'FULL STATEMENT UPTO ' . $request->date_to;
+} else {
+    $period = 'FOR PERIOD BETWEEN ' . $request->date_from . ' AND ' . $request->date_to;
+}
+if ($request->approved_by !== null) {
+    $approved = UserInfo::find($request->approved_by);
+    \QrCode::size(300)
+        ->format('png')
+        ->generate('REQUEST NUMBER: ' . $request->service_number . "\n" .
+            'REPORT TYPE: ' . 'TEA ARRIVAL REPORT' . "\n" .
+            'CLIENT NAME: ' . $reports->first()->client_name . "\n" .
+            'REPORTING: ' . $period . "\n" .
+            'TOTAL PACKAGES: ' . number_format($totalPackets, 2) . "\n" .
+            'TOTAL NET WEIGHT: ' . number_format($totalWeight, 2) . "\n" .
+            'REPORT APPROVED BY: ' . $approved->first_name . ' ' . $approved->surname . "\n",
+            'Files/QrCodes/' . $image);
+}
+$qrCodePath = 'Files/QrCodes/' . $image;
 
-            // Add company header (using absolute path for image)
-            $logoPath = 'assets/img/favicons/icon.png';
-            $companyHeader = '
-            <style>
-                .company-container {
-                    position: relative;
-                    width: 100%;
-                    display: flex;
-                    justify-content: flex-start; /* Align company info to left */
-                    align-items: flex-start; /* Align content at top */
-                    padding-top: 20px;
-                }
-                .company-info {
-                    text-align: left;
-                    font-size: 12px;
-                    line-height: 1.4;
-                }
-                .logo {
-                    height: 50px;
-                    width: 50px;
-                    margin-bottom: 5px;
-                }
-                .heading {
-                    color: green;
-                    font-size: 14px;
-                    font-weight: bold;
-                    margin: 0;
-                }
-                .header {
-                    text-align: center;
-                    font-weight: bold;
-                    font-size: 12px;
-                    margin: 5px 0;
-                }
-                hr {
-                    border: 1px solid #000;
-                    margin: 5px 0;
-                }
-                /* QR Code - Force it to top-right */
-                .qr-container {
-                    position: absolute;
-                    top: 0;
-                    right: 0;
-                    padding: 10px; /* Optional for spacing */
-                }
-                .qr-code {
-                    text-align: right !important;
-                    width: 110px !important;
-                    height: 110px !important;
-                }
-                .address{
-                    text-align: center !important;
-                }
-                .verification{
-                    color: red !important;
-                    font-weight: bold;
-                    font-size: 11px !important;
-                    font-family: Cambria,monospace;
-                }
-            </style>
-            <table>
-            <tr>
-                <td class="address" style="width: 90% !important;">
-                 <img class="logo" src="' . $logoPath . '" alt="Company Logo">
-                 <h1 class="heading">PACKMAC HOLDINGS LIMITED</h1>
-                 <p>Chai Street Shimanzi High Level, Mombasa P.O BOX 41328-80100, Mombasa, Kenya (TMSA 186)</p>
-                </td>
-                <td class="qr-code" style="width: 10% !important;">
-                    ' . ($request->approved_by === null
-                    ? '<span class="verification">NOT APPROVED </span>'
-                    : '<img class="qr-code" src="' . $qrCodePath . '" alt="QR Code">') . '
-                </td>
-            </tr>
-            </table>
+// Raise PHP's actual pcre backtrack limit (the Mpdf constructor option alone does not do this)
+ini_set('pcre.backtrack_limit', 10000000);
+ini_set('memory_limit', '102400M'); // or higher, test what's needed
 
-            <div class="header">' . $period . '<hr></div>';
+$mpdf = new \Mpdf\Mpdf([
+    'mode' => 'utf-8',
+    'format' => 'A4-L', // Landscape
+    'orientation' => 'L',
+    'margin_top' => 2,
+    'margin_bottom' => 7,
+    'margin_left' => 5,
+    'margin_right' => 5,
+    'setAutoBottomMargin' => 'stretch',
+    'tempDir' => storage_path('app/mpdf_temp'),
+]);
 
-            $mpdf->WriteHTML($companyHeader);
-            $clientName = $reports->first()->client_name;
-            $html = View::make('clerk::downloads.tea_collections', [
-                'clientName' => $clientName,
-                'orders' => $reports,
-                'by' => $by,
-                'printed' => $printed
-            ])->render();
+// Set footer
+$mpdf->SetHTMLFooter('
+    <table width="100%">
+        <tr>
+            <td align="left">Printed On : <strong>' . $date . '</strong></td>
+            <td align="center">Page {PAGENO} of {nbpg}</td>
+            <td align="right">Prepared by : <strong>' . $by . '</strong></td>
+        </tr>
+    </table>
+');
 
-            $mpdf->WriteHTML($html);
+// Add company header (using absolute path for image)
+$logoPath = 'assets/img/favicons/icon.png';
+$companyHeader = '
+<style>
+    .company-container {
+        position: relative;
+        width: 100%;
+        display: flex;
+        justify-content: flex-start; /* Align company info to left */
+        align-items: flex-start; /* Align content at top */
+        padding-top: 20px;
+    }
+    .company-info {
+        text-align: left;
+        font-size: 12px;
+        line-height: 1.4;
+    }
+    .logo {
+        height: 50px;
+        width: 50px;
+        margin-bottom: 5px;
+    }
+    .heading {
+        color: green;
+        font-size: 14px;
+        font-weight: bold;
+        margin: 0;
+    }
+    .header {
+        text-align: center;
+        font-weight: bold;
+        font-size: 12px;
+        margin: 5px 0;
+    }
+    hr {
+        border: 1px solid #000;
+        margin: 5px 0;
+    }
+    /* QR Code - Force it to top-right */
+    .qr-container {
+        position: absolute;
+        top: 0;
+        right: 0;
+        padding: 10px; /* Optional for spacing */
+    }
+    .qr-code {
+        text-align: right !important;
+        width: 110px !important;
+        height: 110px !important;
+    }
+    .address{
+        text-align: center !important;
+    }
+    .verification{
+        color: red !important;
+        font-weight: bold;
+        font-size: 11px !important;
+        font-family: Cambria,monospace;
+    }
+</style>
+<table>
+<tr>
+    <td class="address" style="width: 90% !important;">
+     <img class="logo" src="' . $logoPath . '" alt="Company Logo">
+     <h1 class="heading">PACKMAC HOLDINGS LIMITED</h1>
+     <p>Chai Street Shimanzi High Level, Mombasa P.O BOX 41328-80100, Mombasa, Kenya (TMSA 186)</p>
+    </td>
+    <td class="qr-code" style="width: 10% !important;">
+        ' . ($request->approved_by === null
+        ? '<span class="verification">NOT APPROVED </span>'
+        : '<img class="qr-code" src="' . $qrCodePath . '" alt="QR Code">') . '
+    </td>
+</tr>
+</table>
 
-            if (file_exists('Files/QrCodes/' . $image)){
-                unlink('Files/QrCodes/' . $image);
-            }
+<div class="header">' . $period . '<hr></div>';
 
-            // Output PDF
-            $pdfFileName = 'TEA COLLECTIONS.pdf';
-            return Response::make($mpdf->Output($pdfFileName, PdfDestination::INLINE), 200, [
-                'Content-Type' => 'application/pdf',
-                'Content-Disposition' => 'inline; filename="' . $pdfFileName . '"',
-            ]);
+$mpdf->WriteHTML($companyHeader);
+
+$clientName = $reports->first()->client_name;
+
+// Net weight total, computed once up front (same logic as before)
+$netWeight = 0;
+foreach ($reports as $order) {
+    $netWeight += $order->weight == null
+        ? (int) str_replace(',', '', $order->weight)
+        : (int) str_replace(',', '', $order->unit_weight);
+}
+
+// Table shell + header row
+$mpdf->WriteHTML(
+    View::make('clerk::downloads.tea_collections_header', [
+        'clientName' => $clientName,
+    ])->render()
+);
+
+// Body rows, written in small batches so no single WriteHTML() call is too large
+$startIndex = 0;
+foreach ($reports->chunk(200) as $chunk) {
+    $mpdf->WriteHTML(
+        View::make('clerk::downloads.tea_collections_rows', [
+            'orders' => $chunk->values(),
+            'startIndex' => $startIndex,
+        ])->render()
+    );
+    $startIndex += $chunk->count();
+}
+
+// Footer totals row + table close
+$mpdf->WriteHTML(
+    View::make('clerk::downloads.tea_collections_footer', [
+        'totalPackets' => $totalPackets,
+        'netWeight' => $netWeight,
+    ])->render()
+);
+
+if (file_exists('Files/QrCodes/' . $image)) {
+    unlink('Files/QrCodes/' . $image);
+}
+
+// Output PDF
+$pdfFileName = 'TEA COLLECTIONS.pdf';
+return Response::make($mpdf->Output($pdfFileName, PdfDestination::INLINE), 200, [
+    'Content-Type' => 'application/pdf',
+    'Content-Disposition' => 'inline; filename="' . $pdfFileName . '"',
+]);
+
         }elseif ($request->request_type == 7){
             $data = DB::table('blendBalances')
                 ->where('current_packages', '>', 0)
@@ -3539,6 +3580,7 @@ class AppClass
     public function downloadStraightLineClearance($id)
     {
         $shipment = ShippingInstruction::join('clients', 'clients.client_id', '=', 'shipping_instructions.client_id')
+            ->join('stations', 'stations.station_id', '=', 'shipping_instructions.station_id')
             ->leftJoin('clearing_agents', 'clearing_agents.agent_id', '=', 'shipping_instructions.clearing_agent')
             ->join('destinations', 'destinations.destination_id', '=', 'shipping_instructions.destination_id')
             ->leftJoin('transporters', 'transporters.transporter_id', '=', 'shipping_instructions.transporter_id')
@@ -3548,11 +3590,11 @@ class AppClass
                 $join->on('currentstock.stock_id', '=', 'shipments.stock_id')
                     ->on('currentstock.delivery_id', '=', 'shipments.delivery_id');
             })
-            ->select('shipping_number', 'port_name', 'consignee', 'shipping_mark', 'vessel_name', 'seal_number', 'container_number', 'container_size', 'agent_name', 'transporters.transporter_name', 'shipping_instructions.registration', 'drivers.driver_name', 'drivers.phone', 'load_type')
+            ->select('shipping_number', 'station_name', 'drivers.id_number', 'port_name', 'consignee', 'shipping_mark', 'vessel_name', 'seal_number', 'container_number', 'container_size', 'agent_name', 'transporters.transporter_name', 'shipping_instructions.registration', 'drivers.driver_name', 'drivers.phone', 'load_type')
             ->selectRaw("SUM(shipments.shipped_packages) as totalPackages")
             ->selectRaw("SUM(CAST(REPLACE(REPLACE(shipments.shipped_weight, ',', ''), '.00', '') AS DECIMAL(10,2))) as totalWeight")
             ->where('shipping_instructions.shipping_id', $id)
-            ->groupBy('shipping_number', 'port_name', 'consignee', 'shipping_mark', 'vessel_name', 'seal_number', 'container_number', 'container_size', 'agent_name', 'transporters.transporter_name', 'shipping_instructions.registration', 'drivers.driver_name', 'drivers.phone', 'load_type')
+            ->groupBy('shipping_number', 'station_name', 'drivers.id_number', 'port_name', 'consignee', 'shipping_mark', 'vessel_name', 'seal_number', 'container_number', 'container_size', 'agent_name', 'transporters.transporter_name', 'shipping_instructions.registration', 'drivers.driver_name', 'drivers.phone', 'load_type')
             ->first();
 
         $staffName = auth()->user()->user->surname.' '.auth()->user()->user->first_name;
@@ -7768,6 +7810,766 @@ class AppClass
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'inline; filename="' . $pdfFileName . '"',
         ]);
+    }
+
+    /**
+     * EXCEL: Blend packing list — single blend, one section per container, BLEND SUMMARY grand total.
+     * Mirrors blend_packing_list.blade.php exactly.
+     */
+    public function downloadBlendPackingListExcel($id)
+    {
+        list($blendId, $type) = explode(":", base64_decode($id));
+
+        $sheet = DB::table('blend_sheets')
+            ->join('clients', 'clients.client_id', '=', 'blend_sheets.client_id')
+            ->join('destinations', 'destinations.destination_id', '=', 'blend_sheets.destination_id')
+            ->leftJoin('blend_teas', 'blend_teas.blend_id', '=', 'blend_sheets.blend_id')
+            ->leftJoin('clearing_agents', 'clearing_agents.agent_id', '=', 'blend_sheets.agent_id')
+            ->select('blend_sheets.blend_id', 'client_name', 'clients.phone as cPhone', 'email', 'blend_number', 'vessel_name', 'port_name', 'shipping_mark', 'consignee', 'contract', 'grade', 'garden', 'blend_date', 'container_size', 'clients.address', 'package_type', 'container_tare', 'blend_shipped', 'agent_name', 'seal_number', 'output_packages', 'output_weight', 'blend_sheets.packet_tare', 'blend_sheets.address as consignee_address', 'booking_number', 'si_number')
+            ->groupBy('blend_sheets.blend_id', 'blend_sheets.client_id', 'client_name', 'clients.phone', 'email', 'blend_number', 'vessel_name', 'port_name', 'shipping_mark', 'consignee', 'address', 'booking_number', 'si_number', 'contract', 'grade', 'garden', 'blend_date', 'container_size', 'clients.address', 'package_type', 'container_tare', 'blend_shipped', 'agent_name', 'seal_number', 'output_packages', 'output_weight', 'packet_tare')
+            ->whereNull('blend_teas.deleted_at')
+            ->where('blend_sheets.blend_id', $blendId)
+            ->latest('blend_sheets.created_at')
+            ->first();
+
+        $containers = ShipmentContainer::where('blend_id', $blendId)->get();
+        $staffName = optional(auth()->user())->first_name . ' ' . optional(auth()->user())->surname;
+        $date = Carbon::now()->format('D, d-m-Y H:i:s');
+
+        $spreadsheet = new Spreadsheet();
+        $ws = $spreadsheet->getActiveSheet();
+        $ws->setTitle('Packing List');
+
+        $lastCol = 'I';
+        $row = $this->writeBlendHeader($ws, $lastCol, $sheet, 1);
+        $row++; // spacer
+
+        $grandTotals = ['packages' => 0, 'net' => 0, 'tare' => 0, 'pallet' => 0, 'gross' => 0];
+
+        foreach ($containers as $container) {
+            $row = $this->writeBlendContainerSection($ws, $lastCol, $row, $sheet, $container, $containers->count(), $grandTotals);
+        }
+
+        // BLEND SUMMARY row
+        $ws->mergeCells("A{$row}:B{$row}");
+        $ws->setCellValue("A{$row}", 'BLEND SUMMARY');
+        $ws->setCellValue("C{$row}", 'TOTALS');
+        $ws->setCellValue("D{$row}", $grandTotals['packages']);
+        $ws->setCellValue("E{$row}", $grandTotals['net']);
+        $ws->setCellValue("F{$row}", $grandTotals['tare']);
+        $ws->setCellValue("G{$row}", $grandTotals['pallet']);
+        $ws->setCellValue("H{$row}", $grandTotals['gross']);
+        $ws->getStyle("A{$row}:{$lastCol}{$row}")->applyFromArray([
+            'font' => ['bold' => true, 'name' => 'Arial', 'size' => 9],
+            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'D9D9D9']],
+            'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_MEDIUM]],
+        ]);
+
+        $this->applyBlendColumnWidths($ws);
+        $this->writePackingListFooter($ws, $row, trim($staffName), $date);
+
+        $fileName = str_replace('/', '', $sheet->blend_number) . '.xlsx';
+
+        return $this->streamSpreadsheet($spreadsheet, $fileName);
+    }
+
+    /**
+     * EXCEL: Continued blend packing list — one header + container sections per blend,
+     * single BLEND SUMMARY grand total at the very end across all blends.
+     * Mirrors continuous_blend_packing_list.blade.php exactly.
+     */
+    public function downloadBlendPackingListContExcel($id)
+    {
+        list($blendId, $type) = explode(":", base64_decode($id));
+
+        $sheets = DB::table('blend_sheets')
+            ->join('clients', 'clients.client_id', '=', 'blend_sheets.client_id')
+            ->join('destinations', 'destinations.destination_id', '=', 'blend_sheets.destination_id')
+            ->leftJoin('clearing_agents', 'clearing_agents.agent_id', '=', 'blend_sheets.agent_id')
+            ->select(
+                'blend_sheets.blend_id', 'client_name', 'clients.phone as cPhone', 'email', 'blend_number', 'vessel_name', 'port_name', 'shipping_mark', 'consignee', 'contract', 'grade', 'garden', 'blend_date', 'container_size', 'clients.address', 'package_type', 'container_tare', 'blend_shipped', 'agent_name', 'seal_number', 'output_packages', 'output_weight', 'blend_sheets.packet_tare', 'blend_sheets.address as consignee_address', 'booking_number', 'si_number'
+            )
+            ->groupBy(
+                'blend_sheets.blend_id', 'blend_sheets.client_id', 'client_name', 'clients.phone', 'email', 'blend_number', 'vessel_name', 'port_name', 'shipping_mark', 'consignee', 'clients.address', 'booking_number', 'si_number', 'contract', 'grade', 'garden', 'blend_date', 'container_size', 'package_type', 'container_tare', 'blend_shipped', 'agent_name', 'seal_number', 'output_packages', 'output_weight', 'blend_sheets.packet_tare', 'blend_sheets.address'
+            )
+            ->where('blend_sheets.si_number', $blendId)
+            ->latest('blend_sheets.created_at')
+            ->get();
+
+        $blendIds = $sheets->pluck('blend_id')->unique()->toArray();
+        $allContainers = ShipmentContainer::whereIn('blend_id', $blendIds)
+            ->orderBy('blend_id')->orderBy('container_number')->get();
+        $containersByBlend = $allContainers->groupBy('blend_id');
+
+        $sheets = $sheets->map(function ($sheet) use ($containersByBlend) {
+            $sheet->containers = $containersByBlend->get($sheet->blend_id, collect([]));
+            return $sheet;
+        });
+
+        $staffName = optional(auth()->user())->first_name . ' ' . optional(auth()->user())->surname;
+        $date = Carbon::now()->format('D, d-m-Y H:i:s');
+
+        $spreadsheet = new Spreadsheet();
+        $ws = $spreadsheet->getActiveSheet();
+        $ws->setTitle('Packing List');
+
+        $lastCol = 'I';
+        $row = 1;
+        $grandTotals = ['packages' => 0, 'net' => 0, 'tare' => 0, 'pallet' => 0, 'gross' => 0];
+
+        // Single header, using the first sheet — matches $firstSheet in the blade
+        $firstSheet = $sheets->first();
+        $row = $this->writeBlendHeader($ws, $lastCol, $firstSheet, $row);
+        $row++;
+
+        foreach ($sheets as $sheet) {
+            foreach ($sheet->containers as $container) {
+                $row = $this->writeBlendContainerSection($ws, $lastCol, $row, $sheet, $container, $sheet->containers->count(), $grandTotals);
+            }
+        }
+
+        // Single BLEND SUMMARY across every blend
+        $ws->mergeCells("A{$row}:B{$row}");
+        $ws->setCellValue("A{$row}", 'BLEND SUMMARY');
+        $ws->setCellValue("C{$row}", 'TOTALS');
+        $ws->setCellValue("D{$row}", $grandTotals['packages']);
+        $ws->setCellValue("E{$row}", $grandTotals['net']);
+        $ws->setCellValue("F{$row}", $grandTotals['tare']);
+        $ws->setCellValue("G{$row}", $grandTotals['pallet']);
+        $ws->setCellValue("H{$row}", $grandTotals['gross']);
+        $ws->getStyle("A{$row}:{$lastCol}{$row}")->applyFromArray([
+            'font' => ['bold' => true, 'name' => 'Arial', 'size' => 9],
+            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'D0D0D0']],
+            'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_MEDIUM]],
+        ]);
+
+        $this->applyBlendColumnWidths($ws);
+        $this->writePackingListFooter($ws, $row, trim($staffName), $date);
+
+        $fileName = str_replace('/', '', $sheets[0]->blend_number) . '.xlsx';
+
+        return $this->streamSpreadsheet($spreadsheet, $fileName);
+    }
+
+    /**
+     * Header block — matches the blade's company-info + info table exactly.
+     * Port of loading is hardcoded to "MOMBASA, KENYA" because the blade hardcodes it too.
+     */
+
+    /**
+ * Header block — logo + company name/address, PACKING LIST title,
+ * shipper block, then invoice/consignee/vessel info table.
+ * Port of loading is hardcoded to "MOMBASA, KENYA" because the blade hardcodes it too.
+ */
+private function writeBlendHeader($ws, string $lastCol, $sheet, int $startRow): int
+{
+    // Hardcoded company identity (PACKMAC HOLDINGS LIMITED)
+    $companyName = 'PACKMAC HOLDINGS LIMITED';
+    $companyAddress = 'Chai Street Shimanzi High Level, Mombasa P.O BOX 41328-80100, Mombasa, Kenya (TMSA 186)';
+
+    $row = $startRow;
+
+    // Logo (top-left corner, floats above the merged header cells)
+    $logoPath = public_path('assets/img/favicons/icon.png');
+    if (file_exists($logoPath)) {
+        $drawing = new Drawing();
+        $drawing->setName('Logo');
+        $drawing->setDescription('Company Logo');
+        $drawing->setPath($logoPath);
+        $drawing->setHeight(42);
+        $drawing->setCoordinates('A' . $row);
+        $drawing->setOffsetX(4);
+        $drawing->setOffsetY(4);
+        $drawing->setWorksheet($ws);
+    }
+
+    // Company name
+    $ws->mergeCells("A{$row}:{$lastCol}{$row}");
+    $ws->setCellValue("A{$row}", $companyName);
+    $ws->getStyle("A{$row}")->applyFromArray([
+        'font' => ['bold' => true, 'size' => 14, 'color' => ['rgb' => '2E7D32'], 'name' => 'Arial'],
+        'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
+    ]);
+    $ws->getRowDimension($row)->setRowHeight(20);
+    $row++;
+
+    // Company address
+    $ws->mergeCells("A{$row}:{$lastCol}{$row}");
+    $ws->setCellValue("A{$row}", $companyAddress);
+    $ws->getStyle("A{$row}")->applyFromArray([
+        'font' => ['name' => 'Arial', 'size' => 9, 'italic' => true],
+        'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
+    ]);
+    $ws->getRowDimension($row)->setRowHeight(16);
+    $row++;
+
+    $ws->mergeCells("A{$row}:{$lastCol}{$row}");
+    $ws->setCellValue("A{$row}", 'PACKING LIST');
+    $ws->getStyle("A{$row}")->applyFromArray([
+        'font' => ['bold' => true, 'size' => 12, 'name' => 'Arial'],
+        'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
+        'borders' => ['bottom' => ['borderStyle' => Border::BORDER_THIN]],
+    ]);
+    $row += 2;
+
+    $addr = json_decode((string) $sheet->consignee_address, true) ?: [];
+
+    // Left column: SHIPPER + address, then invoice / consignee / consignee address fields
+    $leftLabels = [
+        'SHIPPER', 'SHIPPER ADDRESS',
+        'INVOICE NUMBER', 'CONSIGNEE', 'CONSIGNEE ADDRESS', 'CONSIGNEE P.O BOX', 'CONSIGNEE STATE', 'CONSIGNEE PHONE',
+    ];
+    $leftValues = [
+        $sheet->client_name,
+        $sheet->client_address ?? '',
+        $sheet->blend_number,
+        $sheet->consignee,
+        $addr['box'] ?? '',
+        $addr['address'] ?? '',
+        $addr['state'] ?? '',
+        $addr['mobile'] ?? '',
+    ];
+
+    $rightLabels = ['PORT OF LOADING', 'DESTINATION PORT', 'BOOKING NUMBER', 'DATE', 'SHIPPING MARKS', 'OCEAN VESSEL'];
+    $rightValues = [
+        'MOMBASA, KENYA',
+        $sheet->port_name,
+        $sheet->booking_number,
+        $sheet->blend_date ? Carbon::parse($sheet->blend_date)->format('d/m/Y') : '',
+        $sheet->shipping_mark,
+        $sheet->vessel_name,
+    ];
+
+    $headerRowCount = max(count($leftLabels), count($rightLabels));
+    for ($i = 0; $i < $headerRowCount; $i++) {
+        $r = $row + $i;
+        if (isset($leftLabels[$i])) {
+            $ws->setCellValue("A{$r}", $leftLabels[$i]);
+            $ws->getStyle("A{$r}")->getFont()->setBold(true)->setName('Arial')->setSize(9);
+            $ws->mergeCells("B{$r}:D{$r}");
+            $ws->setCellValue("B{$r}", ': ' . ($leftValues[$i] ?? ''));
+            $ws->getStyle("B{$r}")->getFont()->setName('Arial')->setSize(9);
+        }
+        if (isset($rightLabels[$i])) {
+            $ws->setCellValue("F{$r}", $rightLabels[$i]);
+            $ws->getStyle("F{$r}")->getFont()->setBold(true)->setName('Arial')->setSize(9);
+            $ws->mergeCells("G{$r}:{$lastCol}{$r}");
+            $ws->setCellValue("G{$r}", ': ' . ($rightValues[$i] ?? ''));
+            $ws->getStyle("G{$r}")->getFont()->setName('Arial')->setSize(9);
+        }
+    }
+
+    return $row + $headerRowCount + 1; // +1 spacer, matches the <hr> before the container loop
+}
+
+    /**
+     * One container section — replicates the blade's per-container computation:
+     * packages/net/tare split evenly across the blend's containers, pallet weight
+     * from the container itself, gross = net + tare + pallet. Renders a data row
+     * and a TOTALS row with identical values (the blade does this too).
+     */
+    private function writeBlendContainerSection($ws, string $lastCol, int $row, $sheet, $container, int $containerCount, array &$grandTotals): int
+    {
+        $packagesPerContainer = $containerCount > 0 ? floor($sheet->output_packages / $containerCount) : 0;
+        $weightPerContainer = $containerCount > 0 ? $sheet->output_weight / $containerCount : 0;
+        $tarePerContainer = $packagesPerContainer * $sheet->packet_tare;
+        $showPalletWeight = isset($sheet->package_type) && ($sheet->package_type != 4);
+        $palletWeight = $showPalletWeight ? ($container->pallet_weight ?? 0) : 0;
+        $grossPerContainer = $weightPerContainer + $tarePerContainer + $palletWeight;
+
+        // Section header
+        $ws->mergeCells("A{$row}:{$lastCol}{$row}");
+        $ws->setCellValue("A{$row}", "Cont No: {$container->container_number}  Seal No: {$container->seal_number}");
+        $ws->getStyle("A{$row}")->applyFromArray([
+            'font' => ['bold' => true, 'name' => 'Arial', 'size' => 9],
+            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'F0F0F0']],
+            'alignment' => ['horizontal' => Alignment::HORIZONTAL_RIGHT],
+        ]);
+        $row++;
+
+        // Column headers
+        $columns = ['Garden', 'Invoice No', 'Grade', 'Qty', 'Nett Kgs', 'TARE', 'Plt Wtt', 'Gross Kgs', 'REMARKS'];
+        $colLetters = range('A', $lastCol);
+        foreach ($columns as $i => $label) {
+            $ws->setCellValue("{$colLetters[$i]}{$row}", $label);
+        }
+        $ws->getStyle("A{$row}:{$lastCol}{$row}")->applyFromArray([
+            'font' => ['bold' => true, 'name' => 'Arial', 'size' => 9],
+            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
+            'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN]],
+        ]);
+        $row++;
+
+        // Data row
+        $data = [$sheet->garden, $sheet->blend_number, $sheet->grade, $packagesPerContainer, $weightPerContainer, $tarePerContainer, $palletWeight, $grossPerContainer, ''];
+        foreach ($data as $i => $val) {
+            $ws->setCellValue("{$colLetters[$i]}{$row}", $val);
+        }
+        $ws->getStyle("A{$row}:{$lastCol}{$row}")->applyFromArray([
+            'font' => ['name' => 'Arial', 'size' => 9],
+            'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN]],
+        ]);
+        $row++;
+
+        // TOTALS row (same values, matches the blade)
+        $ws->setCellValue("C{$row}", 'TOTALS');
+        $ws->setCellValue("D{$row}", $packagesPerContainer);
+        $ws->setCellValue("E{$row}", $weightPerContainer);
+        $ws->setCellValue("F{$row}", $tarePerContainer);
+        $ws->setCellValue("G{$row}", $palletWeight);
+        $ws->setCellValue("H{$row}", $grossPerContainer);
+        $ws->getStyle("A{$row}:{$lastCol}{$row}")->applyFromArray([
+            'font' => ['bold' => true, 'name' => 'Arial', 'size' => 9],
+            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'E8E8E8']],
+            'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN]],
+        ]);
+        $ws->getStyle("E" . ($row - 1) . ":H{$row}")->getNumberFormat()->setFormatCode('#,##0.00');
+        $row += 2; // spacer row, matches the blank <tr> in the blade
+
+        $grandTotals['packages'] += $packagesPerContainer;
+        $grandTotals['net'] += $weightPerContainer;
+        $grandTotals['tare'] += $tarePerContainer;
+        $grandTotals['pallet'] += $palletWeight;
+        $grandTotals['gross'] += $grossPerContainer;
+
+        return $row;
+    }
+
+    private function applyBlendColumnWidths($ws): void
+    {
+        $widths = ['A' => 22, 'B' => 16, 'C' => 10, 'D' => 9, 'E' => 12, 'F' => 10, 'G' => 10, 'H' => 12, 'I' => 16];
+        foreach ($widths as $col => $w) {
+            $ws->getColumnDimension($col)->setWidth($w);
+        }
+    }
+
+        public function downloadSIPackingListExcel($id)
+{
+    list($shippingId, $type) = explode(':', base64_decode($id));
+
+    $shippings = ShippingInstruction::join('clients', 'clients.client_id', '=', 'shipping_instructions.client_id')
+        ->leftJoin('clearing_agents', 'clearing_agents.agent_id', '=', 'shipping_instructions.clearing_agent')
+        ->join('destinations', 'destinations.destination_id', '=', 'shipping_instructions.destination_id')
+        ->leftJoin('shipments', 'shipments.shipping_id', '=', 'shipping_instructions.shipping_id')
+        ->leftJoin('delivery_orders', 'delivery_orders.delivery_id', 'shipments.delivery_id')
+        ->leftJoin('gardens', 'gardens.garden_id', 'delivery_orders.garden_id')
+        ->leftJoin('grades', 'grades.grade_id', 'delivery_orders.grade_id')
+        ->join('stock_ins', 'stock_ins.stock_id', '=', 'shipments.stock_id')
+        ->join('user_infos', 'user_infos.user_id', '=', 'shipping_instructions.user_id')
+        ->select(
+            'clients.address as client_address', 'shipping_instructions.address', 'garden_name', 'grade_name', 'invoice_number', 'ship_date',
+            'client_name', 'shipping_number', 'vessel_name', 'port_name', 'shipped_packages', 'shipped_weight', 'consignee', 'shipping_mark', 'container_number', 'agent_name', 'seal_number', 'delivery_orders.delivery_id', 'production_date', 'expiry_date', 'shipments.pallet_height as height', 'lot_number', 'shipments.package_tare', 'shipments.pallet_weight', 'surname', 'first_name', 'shipping_instructions.booking_number'
+        )
+        ->where('shipping_instructions.shipping_id', $shippingId)
+        ->whereNull('shipments.deleted_at')
+        ->get();
+
+    $sheet = $shippings[0];
+    $printed = auth()->user();
+    $staffName = $printed ? ($printed->first_name . ' ' . $printed->surname) : auth()->user()->username;
+    $date = Carbon::now()->format('D, d-m-Y H:i:s');
+    $companyName = auth()->user()->company_name ?? config('app.name');
+
+    $spreadsheet = ($type == 2)
+        ? $this->buildPalletizedPackingListSheet($shippings, $sheet, $staffName, $date, $companyName)
+        : $this->buildLoosePackingListSheet($shippings, $sheet, $staffName, $date, $companyName);
+
+    $fileName = str_replace('/', '', $sheet->shipping_number) . '.xlsx';
+
+    return $this->streamSpreadsheet($spreadsheet, $fileName);
+}
+    
+    /**
+     * EXCEL: Continued (multi-container) palletized packing list.
+     * Mirrors downloadSIContinuedPackingList() — grouped by container, subtotals per group, grand total.
+     */
+    public function downloadSIContinuedPackingListExcel($id)
+    {
+        $shippings = ShippingInstruction::join('clients', 'clients.client_id', '=', 'shipping_instructions.client_id')
+            ->leftJoin('clearing_agents', 'clearing_agents.agent_id', '=', 'shipping_instructions.clearing_agent')
+            ->join('destinations', 'destinations.destination_id', '=', 'shipping_instructions.destination_id')
+            ->leftJoin('shipments', 'shipments.shipping_id', '=', 'shipping_instructions.shipping_id')
+            ->leftJoin('delivery_orders', 'delivery_orders.delivery_id', 'shipments.delivery_id')
+            ->leftJoin('gardens', 'gardens.garden_id', 'delivery_orders.garden_id')
+            ->leftJoin('grades', 'grades.grade_id', 'delivery_orders.grade_id')
+            ->join('stock_ins', 'stock_ins.stock_id', '=', 'shipments.stock_id')
+            ->join('user_infos', 'user_infos.user_id', '=', 'shipping_instructions.user_id')
+            ->select(
+                'clients.address as client_address', 'shipping_instructions.address', 'garden_name', 'grade_name', 'invoice_number', 'ship_date',
+                'client_name', 'shipping_number', 'vessel_name', 'port_name', 'shipped_packages', 'shipped_weight', 'consignee', 'shipping_mark', 'container_number', 'agent_name', 'seal_number', 'delivery_orders.delivery_id', 'production_date', 'expiry_date', 'shipments.pallet_height as height', 'lot_number', 'shipments.package_tare', 'shipments.pallet_weight', 'surname', 'first_name', 'shipping_instructions.booking_number'
+            )
+            ->where(['shipping_instructions.si_number' => base64_decode($id), 'load_type' => 2])
+            ->whereNull('shipments.deleted_at')
+            ->get();
+    
+        $sheet = $shippings[0];
+        $printed = auth()->user();
+        $staffName = $printed ? ($printed->first_name . ' ' . $printed->surname) : auth()->user()->username;
+        $date = Carbon::now()->format('D, d-m-Y H:i:s');
+        $companyName = auth()->user()->company_name ?? config('app.name');
+    
+        $spreadsheet = $this->buildPalletizedPackingListSheet($shippings, $sheet, $staffName, $date, $companyName);
+    
+        $fileName = str_replace('/', '', $sheet->shipping_number) . '.xlsx';
+    
+        return $this->streamSpreadsheet($spreadsheet, $fileName);
+    }
+    
+    /**
+     * Shared: stream a Spreadsheet object as an xlsx download.
+     */
+    private function streamSpreadsheet(Spreadsheet $spreadsheet, string $fileName)
+    {
+        $writer = new Xlsx($spreadsheet);
+        $tempFile = tempnam(sys_get_temp_dir(), 'pkl');
+        $writer->save($tempFile);
+    
+        return response()->download($tempFile, $fileName, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ])->deleteFileAfterSend(true);
+    }
+    
+    /**
+     * Shared: header block (logo, company name/address, PACKING LIST title,
+     * shipper/invoice/consignee/vessel info) written into the given sheet,
+     * columns A..$lastCol, starting at row 1. Returns the next free row number.
+     */
+    private function writePackingListHeader(
+        \PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $ws,
+        string $lastCol,
+                                                      $sheet,
+        string $companyName,
+        bool $showContainerSealInHeader
+    ): int {
+        // Hardcoded company address (PACKMAC HOLDINGS LIMITED)
+        $companyAddress = 'Chai Street Shimanzi High Level, Mombasa P.O BOX 41328-80100, Mombasa, Kenya (TMSA 186)';
+    
+        $row = 1;
+    
+        // Logo (top-left corner, floats above the merged header cells)
+        $logoPath = public_path('assets/img/favicons/icon.png');
+        if (file_exists($logoPath)) {
+            $drawing = new Drawing();
+            $drawing->setName('Logo');
+            $drawing->setDescription('Company Logo');
+            $drawing->setPath($logoPath);
+            $drawing->setHeight(42);
+            $drawing->setCoordinates('A' . $row);
+            $drawing->setOffsetX(4);
+            $drawing->setOffsetY(4);
+            $drawing->setWorksheet($ws);
+        }
+    
+        // Company name
+        $ws->mergeCells("A{$row}:{$lastCol}{$row}");
+        $ws->setCellValue("A{$row}", strtoupper($companyName));
+        $ws->getStyle("A{$row}")->applyFromArray([
+            'font' => ['bold' => true, 'size' => 14, 'color' => ['rgb' => '2E7D32'], 'name' => 'Arial'],
+            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
+        ]);
+        $ws->getRowDimension($row)->setRowHeight(20);
+        $row++;
+    
+        // Company address
+        $ws->mergeCells("A{$row}:{$lastCol}{$row}");
+        $ws->setCellValue("A{$row}", $companyAddress);
+        $ws->getStyle("A{$row}")->applyFromArray([
+            'font' => ['size' => 9, 'italic' => true, 'name' => 'Arial'],
+            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
+        ]);
+        $ws->getRowDimension($row)->setRowHeight(16);
+        $row++;
+    
+        // Title
+        $ws->mergeCells("A{$row}:{$lastCol}{$row}");
+        $ws->setCellValue("A{$row}", 'PACKING LIST');
+        $ws->getStyle("A{$row}")->applyFromArray([
+            'font' => ['bold' => true, 'size' => 12, 'name' => 'Arial'],
+            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
+            'borders' => ['bottom' => ['borderStyle' => Border::BORDER_THIN]],
+        ]);
+        $row += 2;
+    
+        // Shipper address lines (client_address)
+        $shipperAddressLines = array_filter(preg_split('/\r\n|\r|\n/', (string) $sheet->client_address));
+        $shipperAddressLines = array_pad(array_slice($shipperAddressLines, 0, 4), 4, '');
+    
+        // Left column: Shipper + address, then invoice / consignee / address lines / ocean vessel
+        $leftLabels = [
+            'SHIPPER', 'SHIPPER ADDRESS',
+            'INVOICE NUMBER', 'CONSIGNEE', 'CONSIGNEE ADDRESS', 'CONSIGNEE P.O BOX', 'CONSIGNEE STATE', 'CONSIGNEE PHONE',
+            'OCEAN VESSEL',
+        ];
+        $leftValues = [
+            $sheet->client_name,
+            $sheet->client_address,
+            $sheet->invoice_number,
+            $sheet->consignee ?? $sheet->client_name,
+            $sheet?->address['address'] ?? '',
+            $sheet?->address['box'] ?? '',
+            $sheet?->address['state'] ?? '',
+            $sheet?->address['mobile'] ?? '',
+            $sheet->vessel_name,
+        ];
+    
+        $rightLabels = ['PORT OF LOADING', 'DESTINATION PORT', 'BOOKING NUMBER', 'DATE'];
+        $rightValues = [
+            'MOMBASA, KENYA',
+            $sheet->port_name,
+            $sheet->booking_number ?: 'TBA',
+            $sheet->ship_date ? Carbon::createFromTimestamp($sheet->ship_date)->format('d/m/Y') : '',
+        ];
+        if ($showContainerSealInHeader) {
+            $rightLabels[] = 'CONTAINER NUMBER';
+            $rightValues[] = $sheet->container_number;
+            $rightLabels[] = 'SEAL NUMBER';
+            $rightValues[] = $sheet->seal_number;
+        }
+        $rightLabels[] = 'SHIPPING MARKS';
+        $rightValues[] = $sheet->shipping_mark ?: 'TBA';
+    
+        $headerRowCount = max(count($leftLabels), count($rightLabels));
+        for ($i = 0; $i < $headerRowCount; $i++) {
+            $r = $row + $i;
+            if (isset($leftLabels[$i])) {
+                $ws->setCellValue("A{$r}", $leftLabels[$i]);
+                $ws->getStyle("A{$r}")->getFont()->setBold(true)->setName('Arial')->setSize(9);
+                $ws->mergeCells("B{$r}:D{$r}");
+                $ws->setCellValue("B{$r}", ': ' . ($leftValues[$i] ?? ''));
+                $ws->getStyle("B{$r}")->getFont()->setName('Arial')->setSize(9);
+            }
+            if (isset($rightLabels[$i])) {
+                $ws->setCellValue("F{$r}", $rightLabels[$i]);
+                $ws->getStyle("F{$r}")->getFont()->setBold(true)->setName('Arial')->setSize(9);
+                $ws->mergeCells("G{$r}:{$lastCol}{$r}");
+                $ws->setCellValue("G{$r}", ': ' . ($rightValues[$i] ?? ''));
+                $ws->getStyle("G{$r}")->getFont()->setName('Arial')->setSize(9);
+            }
+        }
+    
+        return $row + $headerRowCount + 1; // blank spacer row before the table
+    }
+    
+    /**
+     * Shared: signature block + "Printed On" stamp, written starting at $row.
+     */
+    private function writePackingListFooter(
+        \PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $ws,
+        int $row,
+        string $staffName,
+        string $date
+    ): void {
+        $row += 2;
+        $ws->setCellValue("A{$row}", 'Prepared By');
+        $ws->getStyle("A{$row}")->getFont()->setBold(true)->setItalic(true)->setName('Arial')->setSize(9);
+        $ws->setCellValue("B{$row}", $staffName);
+        $ws->getStyle("B{$row}")->getFont()->setBold(true)->setName('Arial')->setSize(10);
+    
+        $ws->setCellValue("F{$row}", 'Checked By');
+        $ws->getStyle("F{$row}")->getFont()->setBold(true)->setItalic(true)->setName('Arial')->setSize(9);
+    
+        $row += 2;
+        $ws->setCellValue("A{$row}", 'Printed On: ' . $date);
+        $ws->getStyle("A{$row}")->getFont()->setItalic(true)->setBold(true)->setName('Arial')->setSize(8);
+    }
+    
+    /**
+     * LOOSE packing list — single container, flat table (matches TUSHA TEA sample).
+     * Columns: # | Lot No. | Garden Mark | Invoice Number | Grade | No. of Packages |
+     * Net WT | Tare WT | Pallet WT | Gross WT | Prod. Date | Expiry Date | Pallet Height
+     */
+    private function buildLoosePackingListSheet($shippings, $sheet, $staffName, $date, $companyName): Spreadsheet
+    {
+        $spreadsheet = new Spreadsheet();
+        $ws = $spreadsheet->getActiveSheet();
+        $ws->setTitle('Packing List');
+    
+        $lastCol = 'M';
+        $headerRow = $this->writePackingListHeader($ws, $lastCol, $sheet, $companyName, true);
+    
+        $columns = ['#', 'Lot No.', 'Garden Mark', 'Invoice Number', 'Grade', 'No. of Packages',
+            'Net WT (Kgs)', 'Tare WT (Kgs)', 'Pallet WT (Kgs)', 'Gross WT (Kgs)', 'Prod. Date', 'Expiry Date', 'Pallet Height (CM)'];
+        $colLetters = range('A', $lastCol);
+    
+        foreach ($columns as $i => $label) {
+            $ws->setCellValue("{$colLetters[$i]}{$headerRow}", $label);
+        }
+        $ws->getStyle("A{$headerRow}:{$lastCol}{$headerRow}")->applyFromArray([
+            'font' => ['bold' => true, 'name' => 'Arial', 'size' => 9],
+            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'E0E0E0']],
+            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'wrapText' => true],
+            'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN]],
+        ]);
+    
+        $row = $headerRow + 1;
+        $totals = ['packages' => 0, 'net' => 0, 'tare' => 0, 'pallet' => 0, 'gross' => 0];
+        $index = 1;
+    
+        foreach ($shippings as $s) {
+            $net = str_replace(',', '', $s->shipped_weight) ?? 0;
+            $tare = $s->package_tare * $s->shipped_packages ?? 0;
+            $palletWt = $s->pallet_weight ?? 0;
+            $gross = $net + $tare + $palletWt;
+    
+            $data = [
+                $index++, $s->lot_number, $s->garden_name, $s->invoice_number, $s->grade_name,
+                $s->shipped_packages, $net, $tare, $palletWt, $gross,
+                $s->production_date ? Carbon::parse($s->production_date)->format('Y-m-d') : '',
+                $s->expiry_date ? Carbon::parse($s->expiry_date)->format('Y-m-d') : '',
+                $s->height,
+            ];
+            foreach ($data as $i => $val) {
+                $ws->setCellValue("{$colLetters[$i]}{$row}", $val);
+            }
+            $ws->getStyle("A{$row}:{$lastCol}{$row}")->applyFromArray([
+                'font' => ['name' => 'Arial', 'size' => 9],
+                'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN]],
+            ]);
+    
+            $totals['packages'] += $s->shipped_packages;
+            $totals['net'] += $net;
+            $totals['tare'] += $tare;
+            $totals['pallet'] += $palletWt;
+            $totals['gross'] += $gross;
+            $row++;
+        }
+    
+        // Totals row
+        $ws->mergeCells("A{$row}:E{$row}");
+        $ws->setCellValue("F{$row}", $totals['packages']);
+        $ws->setCellValue("G{$row}", $totals['net']);
+        $ws->setCellValue("H{$row}", $totals['tare']);
+        $ws->setCellValue("I{$row}", $totals['pallet']);
+        $ws->setCellValue("J{$row}", $totals['gross']);
+        $ws->getStyle("A{$row}:{$lastCol}{$row}")->applyFromArray([
+            'font' => ['bold' => true, 'name' => 'Arial', 'size' => 9],
+            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'F0F0F0']],
+            'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN]],
+        ]);
+    
+        $this->applyPackingListNumberFormats($ws, $headerRow + 1, $row, ['G', 'H', 'I', 'J']);
+        $this->applyPackingListColumnWidths($ws, $colLetters, [5, 10, 14, 14, 8, 10, 11, 11, 11, 11, 12, 12, 14]);
+        $this->writePackingListFooter($ws, $row, $staffName, $date);
+    
+        return $spreadsheet;
+    }
+    
+    /**
+     * PALLETIZED / CONTINUED packing list — grouped by container, subtotal per group, grand total.
+     * Columns: # | Lot No. | Garden Mark | Invoice Number | Grade | No. of Packages |
+     * Net WT | Tare WT | Pallet WT | Gross WT | Prod. Date | Expiry Date | Pallet Height | Container Number | Seal Number
+     */
+    private function buildPalletizedPackingListSheet($shippings, $sheet, $staffName, $date, $companyName): Spreadsheet
+    {
+        $spreadsheet = new Spreadsheet();
+        $ws = $spreadsheet->getActiveSheet();
+        $ws->setTitle('Packing List');
+    
+        $lastCol = 'O';
+        $headerRow = $this->writePackingListHeader($ws, $lastCol, $sheet, $companyName, false);
+    
+        $columns = ['#', 'Lot No.', 'Garden Mark', 'Invoice Number', 'Grade', 'No. of Packages',
+            'Net WT (Kgs)', 'Tare WT (Kgs)', 'Pallet WT (Kgs)', 'Gross WT (Kgs)', 'Prod. Date', 'Expiry Date',
+            'Pallet Height (CM)', 'Container Number', 'Seal Number'];
+        $colLetters = range('A', $lastCol);
+    
+        foreach ($columns as $i => $label) {
+            $ws->setCellValue("{$colLetters[$i]}{$headerRow}", $label);
+        }
+        $ws->getStyle("A{$headerRow}:{$lastCol}{$headerRow}")->applyFromArray([
+            'font' => ['bold' => true, 'name' => 'Arial', 'size' => 9],
+            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'E0E0E0']],
+            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'wrapText' => true],
+            'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN]],
+        ]);
+    
+        $row = $headerRow + 1;
+        $index = 1;
+        $grandTotals = ['packages' => 0, 'net' => 0, 'tare' => 0, 'pallet' => 0, 'gross' => 0];
+    
+        // Group rows by container_number, preserving original order
+        $groups = $shippings->groupBy('container_number');
+    
+        foreach ($groups as $containerNumber => $groupRows) {
+            $groupTotals = ['packages' => 0, 'net' => 0, 'tare' => 0, 'pallet' => 0, 'gross' => 0];
+    
+            foreach ($groupRows as $s) {
+                $net = str_replace(',', '', $s->shipped_weight) ?? 0;
+                $tare = ($s->shipped_packages * $s->package_tare) ?? 0;
+                $palletWt = $s->pallet_weight ?? 0;
+                $gross = $net + $tare + $palletWt;
+    
+                $data = [
+                    $index++, $s->lot_number, $s->garden_name, $s->invoice_number, $s->grade_name,
+                    $s->shipped_packages, $net, $tare, $palletWt, $gross,
+                    $s->production_date ? Carbon::parse($s->production_date)->format('Y-m-d') : '',
+                    $s->expiry_date ? Carbon::parse($s->expiry_date)->format('Y-m-d') : '',
+                    $s->height, $s->container_number, $s->seal_number,
+                ];
+                foreach ($data as $i => $val) {
+                    $ws->setCellValue("{$colLetters[$i]}{$row}", $val);
+                }
+                $ws->getStyle("A{$row}:{$lastCol}{$row}")->applyFromArray([
+                    'font' => ['name' => 'Arial', 'size' => 9],
+                    'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN]],
+                ]);
+    
+                foreach (['packages' => $s->shipped_packages, 'net' => $net, 'tare' => $tare, 'pallet' => $palletWt, 'gross' => $gross] as $key => $val) {
+                    $groupTotals[$key] += $val;
+                    $grandTotals[$key] += $val;
+                }
+                $row++;
+            }
+    
+            // Subtotal row per container
+            $ws->mergeCells("A{$row}:E{$row}");
+            $ws->setCellValue("F{$row}", $groupTotals['packages']);
+            $ws->setCellValue("G{$row}", $groupTotals['net']);
+            $ws->setCellValue("H{$row}", $groupTotals['tare']);
+            $ws->setCellValue("I{$row}", $groupTotals['pallet']);
+            $ws->setCellValue("J{$row}", $groupTotals['gross']);
+            $ws->getStyle("A{$row}:{$lastCol}{$row}")->applyFromArray([
+                'font' => ['bold' => true, 'name' => 'Arial', 'size' => 9],
+                'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'F0F0F0']],
+                'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN]],
+            ]);
+            $row++;
+        }
+    
+        // Grand total row
+        $ws->mergeCells("A{$row}:E{$row}");
+        $ws->setCellValue("A{$row}", 'GRAND TOTAL');
+        $ws->setCellValue("F{$row}", $grandTotals['packages']);
+        $ws->setCellValue("G{$row}", $grandTotals['net']);
+        $ws->setCellValue("H{$row}", $grandTotals['tare']);
+        $ws->setCellValue("I{$row}", $grandTotals['pallet']);
+        $ws->setCellValue("J{$row}", $grandTotals['gross']);
+        $ws->getStyle("A{$row}:{$lastCol}{$row}")->applyFromArray([
+            'font' => ['bold' => true, 'name' => 'Arial', 'size' => 10],
+            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'D9D9D9']],
+            'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_MEDIUM]],
+        ]);
+    
+        $this->applyPackingListNumberFormats($ws, $headerRow + 1, $row, ['G', 'H', 'I', 'J']);
+        $this->applyPackingListColumnWidths($ws, $colLetters, [5, 10, 14, 14, 8, 10, 11, 11, 11, 11, 12, 12, 12, 16, 16]);
+        $this->writePackingListFooter($ws, $row, $staffName, $date);
+    
+        return $spreadsheet;
+    }
+    
+    private function applyPackingListNumberFormats($ws, int $fromRow, int $toRow, array $cols): void
+    {
+        foreach ($cols as $col) {
+            $ws->getStyle("{$col}{$fromRow}:{$col}{$toRow}")
+                ->getNumberFormat()->setFormatCode('#,##0.00');
+        }
+    }
+    
+    private function applyPackingListColumnWidths($ws, array $colLetters, array $widths): void
+    {
+        foreach ($colLetters as $i => $col) {
+            $ws->getColumnDimension($col)->setWidth($widths[$i] ?? 12);
+        }
     }
 
 }

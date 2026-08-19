@@ -80,7 +80,7 @@
     <h1 class="heading">PACKMAC HOLDINGS LIMITED</h1>
     <p>Chai Street Shimanzi High Level, Mombasa P.O BOX 41328-80100, Mombasa, Kenya (TMSA 186)</p>
 </div>
-<div class="header">PORT DRIVER CLEARANCE<hr></div>
+<div class="header">PORT DELIVERY NOTE<hr></div>
 <br>
 <p>Receive the following shipment in good order and condition;</p>
 <br>
@@ -89,36 +89,38 @@
     <tr>
         <td style="width: 15%!important;"> SI NUMBER </td>
         <td style="width: 35% !important;"> {{ $shipment->shipping_number }} </td>
-        <td style="width: 20%!important;"> CONTAINER NUMBERS </td>
-        <td style="width: 30% !important;"> {{ $shipment->container_number }} ({{ $shipment->container_size == 1 ? '20 FT' : ($shipment->container_size == 2 ? '40 FT' : '40 FTHC') }}) </td>
+        <td style="width: 15% !important;"> RELEASED FROM </td>
+        <td style="width: 35% !important;"> {{ $shipment->station_name }} </td>
     </tr>
     <tr>
         <td style="width: 15% !important;"> DESTINATION </td>
         <td style="width: 35% !important;"> {{ $shipment->port_name }} </td>
-        <td style="width: 20% !important;"> SHIPPING AGENT </td>
-        <td style="width: 30% !important;"> {{ $shipment->agent_name }}</td>
-    </tr>
-    <tr>
-        <td style="width: 15% !important;"> CONSIGNEE </td>
-        <td style="width: 35% !important;"> {{ $shipment->consignee }} </td>
         <td style="width: 20% !important;"> TRANSPORTER </td>
         <td style="width: 30% !important;"> {{ $shipment->transporter_name }} </td>
     </tr>
     <tr>
-        <td style="width: 15% !important;"> SHIPPING MARK </td>
-        <td style="width: 35% !important;"> {{ $shipment->shipping_mark }} </td>
+        <td style="width: 15% !important;"> VESEL NAME </td>
+        <td style="width: 35% !important;"> {{ $shipment->vessel_name }} </td>
         <td style="width: 20% !important;"> TRUCK REGISTRATION </td>
         <td style="width: 30% !important;"> {{ $shipment->registration }}</td>
     </tr>
     <tr>
-        <td style="width: 15% !important;"> VESEL NAME </td>
-        <td style="width: 35% !important;"> {{ $shipment->vessel_name }} </td>
+        <td style="width: 15% !important;"> SEAL NUMBER </td>
+        <td style="width: 35% !important;"> {{ $shipment->seal_number }} </td>
+
         <td style="width: 20% !important;"> DRIVER NAME </td>
         <td style="width: 30% !important;"> {{ $shipment->driver_name }} </td>
     </tr>
     <tr>
-        <td style="width: 15% !important;"> SEAL NUMBER </td>
-        <td style="width: 35% !important;"> {{ $shipment->seal_number }} </td>
+        <td style="width: 20% !important;"> SHIPPING AGENT </td>
+        <td style="width: 30% !important;"> {{ $shipment->agent_name }}</td>
+        <td style="width: 15% !important;"> ID NUMBER </td>
+        <td style="width: 35% !important;"> {{ $shipment->id_number }} </td>
+
+    </tr>
+    <tr>
+        <td style="width: 20%!important;"> CONTAINER NUMBER </td>
+        <td style="width: 30% !important;"> {{ $shipment->container_number }} ({{ $shipment->container_size == 1 ? '20 FT' : ($shipment->container_size == 2 ? '40 FT' : '40 FTHC') }}) </td>
         <td style="width: 20% !important;"> DRIVER PHONE </td>
         <td style="width: 30% !important;"> {{ $shipment->phone }}</td>
     </tr>
@@ -129,7 +131,7 @@
 <br>
 <p><strong>Total Packages : </strong> {{ number_format($shipment->totalPackages) }} </p>
 <p><strong>Total Weight : </strong> {{ number_format($shipment->totalWeight, 2) }}</p>
-<p><strong>Loading Type : </strong> {{ $shipment->loading_type == 1 ? 'LOOSE LOADING' : 'PALLETIZED LOADING' }}</p>
+<p><strong>Loading Type : </strong> {{ $shipment->load_type === 1 ? 'LOOSE LOADING' : 'PALLETIZED LOADING' }}</p>
 <br>
 <br>
 <p>Shipment left the warehouse in good order and condition;</p>
@@ -148,9 +150,9 @@
     </tr>
     <tr>
         <td style="width: 10% !important;">Date</td>
-        <td style="width: 23% !important;"><hr class="dotted-hr"></td>
+        <td style="width: 23% !important;">{{ $date }}<hr class="dotted-hr"></td>
         <td style="width: 10% !important;">Date</td>
-        <td style="width: 23% !important;"><hr class="dotted-hr"></td>
+        <td style="width: 23% !important;">{{ $date }}<hr class="dotted-hr"></td>
     </tr>
     <tr>
         <td style="width: 10% !important;">Signature</td>
@@ -163,11 +165,11 @@
 <br>
 <p>Goods received in good order and condition;</p>
 <br>
-<p>RECEIVING OFFICER : ____________________________________________</p>
+<p>PORT CLERK : __________________________________________________________________</p>
 <br>
-<p>OFFICER SIGNATURE : ___________________________________________</p>
+<p>CLERK SIGNATURE : ___________________________________________________________</p>
 <br>
-<p>DATE RECEIVED : _________________________________________________</p>
+<p>DATE RECEIVED : ___________________________ TIME:____________________________</p>
 <br>
 <br>
 <p><i><strong>Printed On:</strong> {{ $date }}</i></p>

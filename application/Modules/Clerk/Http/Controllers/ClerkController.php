@@ -5656,4 +5656,21 @@ public function viewExternalTransfers(Request $request)
 
         return view('clerk::transfers.release-form', compact('transfer', 'warehouses', 'transporters', 'users'));
     }
+
+    public function downloadBlendPackingListExcel($id)
+    {
+        return $this->AppClass->downloadBlendPackingListExcel($id);
+    }
+    public function downloadBlendPackingListContExcel($id)
+    {
+        return $this->AppClass->downloadBlendPackingListContExcel($id);
+    }
+    public function downloadSIPackingListExcel($id)
+    {
+        return $this->AppClass->downloadSIPackingListExcel($id);
+    }
+    public function downloadSIContinuedPackingListExcel($id)
+    {
+        return $this->AppClass->downloadSIContinuedPackingListExcel($id);
+    }
 }

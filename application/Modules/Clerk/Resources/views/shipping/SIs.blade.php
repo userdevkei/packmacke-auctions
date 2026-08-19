@@ -189,11 +189,13 @@
                                                     @if($transfer->status >= 1)
                                                         <a class="dropdown-item text-primary" href="{{ route('clerk.downloadSIDocument', $transfer->shipping_id) }}" target="_blank">Download SI</a>
                                                         <a class="dropdown-item text-secondary" href="{{ route('clerk.downloadSIPackingList', base64_encode($transfer->shipping_id.':'.$transfer->load_type)) }}" target="_blank">Packing List</a>
+                                                        <a class="dropdown-item text-secondary" href="{{ route('clerk.downloadSIPackingListExcel', base64_encode($transfer->shipping_id.':'.$transfer->load_type)) }}" target="_blank">Packing List (Excel)</a>
                                                         @if($transfer->load_type == 2)
                                                             <a class="dropdown-item text-secondary" href="{{ route('clerk.downloadSIContinuedPackingList', base64_encode($transfer->si_number) ?? base64_encode($transfer->shipping_number)) }}" target="_blank">Packing List (Cont.) </a>
+                                                            <a class="dropdown-item text-secondary" href="{{ route('clerk.downloadSIContinuedPackingListExcel', base64_encode($transfer->si_number) ?? base64_encode($transfer->shipping_number)) }}" target="_blank">Packing List (Cont.) (Excel)</a>
                                                         @endif
                                                     @endif
-                                                    <a class="dropdown-item text-dark" href="{{ route('clerk.downloadDriverClearance', $transfer->shipping_id) }}" target="_blank"> Driver Clearance</a>
+                                                    <a class="dropdown-item text-dark" href="{{ route('clerk.downloadDriverClearance', $transfer->shipping_id) }}" target="_blank"> Port Delivery Note</a>
                                                 </div>
                                             </div>
                                         </div>

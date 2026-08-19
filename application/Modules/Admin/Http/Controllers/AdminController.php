@@ -95,6 +95,7 @@ use App\Services\ExportDirectDeliveryOrders;
 use App\Services\ExportShippingInstructions;
 use Illuminate\Contracts\Support\Renderable;
 use Modules\Clerk\Entities\WarehouseLocation;
+use PhpOffice\PhpSpreadsheet\Worksheet\Drawing;
 
 class AdminController extends Controller
 {
@@ -2675,6 +2676,7 @@ class AdminController extends Controller
 
         return $query;
     }
+
 
 public function externalTransfersData(Request $request)
 {
@@ -8218,4 +8220,20 @@ $clients = Client::join('delivery_orders', 'delivery_orders.client_id', '=', 'cl
         return response()->json(['status' => 'success']);
     }
 
+    public function downloadBlendPackingListExcel($id)
+    {
+        return $this->AppClass->downloadBlendPackingListExcel($id);
+    }
+    public function downloadBlendPackingListContExcel($id)
+    {
+        return $this->AppClass->downloadBlendPackingListContExcel($id);
+    }
+    public function downloadSIPackingListExcel($id)
+    {
+        return $this->AppClass->downloadSIPackingListExcel($id);
+    }
+    public function downloadSIContinuedPackingListExcel($id)
+    {
+        return $this->AppClass->downloadSIContinuedPackingListExcel($id);
+    }
 }
