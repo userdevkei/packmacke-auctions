@@ -103,7 +103,9 @@ Route::prefix('clerk')->middleware(['auth', 'web', 'userRoles', 'userRole:2,3,4,
     Route::get('update-shipped-details/{id}', [ClerkController::class, 'markAsShipped'])->name('clerk.markAsShipped');
     Route::get('download-shipping-instruction/{id}', [ClerkController::class, 'downloadSIDocument'])->name('clerk.downloadSIDocument');
     Route::get('download-shipping-instruction-packing-list/{id}', [ClerkController::class, 'downloadSIPackingList'])->name('clerk.downloadSIPackingList');
+    Route::get('download-shipping-instruction-packing-list-excel/{id}', [ClerkController::class, 'downloadSIPackingListExcel'])->name('clerk.downloadSIPackingListExcel');
     Route::get('download-continued-shipping-instruction-packing-list/{id}', [ClerkController::class, 'downloadSIContinuedPackingList'])->name('clerk.downloadSIContinuedPackingList');
+    Route::get('download-continued-shipping-instruction-packing-list-excel/{id}', [ClerkController::class, 'downloadSIContinuedPackingListExcel'])->name('clerk.downloadSIContinuedPackingListExcel');
     Route::get('download-driver-clearance-form/{id}', [ClerkController::class, 'downloadDriverClearance'])->name('clerk.downloadDriverClearance');
     Route::get('create-shipping-instruction', [ClerkController::class, 'createSI'])->name('clerk.createSI');
     Route::get('edit-si-details/{id}', [ClerkController::class, 'editSI'])->name('clerk.editSI');

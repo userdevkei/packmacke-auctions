@@ -78,11 +78,21 @@
 </head>
 <body>
 <div class="company-info">
-    <h1 class="heading">{{ $sheet->client_name }}</h1>
-    <p>{{ $sheet->client_address }}</p>
+    <span>
+        <img class="logo" src="{{ asset('assets/img/favicons/icon.png') }}" alt="Logo">
+    </span>
+    <h1 class="heading">PACKMAC HOLDINGS LIMITED</h1>
+    <p>Chai Street Shimanzi High Level, Mombasa P.O BOX 41328-80100, Mombasa, Kenya (TMSA 186)</p>
 </div>
 <div class="header">PACKING LIST<hr></div>
 <table>
+    <tr>
+        <td style="width: 15% !important; font-weight: bold !important;"> SHIPPER </td>
+        <td style="width: 85% !important;">
+            <h4> : {{ $sheet->client_name }}</h3>
+            <p> : {{ $sheet->client_address }}</p>
+        </td>
+    </tr>
     <tr>
         <td style="width: 15% !important; font-weight: bold !important;"> INVOICE NUMBER </td>
         <td style="width: 40% !important;"> :  {{ $sheet->shipping_number }} </td>

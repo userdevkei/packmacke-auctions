@@ -168,7 +168,9 @@ Route::prefix('admin')->middleware(['auth', 'web', 'userRoles', 'userRole:1', 'd
     Route::get('edit-si-details/{id}', [AdminController::class, 'editSI'])->name('admin.editSI');
     Route::post('update-si-details/{id}', [AdminController::class, 'updateSI'])->name('admin.updateSI');
     Route::get('download-shipping-instruction-packing-list/{id}', [AdminController::class, 'downloadSIPackingList'])->name('admin.downloadSIPackingList');
+    Route::get('download-shipping-instruction-packing-list-excel/{id}', [AdminController::class, 'downloadSIPackingListExcel'])->name('admin.downloadSIPackingListExcel');
     Route::get('download-continued-shipping-instruction-packing-list/{id}', [AdminController::class, 'downloadSIContinuedPackingList'])->name('admin.downloadSIContinuedPackingList');
+    Route::get('download-continued-shipping-instruction-packing-list-excel/{id}', [AdminController::class, 'downloadSIContinuedPackingListExcel'])->name('admin.downloadSIContinuedPackingListExcel');
 
     Route::get('view-all-blend-requests', [AdminController::class, 'viewBlendProcessing'])->name('admin.viewBlendProcessing');
     Route::get('create-blend-sheet', [AdminController::class, 'createBlendSheet'])->name('admin.createBlendSheet');
