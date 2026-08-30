@@ -94,6 +94,8 @@ Route::prefix('clerk')->middleware(['auth', 'web', 'userRoles', 'userRole:2,3,4,
     Route::get('view-tci-details/{id}', [ClerkController::class, 'viewTciDetails'])->name('clerk.viewTciDetails');
     Route::get('add-tci', [ClerkController::class, 'addTCI'])->name('clerk.addTCI');
 
+    Route::get('download-local-delivery-note/{id}', [ClerkController::class, 'downloadLocalDeliveryNote'])->name('clerk.downloadLocalDeliveryNote');
+
     Route::get('view-shipping-instructions', [ClerkController::class, 'viewShippingInstructions'])->name('clerk.viewShippingInstructions');
     Route::post('add-shipping-instruction', [ClerkController::class, 'addShippingInstruction'])->name('clerk.addShippingInstruction');
     Route::get('add-teas-to-shipping-instruction/{id}', [ClerkController::class, 'addShipmentTeas'])->name('clerk.addShipmentTeas');

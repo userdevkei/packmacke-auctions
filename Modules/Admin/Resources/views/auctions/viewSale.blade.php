@@ -144,7 +144,7 @@
                                                             </div>
 
                                                             <div class="d-flex justify-content-center mt-1">
-                                                                <button id="submitButton" type="submit" class="btn btn-success col-8">Show Client Teas </button>
+                                                                <button id="submitButton" type="submit" class="btn btn-success col-8">Update Sale</button>
                                                             </div>
                                                         </form>
                                                     </div>

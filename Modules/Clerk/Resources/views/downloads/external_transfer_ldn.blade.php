@@ -82,7 +82,7 @@
         }
         .ack-line {
             font-size: 11px !important;
-            margin: 0 0 12px 0;
+            margin: 0 0 17px 0;
         }
         .dotted-hr {
             border: none;
@@ -103,11 +103,19 @@
 @php
     $type = 'LOCAL DELIVERY NOTE';
 @endphp
-<div class="header">{{ $type }}<hr></div>
-
-<div class="warning-note">
-    Please ensure that all teas above are weighed before loading — we will not entertain any claims whatsoever thereafter.
+<div class="header">
+    {{ $type }}
+    <hr>
 </div>
+
+<table style="width:100%; border-collapse:collapse; margin-bottom:4px;">
+    <tr>
+        <td style="border:none; width:70%;"></td>
+        <td style="border:none; width:30%; text-align:right; font-size:10px;">
+            <b> PREPARED BY: </b> {{ $by ?? '' }}
+        </td>
+    </tr>
+</table>
 
 <table class="info-grid">
     <tr>
@@ -123,7 +131,7 @@
         <td>{{ !empty($details->release_date) ? \Carbon\Carbon::parse($details->release_date)->format('d-m-Y') : '' }}</td>
     </tr>
     <tr>
-        <td class="label">DISPATCH FROM</td>
+        <td class="label">DISPATCH WHS</td>
         <td>{{ $details->station_name ?? '' }}</td>
         <td class="label">DESTINATION WHS</td>
         <td>{{ $details->warehouse_name }}</td>
@@ -150,8 +158,10 @@
     </thead>
     <tbody>
     <?php
-    $receivedPackages = 0;
-    $netWeights = 0;
+        $receivedPackages = 0;
+        $netWeights = 0;
+        $grossWeight = 0;
+        $grossPalletWeight = 0;
     ?>
     @foreach($orders as $order)
         <tr>
@@ -173,6 +183,8 @@
             <?php
             $receivedPackages += $order->transferred_palettes;
             $netWeights += $order->transferred_weight;
+            $grossWeight += str_replace(',', '', $order->pallet_weight) + str_replace(',', '', $order->transferred_weight) + $order->transferred_palettes;
+            $grossPalletWeight += str_replace(',', '', $order->pallet_weight);
             ?>
     @endforeach
     </tbody>
@@ -180,31 +192,25 @@
         <td colspan="7" style="border: none !important;"></td>
         <td>{{ $receivedPackages }}</td>
         <td>{{ number_format($netWeights, 2) }}</td>
-        <td colspan="2" style="border: none !important;"></td>
+        <td>{{ number_format($grossPalletWeight, 2) }}</td>
+        <td>{{ number_format($grossWeight, 2) }}</td>
+        <td colspan="1" style="border: none !important;"></td>
     </tr>
 </table>
 
 <br>
-<br>
 <p><strong>Remarks</strong> : ____________________________________________________________________________________________________________________________ </p>
-<br>
+<p class="ack-statement">I hereby acknowledge the receipt of the above mentioned goods in good order and condition.</p>
 
 <table class="table2">
     <tr>
-        <td colspan="2" style="width: 50% !important;"><i class="logistics">DRIVER DETAILS</i></td>
-        <td colspan="2" style="width: 50% !important;"><i class="logistics">DELIVERY DETAILS</i></td>
+        <td colspan="4" style="width: 50% !important;"><i class="logistics">DRIVER DETAILS</i></td>
     </tr>
     <tr>
         <td style="width: 10% !important;">Transporter</td>
         <td style="width: 23% !important;">{{ $details->transporter_name }}<hr class="dotted-hr"></td>
-        <td style="width: 10% !important;">Destination</td>
-        <td style="width: 23% !important;">{{ $details->warehouse_name }}<hr class="dotted-hr"></td>
-    </tr>
-    <tr>
         <td style="width: 10% !important;">Reg. Number</td>
         <td style="width: 23% !important;">{{ $details->registration }}<hr class="dotted-hr"></td>
-        <td style="width: 10% !important;">Prepared By</td>
-        <td style="width: 23% !important;">{{ $user }}<hr class="dotted-hr"></td>
     </tr>
     <tr>
         <td style="width: 10% !important;">Driver Name</td>
@@ -216,21 +222,22 @@
         <td style="width: 10% !important;">Driver IDNO</td>
         <td style="width: 23% !important;">{{ $details->id_number }}<hr class="dotted-hr"></td>
         <td style="width: 10% !important;">Signature &amp; Date</td>
-        <td style="width: 23% !important;"><hr class="dotted-hr"></td>
+        <td style="width: 23% !important;">,<hr class="dotted-hr"></td>
     </tr>
 </table>
-
-<p class="ack-statement">I hereby acknowledge the receipt of the above mentioned goods in good order and condition.</p>
-
+<br>
 
 <p class="ack-line">
-    <strong>Receiving Clerk</strong> &nbsp; Name: __________________________________________________ &nbsp;&nbsp; Signature: ______________ &nbsp;&nbsp; Date &amp; Time: ________________
+    <strong>Operator </strong> &nbsp; Name: ___________________________________________________ &nbsp;&nbsp; Signature: _____________________ &nbsp;&nbsp; Date &amp; Time: ___________________
 </p>
 <p class="ack-line">
-    <strong>Warehouse Officer</strong> &nbsp; Name: _______________________________________________ &nbsp;&nbsp; Signature: ______________ &nbsp;&nbsp; Date &amp; Time: ________________
+    <strong>Loading Clerk</strong> &nbsp; Name: _____________________________________________ &nbsp;&nbsp; Signature: _____________________ &nbsp;&nbsp; Date &amp; Time: ___________________
 </p>
 <p class="ack-line">
-    <strong>Guard</strong> &nbsp; Name: _____________________________________________________________ &nbsp;&nbsp; Signature: ______________ &nbsp;&nbsp; Date &amp; Time: ________________
+    <strong>Whs Officer</strong> &nbsp; Name: ________________________________________________ &nbsp;&nbsp; Signature: _____________________ &nbsp;&nbsp; Date &amp; Time: ___________________
+</p>
+<p class="ack-line">
+    <strong>Guard</strong> &nbsp; Name: ______________________________________________________ &nbsp;&nbsp; Signature: _____________________ &nbsp;&nbsp; Date &amp; Time: ___________________
 </p>
 
 <table class="table2">
@@ -268,5 +275,6 @@
         </tr>
     @endforeach
 </table>
+
 </body>
 </html>

@@ -3341,7 +3341,7 @@ return Response::make($mpdf->Output($pdfFileName, PdfDestination::INLINE), 200, 
             'tempDir' => storage_path('app/mpdf_temp'),
             'mode'        => 'utf-8',
             'format'      => 'A4-L', // Landscape
-            'orientation' => 'P',
+            'orientation' => 'L',
             'margin_top'    => 2,
             'margin_bottom' => 7,
             'margin_left'   => 5,
@@ -3354,9 +3354,8 @@ return Response::make($mpdf->Output($pdfFileName, PdfDestination::INLINE), 200, 
         $mpdf->SetHTMLFooter('
             <table width="100%">
                 <tr>
-                    <td align="left">Printed by: <strong>' . $by . '</strong></td>
+                    <td align="left"><b>Note:</b> Please ensure that all teas above are weighed before loading — we will not entertain any claims whatsoever thereafter.</strong></td>
                     <td align="center">Page {PAGENO} of {nbpg}</td>
-                    <td align="right">Prepared by: <strong>' . $user . '</strong></td>
                 </tr>
             </table>
         ');
