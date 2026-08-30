@@ -174,6 +174,8 @@
                                                         @if (in_array(auth()->user()->role_id, [2, 3, 5]))
                                                             <a class="dropdown-item text-danger" href="{{ route('clerk.downloadDelNote', base64_encode($transfer->delivery_number.':'.$transfer->lot)) }}" target="_blank">Download Del Note</a>
                                                         @endif
+                                                        <a class="dropdown-item text-info" href="{{ route('clerk.downloadLocalDeliveryNote', base64_encode($transfer->delivery_number.':'.$transfer->lot)) }}" target="_blank">Download Del Note</a>
+
                                                     @endif
                                                 </div>
                                             </div>

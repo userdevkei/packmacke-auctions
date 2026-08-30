@@ -7428,7 +7428,7 @@ $clients = Client::join('delivery_orders', 'delivery_orders.client_id', '=', 'cl
             ->join('brokers', 'brokers.broker_id', '=', 'auctions.broker_id')
             ->leftJoin('clients', 'clients.client_id', '=', 'auctions.client_id')
             ->leftJoin('warehouses', 'warehouses.warehouse_id', '=', 'auctions.warehouse_id')
-            ->select('auction_id', 'currentstock.client_name', 'warrant_number', 'stock_ins.total_pallets as current_stock', 'stock_ins.net_weight as current_weight', 'auctions.status', 'clients.client_name as buyer_name', 'brokers.broker_name', 'invoice_number', 'garden_name', 'grade_name', 'order_number', 'auctions.client_id', 'auctions.broker_id', 'sale', 'auctions.sale_date', 'auctions.prompt_date', 'auctions.warehouse_id', 'warehouses.warehouse_name', 'release_date')
+            ->select('auction_id', 'currentstock.client_name', 'warrant_number', 'stock_ins.total_pallets as current_stock', 'stock_ins.net_weight as current_weight', 'auctions.status', 'clients.client_name as buyer_name', 'brokers.broker_name', 'invoice_number', 'garden_name', 'grade_name', 'order_number', 'auctions.client_id', 'auctions.broker_id', 'sale', 'auctions.sale_date', 'auctions.prompt_date', 'auctions.warehouse_id', 'warehouses.warehouse_name', 'release_date', 'auctions.do_number', 'auctions.lot_number')
             ->where('auctions.sale', $sale)
             ->orderBy('warrant_number')
             ->get();
@@ -7444,7 +7444,7 @@ $clients = Client::join('delivery_orders', 'delivery_orders.client_id', '=', 'cl
                 $join->on('currentstock.delivery_id', '=', 'auctions.delivery_id')
                     ->on('currentstock.stock_id', '=', 'auctions.stock_id');
             })
-            ->select('currentstock.stock_id', 'currentstock.delivery_id', 'currentstock.client_name', 'currentstock.client_id', 'invoice_number', 'order_number', 'lot_number', 'current_stock', 'current_weight', 'garden_name', 'grade_name')
+            ->select('currentstock.stock_id', 'currentstock.delivery_id', 'currentstock.client_name', 'currentstock.client_id', 'invoice_number', 'order_number', 'currentstock.lot_number', 'current_stock', 'current_weight', 'garden_name', 'grade_name')
             ->where('current_stock', '>', 0)
             ->where('current_weight', '>', 0)
             ->where(['currentstock.client_id' => $request->client])
@@ -7773,7 +7773,7 @@ $clients = Client::join('delivery_orders', 'delivery_orders.client_id', '=', 'cl
     }
     public function viewPrivateSales()
     {
-        $auctions = Auction::select('sale')
+       $auctions = Auction::select('sale')
             ->where('auctions.type', 'private')
             ->groupBy('sale')
             ->orderByRaw('CAST(SUBSTRING_INDEX(sale, "/", -1) AS UNSIGNED) DESC')
@@ -7797,7 +7797,7 @@ $clients = Client::join('delivery_orders', 'delivery_orders.client_id', '=', 'cl
             ->leftJoin('clients', 'clients.client_id', '=', 'auctions.client_id')
             ->leftJoin('warehouses', 'warehouses.warehouse_id', '=', 'auctions.warehouse_id')
             ->leftJoin('external_transfers', 'external_transfers.stock_id', '=', 'auctions.stock_id')
-            ->select('auction_id', 'currentstock.client_name', 'warrant_number', 'stock_ins.total_pallets as current_stock', 'stock_ins.net_weight as current_weight', 'auctions.status', 'clients.client_name as buyer_name', 'brokers.broker_name', 'invoice_number', 'garden_name', 'grade_name', 'order_number', 'auctions.client_id', 'auctions.broker_id', 'sale', 'auctions.sale_date', 'auctions.prompt_date', 'auctions.warehouse_id', 'warehouses.warehouse_name', 'auctions.release_date', 'external_transfers.delivery_number')
+            ->select('auction_id', 'currentstock.client_name', 'warrant_number', 'stock_ins.total_pallets as current_stock', 'stock_ins.net_weight as current_weight', 'auctions.status', 'clients.client_name as buyer_name', 'brokers.broker_name', 'invoice_number', 'garden_name', 'grade_name', 'order_number', 'auctions.client_id', 'auctions.broker_id', 'sale', 'auctions.sale_date', 'auctions.prompt_date', 'auctions.warehouse_id', 'warehouses.warehouse_name', 'auctions.release_date', 'external_transfers.delivery_number', 'auctions.do_number', 'auctions.lot_number')
             ->where('auctions.sale', $sale)
             ->orderBy('warrant_number')
             ->get();
@@ -7808,57 +7808,48 @@ $clients = Client::join('delivery_orders', 'delivery_orders.client_id', '=', 'cl
     }
     public function preparePrivateSaleList(Request $request)
     {
-        // $teas = DB::table('currentstock')
-        //     ->leftJoin('auctions', function ($join) {
-        //         $join->on('currentstock.delivery_id', '=', 'auctions.delivery_id')
-        //             ->on('currentstock.stock_id', '=', 'auctions.stock_id');
-        //     })
-        //     ->select('currentstock.stock_id', 'currentstock.delivery_id', 'currentstock.client_name', 'currentstock.client_id', 'invoice_number', 'order_number', 'lot_number', 'current_stock', 'current_weight', 'garden_name', 'grade_name')
-        //     ->where('current_stock', '>', 0)
-        //     ->where('current_weight', '>', 0)
-        //     ->where(['currentstock.client_id' => $request->client])
-        //     ->whereNull('auctions.warrant_number')
-        //     ->orderBy('garden_name', 'asc')
-        //     ->orderBy('invoice_number', 'asc')
-        //     ->get();
-
-        $teas = DB::table('currentstock')
-    ->leftJoin('auctions', function ($join) {
-        $join->on('currentstock.delivery_id', '=', 'auctions.delivery_id')
-             ->on('currentstock.stock_id', '=', 'auctions.stock_id');
-    })
-    ->select(
-        'currentstock.stock_id',
-        'currentstock.delivery_id',
-        'currentstock.client_name',
-        'currentstock.client_id',
-        'invoice_number',
-        'order_number',
-        'lot_number',
-        'current_stock',
-        'current_weight',
-        'garden_name',
-        'grade_name'
-    )
-    ->where('currentstock.client_id', $request->client)
-    ->where(function ($query) {
-        $query->where(function ($q) {
-            $q->where('current_stock', '>', 0)
-              ->where('current_weight', '>', 0);
-        })->orWhere(function ($q) {
-            $q->where('current_stock', '<=', 0)
-              ->where('current_weight', '<=', 0)
-              ->whereNotExists(function ($sub) {
-                  $sub->select(DB::raw(1))
-                      ->from('auctions as a')
-                      ->whereColumn('a.stock_id', 'currentstock.stock_id');
-              });
-        });
-    })
-    ->whereNull('auctions.warrant_number')
-    ->orderBy('garden_name', 'asc')
-    ->orderBy('invoice_number', 'asc')
-    ->get();
+                $teas = DB::table('currentstock')
+                ->leftJoin('auctions', function ($join) {
+                    $join->on('currentstock.delivery_id', '=', 'auctions.delivery_id')
+                        ->on('currentstock.stock_id', '=', 'auctions.stock_id');
+                })
+                ->select(
+                    'currentstock.stock_id',
+                    'currentstock.delivery_id',
+                    'currentstock.client_name',
+                    'currentstock.client_id',
+                    'invoice_number',
+                    'order_number',
+                    'currentstock.lot_number',
+                    'current_stock',
+                    'current_weight',
+                    'garden_name',
+                    'grade_name'
+                )
+                ->where('currentstock.client_id', $request->client)
+                ->where(function ($query) {
+                    $query->where(function ($q) {
+                        $q->where('current_stock', '>', 0)
+                        ->where('current_weight', '>', 0);
+                    })->orWhere(function ($q) {
+                        $q->where('current_stock', '<=', 0)
+                        ->where('current_weight', '<=', 0)
+                        ->whereNotExists(function ($sub) {
+                            $sub->select(DB::raw(1))
+                                ->from('auctions as a')
+                                ->whereColumn('a.stock_id', 'currentstock.stock_id');
+                        });
+                    });
+                })
+                ->where(function ($query) {
+                    $query->where(function ($q) {
+                        $q->whereNull('auctions.deleted_at')
+                          ->whereNull('auctions.warrant_number');
+                    })->orWhereNotNull('auctions.deleted_at');
+                })
+                ->orderBy('garden_name', 'asc')
+                ->orderBy('invoice_number', 'asc')
+                ->get();
 
         $client = Client::where(['client_id' => $request->client])->first();
         $brokers = Broker::all();
