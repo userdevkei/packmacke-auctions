@@ -106,39 +106,44 @@
                                 <td>{{ $transfer->station_name }}</td>
                                 <td>{{ $transfer->warehouse_name }}</td>
                                 <td>
-                                    {!! $transfer->status === 0 ? '<span class="badge bg-warning"> Created </span>' : ($transfer->status == 1 ?  '<span class="badge bg-danger"> Initiated <span>' : ($transfer->status == 2 ? '<span class="badge bg-info"> Approved (Op) <span>' : ($transfer->status == 3 ? '<span class="badge bg-secondary"> Approved (Fin) <span>' : '<span class="badge bg-success"> Released <span>'))) !!}
+                                    {!! $transfer->status == 0 ? '<span class="badge bg-warning"> Created </span>'
+                                        : ($transfer->status == 1 ? '<span class="badge bg-dark"> Initiated </span>'
+                                        : ($transfer->status == 2 ? '<span class="badge bg-info"> 1st Approved </span>'
+                                        : ($transfer->status == 3 ? '<span class="badge bg-secondary"> Released </span>'
+                                        : '<span class="badge bg-success"> Completed </span>'))) !!}
                                 </td>
                                 <td nowrap="">
                                     <div class="d-flex align-items-center">
-                                        <!-- Trace Tea Icon -->
-                                        @if(@canuser('transfer.external.create'))
-                                            @if($transfer->status === 0 )
-                                                <a class="link text-warning" data-bs-toggle="tooltip" data-bs-placement="left" title="Click to approve this transfer" onclick="return confirm('Are you sure you want to initiate this transfer request?')" href="{{ route('clerk.initiateExternalTransfer', base64_encode($transfer->delivery_number)) }}" ><span class="fa-regular fa-thumbs-up"></span></a>
-                                            @elseif($transfer->status == 1)
-                                                <a class="link text-danger" data-bs-toggle="tooltip" data-bs-placement="left" title="Transfer initiated, pending approval"> <span class="fa-solid fa-check"> </span> </a>
-                                            @elseif($transfer->status == 3 && (@canuser('external.release') && $transfer->lot != null))
-                                                 <a class="link link-danger release-btn"
-                                                   title="Transfer approved, pending release"
-                                                   data-delivery="{{ $transfer->delivery_number }}"
-                                                   data-url="{{ route('clerk.releaseForm', base64_encode($transfer->delivery_number.':'.($transfer->lot ?? ''))) }}"
-                                                   data-client="{{ $transfer->client_name }}"
-                                                   href="#">
-                                                    <span class="fa-solid fa-truck-arrow-right"></span>
+                                        @if($transfer->status == 0)
+                                            @if(@canuser('transfer.external.create') && $transfer->created_by == auth()->user()->user_id)
+                                                <a class="link text-warning" data-bs-toggle="tooltip" data-bs-placement="left"
+                                                   title="Click to initiate transfer"
+                                                   onclick="return confirm('Are you sure you want to initiate this transfer request?')"
+                                                   href="{{ route('clerk.initiateExternalTransfer', base64_encode($transfer->delivery_number)) }}">
+                                                    <span class="fa-solid fa-toggle-off"></span>
                                                 </a>
-
-                                            @elseif($transfer->status == 3)
-                                                <a class="link text-secondary" data-bs-toggle="tooltip" data-bs-placement="left" title="Transfer approved, pending release"> <span class="fa-solid fa-truck-arrow-right"> </span></a>
                                             @else
-                                                <a class="link text-success" data-bs-toggle="tooltip" data-bs-placement="left" title="Transfer released, and stock updated"> <span class="fa-solid fa-check-double"></span> </a>
+                                                <a class="link text-danger" data-bs-toggle="tooltip" data-bs-placement="left" title="Transfer pending initiation">
+                                                    <span class="fa-solid fa-spinner"></span>
+                                                </a>
                                             @endif
-                                        @elseif(@canuser('transfer.external.approve'))
-                                            @if($transfer->status === 0 || $transfer->status == 1)
-                                                <a class="link text-warning" data-bs-toggle="tooltip" data-bs-placement="left" title="Click to approve this transfer" onclick="return confirm('Are you sure you want to approve this transfer request?')" href="{{ route('clerk.approveExternalTransfer', base64_encode($transfer->delivery_number)) }}" ><span class="fa-regular fa-thumbs-up"></span></a>
-                                            @elseif($transfer->status == 2)
-                                                <a class="link text-info" data-bs-toggle="tooltip" data-bs-placement="left" title="Transfer Approved By Operations"> <span class="fa-solid fa-check"></span> </a>
-                                            @elseif($transfer->status == 3 && $transfer->lot != null)
-                                                 <a class="link link-danger release-btn"
-                                                   title="Transfer approved, pending release"
+                                        @elseif($transfer->status == 1)
+                                            @if(@canuser('transfer.external.approve'))
+                                                <a class="link text-warning" data-bs-toggle="tooltip" data-bs-placement="left"
+                                                   title="Click to give first approval"
+                                                   onclick="return confirm('Are you sure you want to approve this transfer request?')"
+                                                   href="{{ route('clerk.approveExternalTransfer', base64_encode($transfer->delivery_number)) }}">
+                                                    <span class="fa-regular fa-thumbs-up"></span>
+                                                </a>
+                                            @else
+                                                <a class="link text-info" data-bs-toggle="tooltip" data-bs-placement="left" title="Transfer pending first approval">
+                                                    <span class="fa-regular fa-hourglass-half"></span>
+                                                </a>
+                                            @endif
+                                        @elseif($transfer->status == 2)
+                                            @if(@canuser('transfer.external.release') && $transfer->lot != null)
+                                                <a class="link link-danger release-btn"
+                                                   title="Approved — release this transfer"
                                                    data-delivery="{{ $transfer->delivery_number }}"
                                                    data-url="{{ route('clerk.releaseForm', base64_encode($transfer->delivery_number.':'.($transfer->lot ?? ''))) }}"
                                                    data-client="{{ $transfer->client_name }}"
@@ -146,23 +151,34 @@
                                                     <span class="fa-solid fa-truck-arrow-right"></span>
                                                 </a>
                                             @else
-                                                <a class="link text-success" data-bs-toggle="tooltip" data-bs-placement="left" title="Transfer released, stock updated"> <span class="fa-solid fa-check-double"></span> </a>
+                                                <a class="link text-secondary" data-bs-toggle="tooltip" data-bs-placement="left"
+                                                   title="{{ $transfer->lot == null ? 'Approved, awaiting lot assignment' : 'Approved, pending release' }}">
+                                                    <span class="fa-solid fa-truck-arrow-right"></span>
+                                                </a>
+                                            @endif
+                                        @elseif($transfer->status == 3)
+                                            @if(@canuser('transfer.external.approve.final'))
+                                                <a class="link text-primary" data-bs-toggle="tooltip" data-bs-placement="left"
+                                                   title="Released — give final approval"
+                                                   onclick="return confirm('Are you sure you want to give final approval for this transfer?')"
+                                                   href="{{ route('clerk.approveExternalTransferFinal', base64_encode($transfer->delivery_number.':'.($transfer->lot ?? ''))) }}">
+                                                    <span class="fa-solid fa-check"></span>
+                                                </a>
+                                            @else
+                                                <a class="link text-primary" data-bs-toggle="tooltip" data-bs-placement="left" title="Released, pending final approval">
+                                                    <span class="fa-regular fa-hourglass-half"></span>
+                                                </a>
                                             @endif
                                         @else
-                                            @if($transfer->status === null)
-                                                <a class="link text-danger" data-bs-toggle="tooltip" data-bs-placement="left" title="Transfer pending initiation"> <span class="fa-solid fa-spinner"></span></a>
-                                            @elseif($transfer->status == 0)
-                                                <a class="link text-info" data-bs-toggle="tooltip" data-bs-placement="left" title="Transfer Pending Approval" href="#" ><span class="fa-solid fa-spinner"></span></a>
-                                            @elseif($transfer->status == 1)
-                                                <a class="link text-success" data-bs-toggle="tooltip" data-bs-placement="left" title="Transfer approved, pending release"> <span class="fa-solid fa-check"></span> </a>
-                                            @elseif($transfer->status == 4)
-                                                <a class="link text-success" data-bs-toggle="tooltip" data-bs-placement="left" title="Transfer released"> <span class="fa-solid fa-check-double"></span> </a>
-
-                                            @endif
+                                            <a class="link text-success" data-bs-toggle="tooltip" data-bs-placement="left" title="Transfer completed, stock updated">
+                                                <span class="fa-solid fa-check-double"></span>
+                                            </a>
                                         @endif
+
                                         <!-- Dropdown Icon -->
-                                        <div class="dropdown font-sans-serif position-static" >
-                                            <a class="link text-600 btn-sm dropdown-toggle btn-reveal" type="button" data-bs-toggle="dropdown" data-boundary="window" aria-haspopup="true" aria-expanded="false">
+                                        <div class="dropdown font-sans-serif position-static">
+                                            <a class="link text-600 btn-sm dropdown-toggle btn-reveal" type="button"
+                                               data-bs-toggle="dropdown" data-boundary="window" aria-haspopup="true" aria-expanded="false">
                                                 <span class="fas fa-ellipsis-h fs-10"></span>
                                             </a>
                                             <div class="dropdown-menu dropdown-menu-end border py-0">
@@ -171,13 +187,9 @@
                                                     @if($transfer->buyer_name == null)
                                                         <a class="dropdown-item text-primary" href="{{ route('clerk.downloadExtraDelNote', base64_encode($transfer->delivery_number.':'.$transfer->lot)) }}" target="_blank">Download Transfer</a>
                                                     @else
-                                                        @if (in_array(auth()->user()->role_id, [2, 3, 5]))
+                                                        @if(in_array(auth()->user()->role_id, [2, 3, 5]))
                                                             <a class="dropdown-item text-danger" href="{{ route('clerk.downloadDelNote', base64_encode($transfer->delivery_number.':'.$transfer->lot)) }}" target="_blank">Download Del Note</a>
-
-                                                            <a class="dropdown-item text-info" href="{{ route('clerk.downloadLocalDeliveryNote', base64_encode($transfer->delivery_number . ':' . $transfer->lot)) }}" target="_blank">Local Delivery Note</a>
                                                         @endif
-                                                        <a class="dropdown-item text-info" href="{{ route('clerk.downloadLocalDeliveryNote', base64_encode($transfer->delivery_number.':'.$transfer->lot)) }}" target="_blank">Download Del Note</a>
-
                                                     @endif
                                                 </div>
                                             </div>
@@ -256,28 +268,6 @@
             });
         });
 
-        //     var idNumber = $(this).val();
-
-        //     $.ajax({
-        //         url: '{{ route('clerk.fetchIdNumber') }}',
-        //         method: 'GET',
-        //         data: {idNumber},
-        //         dataType: 'json',
-        //         success: function (response) {
-        //             console.log('Success:', response.driver_name);
-
-        //             $('.driverName').val(response.driver_name)
-        //             $('.driverPhone').val(response.driver_phone)
-        //         },
-        //         error: function (xhr, status, error) {
-        //             // Function to handle errors
-        //             console.error('Error:', error);
-        //             $('#driverName').val('')
-        //             $('#driverPhone').val('')
-        //         }
-        //     });
-        // });
-
         document.addEventListener('click', function(e) {
             const btn = e.target.closest('.release-btn');
             if (!btn) return;
@@ -305,6 +295,8 @@
                 .then(res => res.text())
                 .then(html => {
                     document.getElementById('releaseModalBody').innerHTML = html;
+
+                    // ✅ Reinitialize Choices.js on injected selects
                     document.querySelectorAll('#releaseModalBody .js-choice').forEach(function(el) {
                         const choicesInstance = new Choices(el, {
                             searchEnabled: true,

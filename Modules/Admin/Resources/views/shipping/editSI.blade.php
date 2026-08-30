@@ -14,7 +14,7 @@
                     <form method="POST" class="needs-validation" novalidate="" action="{{ route('admin.updateSI', $si->shipping_id) }}">
                         @csrf
                         <div class="row g-2">
-                            <div class="col-md-4 mb-0">
+                            <div class="col-md-3 mb-0">
                                 <label for="organizerSingle">CLIENTS</label>
                                 <select class="form-select js-choice" name="client" data-options='{"removeItemButton":true,"placeholder":true}' @if($si->status > 0 || $siTeas > 0) disabled @endif onchange="updateHiddenClient(this)">
                                     @foreach($clients as $client)
@@ -24,7 +24,7 @@
                                 <input type="hidden" id="hiddenClient" name="client_hidden" value="{{ $si->client_id }}">
                             </div>
 
-                            <div class="col-md-4 mb-0">
+                            <div class="col-md-3 mb-0">
                                 <label for="organizerSingle">PREPARED AT</label>
                                 <select class="form-select js-choice" name="station" data-options='{"removeItemButton":true,"placeholder":true}' @if($si->status > 0 || $si->status > null || $siTeas > 0) disabled @endif onchange="updateHiddenInput(this)">
                                     <option disabled selected value="">Select PHML Warehouse...</option>
@@ -35,7 +35,7 @@
                                 <input type="hidden" id="hiddenStation" name="station_hidden" value="{{ $si->station_id }}">
                             </div>
 
-                            <div class="col-md-4 mb-0">
+                            <div class="col-md-3 mb-0">
                                 <label for="organizerSingle">DESTINATION PORT</label>
                                 <select class="form-select js-choice" id="selectedWarehouse" size="1" name="destination" data-options='{"removeItemButton":true,"placeholder":true}'>
                                     <option disabled selected value="">Select Port ...</option>
@@ -45,7 +45,7 @@
                                 </select>
                             </div>
 
-                            <div class="col-md-4 mb-2">
+                            <div class="col-md-3 mb-2">
                                 <label for="organizerSingle">CONTAINER SIZE</label>
                                 <select class="form-select js-choice" name="containerSize" data-options='{"removeItemButton":true,"placeholder":true}'>
                                     <option disabled selected value="">Select Tea Type...</option>
@@ -55,7 +55,7 @@
                                 </select>
                             </div>
 
-                            <div class="col-md-4 mb-2">
+                            <div class="col-md-3 mb-2">
                                 <label for="organizerSingle">LOADING TYPE</label>
                                 <select class="form-select js-choice" name="package" data-options='{"removeItemButton":true,"placeholder":true}'>
                                     <option disabled selected value="">Select Tea Type...</option>
@@ -64,54 +64,59 @@
                                 </select>
                             </div>
 
-                            <div class="col-md-4 mb-2">
+                            <div class="col-md-3 mb-2">
                                 <label for="floatingInputValid">SI NUMBER (PARENT)</label>
                                 <input class="form-control"  type="text" name="shippingNumber" value="{{ $si->si_number }}" placeholder="provide SI number" style="height: 58% !important;"/>
                             </div>
 
-                            <div class="col-md-4 mb-2">
+                            <div class="col-md-3 mb-2">
                                 <label for="floatingInputValid">SI NUMBER</label>
                                 <input class="form-control" value="{{ $si->shipping_number }}" type="text" name="shipmentNumber" placeholder="provide total net weight" style="height: 58% !important;"/>
                             </div>
 
-                            <div class="col-md-4 mb-2">
+                            <div class="col-md-3 mb-2">
                                 <label for="floatingInputValid">BOOKING NUMBER</label>
                                 <input class="form-control" id="bookingNumber" type="text" value="{{ $si->booking_number }}" name="bookingNumber" placeholder="provide shipping mark" style="height: 58% !important;"/>
                             </div>
 
-                            <div class="col-md-4 mb-2">
+                            <div class="col-md-3 mb-2">
                                 <label for="floatingInputValid">SHIPPING MARK</label>
                                 <input class="form-control" value="{{ $si->shipping_mark }}" id="totalWeight" type="text" name="mark" placeholder="provide total net weight" style="height: 58% !important;"/>
                             </div>
 
-                            <div class="col-md-4 mb-2">
+                            <div class="col-md-3 mb-2">
                                 <label for="floatingInputValid">CONSIGNEE</label>
                                 <input class="form-control" value="{{ $si->consignee }}" id="totalWeight" type="text" name="consignee" placeholder="provide total net weight" style="height: 58% !important;"/>
                             </div>
 
-                            <div class="col-md-4 mb-2">
+                            <div class="col-md-3 mb-2">
                                 <label for="floatingInputValid">P.O BOX</label>
                                 <input class="form-control" id="totalWeight" type="text" name="box" value="{{ $si->address['box'] ?? old('box') }}" placeholder="consignee p.o box" required style="height: 58% !important;"/>
                             </div>
 
-                            <div class="col-md-4 mb-2">
+                            <div class="col-md-3 mb-2">
                                 <label for="floatingInputValid">ADDRESS LINE </label>
                                 <input class="form-control" id="totalWeight" type="text" name="address" value="{{ $si->address['address'] ?? old('address') }}" placeholder="consignee address" required style="height: 58% !important;"/>
                             </div>
 
-                            <div class="col-md-4 mb-2">
+                            <div class="col-md-3 mb-2">
                                 <label for="floatingInputValid">STATE/COUNTRY</label>
                                 <input class="form-control" id="totalWeight" type="text" name="state" value="{{ $si->address['state'] ?? old('state') }}" placeholder="consignee state and country" required style="height: 58% !important;"/>
                             </div>
 
-                            <div class="col-md-4 mb-2">
+                            <div class="col-md-3 mb-2">
                                 <label for="floatingInputValid">TELEPHONE NUMBER</label>
                                 <input class="form-control" id="totalWeight" type="text" name="mobile" value="{{ $si->address['mobile'] ?? old('mobile') }}" placeholder="telephone number" required style="height: 58% !important;"/>
                             </div>
 
-                            <div class="col-md-4 mb-2">
+                            <div class="col-md-3 mb-2">
                                 <label for="floatingInputValid">VESSEL NAME</label>
                                 <input class="form-control" value="{{ $si->vessel_name }}" type="text" name="vessel" placeholder="provide total net weight" style="height: 58% !important;"/>
+                            </div>
+
+                            <div class="col-md-3 mb-2">
+                                <label for="floatingInputValid">PO/INV NUMBER</label>
+                                <input class="form-control" id="invoiceNumber" type="text" value="{{ $si->invoice_number }}" name="invoiceNumber" placeholder="provide invoice/po number" style="height: 58% !important;"/>
                             </div>
                         </div>
                         <div class="col-md-12 mb-3">
@@ -128,7 +133,7 @@
         </div>
     </div>
 
-        <script src="https://code.jquery.com/jquery-3.7.1.js"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.js"></script>
     <script>
 
         function calcNetWeight(totalWeight, numberPackages, packageTare, palletWeight) {

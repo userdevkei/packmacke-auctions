@@ -16,6 +16,7 @@ use Modules\Clerk\Http\Controllers\ClerkController;
 
 Route::prefix('clerk')->middleware(['auth', 'web', 'userRoles', 'userRole:2,3,4,5,6', 'domainValidation'])->group(function() {
     Route::get('/', [ClerkController::class, 'index'])->name('clerk.dashboard');
+    Route::get('dashboard-stats', [ClerkController::class, 'dashboardStats'])->name('clerk.dashboard.stats');
     Route::get('dashboard-report/{id}', [ClerkController::class, 'dashboardReport'])->name('clerk.dashboardReport');
     Route::get('internal-transfers', [ClerkController::class, 'viewInternalTransfers'])->name('clerk.viewInternalTransfers');
     Route::post('internal-transfers', [ClerkController::class, 'viewInternalTransfers'])->name('clerk.viewInternalTransfers');
@@ -222,4 +223,62 @@ Route::prefix('clerk')->middleware(['auth', 'web', 'userRoles', 'userRole:2,3,4,
     Route::get('view-tcis-pending-collection', [ClerkController::class, 'viewPendingTCIs'])->name('clerk.viewPendingTCIs');
     Route::get('view-tcis-pending-collection-by-location/{id}', [ClerkController::class, 'viewLocationPendingTCIs'])->name('clerk.viewLocationPendingTCIs');
     Route::any('download-tcis-pending-collection-by-location/{id}', [ClerkController::class, 'downloadLocationPendingTCIs'])->name('clerk.downloadLocationPendingTCIs');
+
+    Route::get('/transfers/internal/approve-first/{id}', [ClerkController::class, 'approveTransferFirst'])->name('clerk.approveTransferFirst');
+    Route::get('/transfers/internal/approve-final/{id}', [ClerkController::class, 'approveTransferFinal'])->name('clerk.approveTransferFinal');
+
+    Route::get('/transfers/external/approve-final/{id}', [ClerkController::class, 'approveExternalTransferFinal'])->name('clerk.approveExternalTransferFinal');
+
+
+    Route::get('/blend/logistics/{id}', [ClerkController::class, 'getBlendLogistics'])->name('clerk.getBlendLogistics');
+    Route::post('/blend/logistics/{id}', [ClerkController::class, 'updateBlendLogistics'])->name('clerk.updateBlendLogistics');
+
+    Route::get('/si/approve-first/{id}', [ClerkController::class, 'approveSIFirst'])->name('clerk.approveSIFirst');
+    Route::get('/si/approve-final/{id}', [ClerkController::class, 'approveSIFinal'])->name('clerk.approveSIFinal');
+
+    Route::get('/blend/initiate/{id}', [ClerkController::class, 'initiateBlendSheet'])->name('clerk.initiateBlendSheet');
+    Route::get('/blend/approve-first/{id}', [ClerkController::class, 'approveBlendFirst'])->name('clerk.approveBlendFirst');
+    Route::get('/blend/approve-final/{id}', [ClerkController::class, 'approveBlendFinal'])->name('clerk.approveBlendFinal');
+    Route::get('/blend/mark-as-shipped/{id}', [ClerkController::class, 'markBlendShipped'])->name('clerk.markBlendShipped');
+
+    Route::get('blend-containers/{id}', [ClerkController::class, 'manageContainers'])->name('clerk.manageBlendContainers');
+    Route::post('blend-containers/{id}/store', [ClerkController::class, 'storeContainer'])->name('clerk.storeContainer');
+    Route::put('blend-containers-item/{containerId}', [ClerkController::class, 'updateContainer'])->name('clerk.updateContainer');
+    Route::delete('blend-containers-item/{containerId}', [ClerkController::class, 'destroyContainer'])->name('clerk.destroyContainer');
+    Route::patch('blend-containers-item/{containerId}/status', [ClerkController::class, 'updateContainerStatus'])->name('clerk.updateContainerStatus');
+    Route::get('blend-containers-item/{id}/clearance', [ClerkController::class, 'downloadContainerClearance'])->name('clerk.downloadContainerClearance');
+    Route::get('blend-containers-item/{id}/packing-list-pdf', [ClerkController::class, 'downloadContainerPackingListPdf'])->name('clerk.downloadContainerPackingListPdf');
+    Route::get('blend-containers-item/{id}/packing-list-excel', [ClerkController::class, 'downloadContainerPackingListExcel'])->name('clerk.downloadContainerPackingListExcel');
+
+    Route::get('download-excel-blend-sheet-packing-list/{id}', [ClerkController::class, 'downloadBlendPackingListExcel'])->name('clerk.downloadBlendPackingListExcel');
+    Route::get('download-excel-blend-sheet-packing-list-cont/{id}', [ClerkController::class, 'downloadBlendPackingListContExcel'])->name('clerk.downloadBlendPackingListContExcel');
+
+    Route::prefix('rebags')->name('clerk.')->group(function () {
+        Route::get('/', [ClerkController::class, 'viewRebagJobs'])->name('rebagJobs');
+        Route::get('create-rebag-job', [ClerkController::class, 'createRebagJob'])->name('createRebagJob');
+        Route::post('add-rebag-job', [ClerkController::class, 'addRebagJob'])->name('addRebagJob');
+        Route::get('{id}/dd-rebag-job-teas', [ClerkController::class, 'addRebagJobTeas'])->name('addRebagJobTeas');
+        Route::post('{id}/store-rebag-job-teas', [ClerkController::class, 'storeRebagJobTeas'])->name('storeRebagJobTeas');
+        Route::post('{id}/add-rebag-job-blend-balances-teas', [ClerkController::class, 'addRebagJobBlendBalanceTeas'])->name('addRebagJobBlendBalanceTeas');
+        Route::get('{id}/update-rebag-job', [ClerkController::class, 'updateRebagJob'])->name('updateRebagJob');
+        Route::get('{id}/delete-rebag-job-tea', [ClerkController::class, 'deleteRebagJobTea'])->name('deleteRebagJobTea');
+        Route::get('{id}/update-rebag-job-outturn-report', [ClerkController::class, 'updateRebagJobOutTurnReport'])->name('updateRebagJobOutTurnReport');
+        Route::post('{id}/update-rebag-job-details', [ClerkController::class, 'updateRebagJobDetails'])->name('updateRebagJobDetails');
+        Route::get('{id}/edit-rebag-job', [ClerkController::class, 'editRebagJob'])->name('editRebagJob');
+        Route::post('{id}/update-rebag', [ClerkController::class, 'updateRebag'])->name('updateRebag');
+        Route::get('{id}/make-rebag-job-as-shipped', [ClerkController::class, 'markRebagJobAsShipped'])->name('markRebagJobAsShipped');
+        Route::get('{id}/download-rebag-job', [ClerkController::class, 'downloadRebagJob'])->name('downloadRebagJob');
+        Route::get('{id}/download-rebag-job-driver-clearance', [ClerkController::class, 'downloadRebagJobDriverClearance'])->name('downloadRebagJobDriverClearance');
+        Route::get('{id}/download-rebag-job-packing-list', [ClerkController::class, 'downloadRebagJobPackingList'])->name('downloadRebagJobPackingList');
+        Route::get('{id}/download-rebag-job-packing-list-excel', [ClerkController::class, 'downloadRebagJobPackingListExcel'])->name('downloadRebagJobPackingListExcel');
+        Route::get('{id}/download-rebag-job-packing-list-cont', [ClerkController::class, 'downloadRebagJobPackingListCont'])->name('downloadRebagJobPackingListCont');
+        Route::get('{id}/download-rebag-job-packing-list-cont-excel', [ClerkController::class, 'downloadRebagPackingListContExcel'])->name('downloadRebagJobPackingListContExcel');
+
+        Route::get('/rebag/initiate/{id}', [ClerkController::class, 'initiateRebagSheet'])->name('initiateRebagSheet');
+        Route::get('/rebag/mark-as-shipped/{id}', [ClerkController::class, 'markRebagShipped'])->name('markRebagShipped');
+        Route::get('/rebag/approve-first/{id}', [ClerkController::class, 'approveRebagFirst'])->name('approveRebagFirst');
+        Route::get('/rebag/approve-final/{id}', [ClerkController::class, 'approveRebagFinal'])->name('approveRebagFinal');
+        Route::get('/logistics/{id}', [ClerkController::class, 'getRebagLogistics'])->name('getRebagLogistics');
+        Route::post('/logistics/{id}', [ClerkController::class, 'updateRebagLogistics'])->name('updateRebagLogistics');
+    });
 });

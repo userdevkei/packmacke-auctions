@@ -220,10 +220,10 @@
                         <select id="filter-status" class="form-select js-choice" data-placeholder="All Statuses">
                             <option value="">All Statuses</option>
                             <option value="0">Created</option>
-                            <option value="1">Pending Approval</option>
-                            <option value="2">Approved (Ops)</option>
-                            <option value="3">Approved (Fin)</option>
-                            <option value="4">Released</option>
+                            <option value="1">Initiated</option>
+                            <option value="2">1st Approved</option>
+                            <option value="3">Released</option>
+                            <option value="4">Completed</option>
                         </select>
                     </div>
                     <div class="col-6 col-md-3">
@@ -631,8 +631,14 @@ table = $('#datatable').DataTable({
                 success: function (response) {
                     $('#selectClients').empty();
                     $('#selectClients').append('<option value="" selected disabled class="text-center"> -- select client --');
-                    $.each(response, function (index, client) {
-                        $('#selectClients').append('<option value="' + client.client_id + '">' + client.client_name + '</option>');
+
+                    var seen = {};
+                    $.each(response, function (clientName, rows) {
+                        // rows is an array of duplicate records for this client — just take the first
+                        var row = Array.isArray(rows) ? rows[0] : rows;
+                        if (!row || !row.client_id || seen[row.client_id]) return;
+                        seen[row.client_id] = true;
+                        $('#selectClients').append('<option value="' + row.client_id + '">' + (row.client_name || clientName) + '</option>');
                     });
                 }
             });

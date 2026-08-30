@@ -1,4 +1,6 @@
 @extends('clerk::layouts.default')
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.3.0/css/bootstrap.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/2.1.5/css/dataTables.dataTables.css">
 <style>
     /* Disable the up and down arrows */
     input[type="number"]::-webkit-inner-spin-button,
@@ -17,124 +19,6 @@
         border-right: none !important;
         border-color: forestgreen !important;
     }
-
-    .tag-container {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 5px;
-    }
-
-    .tag {
-        display: flex;
-        align-items: center;
-        background-color: forestgreen;
-        color: white;
-        padding: 5px 10px;
-        border-radius: 20px;
-        font-size: 14px;
-    }
-
-    .tag .remove-button {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 16px;
-        height: 16px;
-        margin-left: 5px;
-        color: yellow !important;
-        background: forestgreen;
-        border: none !important;
-        font-size: 16px;
-        /*font-style: italic;*/
-        cursor: pointer;
-    }
-
-    .input-container {
-        position: relative;
-        width: 100%;
-    }
-
-    /* .input-container input {
-        width: 32%;
-        !*padding: 10px;*!
-        !*border: 1px solid #ccc;*!
-        !*border-radius: 5px;*!
-        !*font-size: 14px;*!
-        !*margin-bottom: 5px;*!
-        !*height: 70% !important;*!
-    } */
-
-    .input-container .add-button {
-        position: absolute;
-        top: 50%;
-        right: 10px;
-        transform: translateY(-50%);
-        background-color: #007bff;
-        color: #fff;
-        padding: 2px 8px;
-        border: none;
-        border-radius: 50%;
-        cursor: pointer;
-        font-size: 14px;
-        outline: none;
-    }
-
-    #editableSelect, #idSelect {
-        min-width: 14vw !important; /* Set width to 100% */
-        min-height: 2.5vh !important;
-        box-sizing: border-box; /* Include padding and border in the width calculation */
-        /* Add any other styling you need */
-    }
-
-    .container-row {
-        border-bottom: 1px solid #e9ecef;
-        padding: 4px 0;
-    }
-
-    .container-row:hover {
-        background-color: #f8f9fa;
-    }
-
-    .remove-btn {
-        cursor: pointer;
-        color: #dc3545;
-        font-size: 16px;
-        border: none;
-        background: none;
-        padding: 0;
-        width: 20px;
-    }
-
-    .remove-btn:hover {
-        color: #bb2d3b;
-    }
-
-    .compact-input {
-        padding: 4px 8px;
-        font-size: 13px;
-        height: 28px;
-    }
-
-    .fs-xs {
-        font-size: 11px !important;
-        font-weight: 600;
-    }
-
-    .header-row {
-        background-color: #f8f9fa;
-        padding: 4px 0;
-        margin-bottom: 2px;
-        border-bottom: 2px solid #dee2e6;
-    }
-
-    .btn-sm-custom {
-        padding: 4px 12px;
-        font-size: 13px;
-    }
-
-    #containersWrapper {
-
-    }
 </style>
 @section('clerk::dashboard')
     <div class="card">
@@ -150,272 +34,178 @@
                 <div class="tab-pane preview-tab-pane active" role="tabpanel" aria-labelledby="tab-dom-c3976e0e-38db-410e-861a-36d04a3a7494" id="dom-c3976e0e-38db-410e-861a-36d04a3a7494">
                     <form method="POST" action="{{ route('clerk.updateBlendSheetDetails', $bs->blend_id) }}">
                         @csrf
-                            <div class="row row-cols-sm-2 g-2">
-                                <fieldset class="border py-2">
-                                    <legend class="float-none fw-bolder w-auto p-2 h6">BLEND OUTTURN </legend>
-                                    <div class="row mb-2 mx-2">
-                                        <div class="col-md-4">
-                                            <span class="h6 " style="font-size: 90% !important;">INPUT WEIGHT</span>
-                                        </div>
-                                        <div class="col-md-2">
-                                            <span class="fs-sm"><span id="inputWeight">{{ $bs->input_weight }}</span> </span>
-                                        </div>
-                                        <div class="col-md-4">
-                                            <span class="h6 " style="font-size: 90% !important;">INPUT PACKAGES</span>
-                                        </div>
-                                        <div class="col-md-2">
-                                            <span class="fs-sm"><span id="inputWeight">{{ $bs->input_packages }}</span> </span>
-                                        </div>
+                        <div class="row row-cols-sm-2 g-2">
+                            <fieldset class="border py-2">
+                                <legend class="float-none fw-bolder w-auto p-2 h6">BLEND OUTTURN </legend>
+                                <div class="row mb-2 mx-2">
+                                    <div class="col-md-4">
+                                        <span class="h6 " style="font-size: 90% !important;">INPUT WEIGHT</span>
                                     </div>
-                                    <div class="mb-2 mx-2 my-3">
-                                        <span class="h6 fs-xs  m-2" style="font-size: 95% !important;">BLENDED TEA PACKAGING </span>
+                                    <div class="col-md-2">
+                                        <span class="fs-sm"><span id="inputWeight">{{ $bs->input_weight }}</span> </span>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <span class="h6 " style="font-size: 90% !important;">INPUT PACKAGES</span>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <span class="fs-sm"><span id="inputWeight">{{ $bs->input_packages }}</span> </span>
+                                    </div>
+                                </div>
+                                <div class="mb-2 mx-2 my-3">
+                                    <span class="h6 fs-xs  m-2" style="font-size: 95% !important;">BLENDED TEA PACKAGING </span>
+                                </div>
+
+                                <div class="row mb-4 mx-2 mt-3">
+                                    <div class="col-md-6">
+                                        <span class="h6 fs-xs  m-2" style="font-size: 95% !important;">BLEND PHASES INVOLVED</span>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <input type="number" class="form-control noOfBlends" name="noOfBlends" id="blendNumbers">
+                                    </div>
+                                </div>
+
+                                <div class="mb-4 mx-2 mt-1" id="appendList"></div>
+
+                                <div class="row mb-2 mx-2">
+                                    <div class="col-md-6">
+                                        <span class="h6 fs-xs " style="font-size: 95% !important;">SHIPMENT TOTAL WEIGHT</span>
+                                    </div>
+                                    <div class="col-md-6"><span class=" text-primary" id="shipmentTotal"></span></div>
+                                </div>
+
+                                <div class="row mb-2 mx-2 my-3">
+                                    <div class="col-md-6">
+                                        <span class="h6 fs-xs  m-2" style="font-size: 95% !important;">BLEND BALANCE PACKAGES </span>
                                     </div>
 
-                                    <div class="row mb-4 mx-2 mt-3">
-                                        <div class="col-md-6">
-                                            <span class="h6 fs-xs  m-2" style="font-size: 95% !important;">BLEND PHASES INVOLVED</span>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <input type="number" class="form-control noOfBlends" name="noOfBlends" id="blendNumbers">
-                                        </div>
-                                    </div>
-
-                                    <div class="mb-4 mx-2 mt-1" id="appendList"></div>
-
-                                    <div class="row mb-2 mx-2">
-                                        <div class="col-md-6">
-                                            <span class="h6 fs-xs " style="font-size: 95% !important;">SHIPMENT TOTAL WEIGHT</span>
-                                        </div>
-                                        <div class="col-md-6"><span class=" text-primary" id="shipmentTotal"></span></div>
-                                    </div>
-
-                                    <div class="row mb-2 mx-2 my-3">
-                                        <div class="col-md-6">
-                                            <span class="h6 fs-xs  m-2" style="font-size: 95% !important;">BLEND BALANCE PACKAGES </span>
-                                        </div>
-
-                                        <div class="col-md-6">
+                                    <div class="col-md-6">
                                             <span class="fs-sm">
                                             <input type="number" min="0" inputmode="numeric" class="form-control packagesNumberEx" id="packagesNumberEx" step="0.1" placeholder="NO. OF PACKAGES">
                                             </span>
-                                        </div>
                                     </div>
-
-                                    <div id="inputFields-"></div>
-
-                                    <div class="row mb-3 mx-2 my-2" id="extraBlendBalance"></div>
-
-                                    <div class="row mb-2 mx-2">
-                                        <div class="col-md-6">
-                                            <span class="h6 fs-xs " style="font-size: 95% !important;">TOTAL BLEND BALANCE </span>
-                                        </div>
-                                        <div class="col-md-6"><span class=" text-info" id="totalBlendBalance"></span></div>
-                                    </div>
-
-                                </fieldset>
-
-                                <fieldset class="border py-2">
-                                    <legend class="float-none w-auto fw-bolder p-2 h6">BLEND OUTTURN </legend>
-                                    <div class="row mb-2 mx-2 my-3">
-                                        <div class="col-md-6">
-                                            <span class="h6 fs-xs  m-2" style="font-size: 95% !important;">SWEEPINGS</span>
-                                        </div>
-
-                                        <div class="col-md-6">
-                                            <span class="fs-sm">
-                                                <input type="number" min="0" inputmode="numeric" class="form-control sweepings" id="sweepings" step="0.1" name="sweepings" placeholder="WEIGHT OF SWEEPINGS" required value="{{ $outTurnReport['sweepings'] }}">
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    <div class="row mb-2 mx-2 my-3">
-                                        <div class="col-md-6">
-                                            <span class="h6 fs-xs  m-2" style="font-size: 95% !important;">CYCLONE/DUST</span>
-                                        </div>
-
-                                        <div class="col-md-6">
-                                            <span class="fs-sm">
-                                                <input type="number" min="0" inputmode="numeric" class="form-control sweepings" id="cDust" step="0.1" name="cDust" placeholder="WEIGHT OF CYCLONE/DUST" required value="{{ $outTurnReport['c_dust'] }}">
-                                            </span>
-                                        </div>
-                                    </div>
-
-
-                                    <div class="row mb-2 mx-2 my-3">
-                                        <div class="col-md-6">
-                                            <span class="h6 fs-xs  m-2" style="font-size: 95% !important;">FIBRE</span>
-                                        </div>
-
-                                        <div class="col-md-6">
-                                            <span class="fs-sm">
-                                                <input type="number" min="0" inputmode="numeric" class="form-control sweepings" id="fibre" step="0.1" name="fibre" placeholder="WEIGHT OF FIBRE" required value="{{ $outTurnReport['fibre'] }}">
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    <div class="row mb-4 mx-2 my-3">
-                                        <div class="col-md-6">
-                                            <span class="h6 fs-xs  m-2" style="font-size: 95% !important;">SIEVED DUST</span>
-                                        </div>
-
-                                        <div class="col-md-6">
-                                            <span class="fs-sm">
-                                                <input type="number" min="0" inputmode="numeric" class="form-control sweepings" id="bDust" step="0.1" name="bDust" placeholder="WEIGHT OF BROWN DUST" required value="{{ $outTurnReport['b_dust'] }}">
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    <div class="row mb-4 mx-2 my-3">
-                                        <div class="col-md-6">
-                                            <span class="h6 fs-xs  m-2" style="font-size: 95% !important;">TARE WEIGHT VARIANCE</span>
-                                        </div>
-
-                                        <div class="col-md-6">
-                                            <span class="fs-sm">
-                                            <input type="number" min="0" inputmode="numeric" class="form-control tareVariance" id="tVariance" step="0.01" name="tareVariance" value="{{ $outTurnReport['variance'] }}"  placeholder="TARE VARIANCE" required >
-                                            </span>
-                                        </div>
-                                        <input type="hidden" id="totalPackages">
-                                    </div>
-
-                                    <div class="row mb-2 mx-2">
-                                        <div class="col-md-6">
-                                            <span class="h6 fs-xs " style="font-size: 95% !important;">OTHER BALANCES</span>
-                                        </div>
-                                        <div class="col-md-6"><span class=" text-danger" id="otherBlendBalance"></span></div>
-                                    </div>
-
-                                    <div class="row mb-2 mx-2">
-                                        <div class="col-md-6">
-                                            <span class="h6 " style="font-size: 90% !important;">PRODUCTION WEIGHT <sup class="text-danger">*</sup></span>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <div class="col-md-6"><span class=" text-success" id="outputWeight"></span></div>
-                                        </div>
-                                    </div>
-
-                                    <div class="row mb-2 mx-2">
-                                        <div class="col-md-4"><span class="h6 fs-xs " style="font-size: 85% !important;">GAIN/LOSS</span> </div>
-                                        <div class="col-md-2"><span class="text-primary" id="gainWeight"></span></div>
-                                        <div class="col-md-3"><span class="h6 fs-xs " style="font-size: 85% !important;">GAIN/LOSS(%) </span> </div>
-                                        <div class="col-md-3"> <span class="text-info" id="gainPercent"></span> </div>
-                                    </div>
-                                </fieldset>
-                            </div>
-
-                            <fieldset class="border p-2">
-                                <legend class="float-none w-auto p-2 h6 fw-bolder">LOGISTICS</legend>
-
-                                <div class="row row-cols-sm-4 g-1">
-                                    <div class="mb-2">
-                                        <label class="my-1 fs-xs " style="font-size: 85% !important;">PACKAGE TARE <sup class="text-danger">*</sup></label>
-                                        @php $increment = 0.1; @endphp
-                                        <select class="form-select js-choice" name="packageTare" data-options='{"removeItemButton":true,"placeholder":true}'>
-                                            <option disabled selected value="">-- select package tare --</option>
-                                            @for ($i = 0.1; $i <= 1; $i += $increment)
-                                                <option @if($outTurnReport['packageTare'] == $i) selected @endif value="{{ $i }}">{{ number_format($i, 1) }} Kgs</option>
-                                            @endfor
-                                        </select>
-                                    </div>
-                                    <div class="mb-2">
-                                        <label class="my-1 fs-xs " style="font-size: 85% !important;">CONTAINER TARE <sup class="text-danger">*</sup></label>
-                                        <input type="number" value="{{ $outTurnReport['container_tare'] }}" step="0.01" name="tare" class="form-control" placeholder="--" style="height: 62% !important;">
-                                    </div>
-                                    <div class="mb-2">
-                                        <label class="my-1 fs-xs " style="font-size: 85% !important;">CLEARING AGENT <sup class="text-danger">*</sup></label>
-                                        <select name="agentId" class="form-select js-choice" data-options='{"removeItemButton":true,"placeholder":true}' style="height: 62% !important;">
-                                            <option selected disabled value="">-- select clearing agent -- </option>
-                                            @foreach($agents as $agent)
-                                                <option @if($outTurnReport['agent_id'] == $agent->agent_id) selected @endif value="{{ $agent->agent_id }}">{{ $agent->agent_name }}</option>
-                                            @endforeach
-                                        </select>
-                                    </div>
-
-                                    <div class="mb-2">
-                                        <label class="my-1 fs-xs " style="font-size: 85% !important;">SEAL NUMBER <sup class="text-danger">*</sup></label>
-                                        <input type="text" name="seal" class="form-control" placeholder="--" style="height: 62% !important;" value="{{ $outTurnReport['seal_number'] }}">
-                                    </div>
-
-                                    <div class="mb-2">
-                                        <label class="my-1 fs-xs " style="font-size: 85% !important;">CARGO ESCORTED? <sup class="text-danger">*</sup></label>
-                                        <select name="escortId" class="form-select form-select-lg js-choice" data-options='{"removeItemButton":true,"placeholder":true}'>
-                                            <option selected disabled value="">-- select option -- </option>
-                                            <option @if($outTurnReport['escort'] == 1) selected @endif value="1">YES</option>
-                                            <option @if($outTurnReport['escort'] == 2) selected @endif value="2">NO</option>
-                                        </select>
-                                    </div>
-
-                                    <div class="mb-2">
-                                        <label class="my-1 fs-xs " style="font-size: 85% !important;">BLEND DATE <sup class="text-danger">*</sup></label>
-                                        <input type="date" name="blendDate" class="form-control " placeholder="--" required style="height: 62% !important;" value="{{ $outTurnReport['blend_date'] ? \Carbon\Carbon::parse($outTurnReport['blend_date'])->format('Y-m-d') : '' }}">
-                                    </div>
-
-                                    <div class="mb-2">
-                                        <label class="my-1 fs-xs " style="font-size: 85% !important;">TRANSPORTER <sup class="text-danger">*</sup></label>
-                                        <select name="transporter" class="form-select js-choice" data-options='{"removeItemButton":true,"placeholder":true}' style="height: 62% !important;">
-                                            <option selected disabled value=" ">-- select transporter -- </option>
-                                            @foreach($transporters as $transporter)
-                                                <option @if($outTurnReport['transporter_id'] == $transporter->transporter_id) selected @endif value="{{ $transporter->transporter_id }}">{{ $transporter->transporter_name }}</option>
-                                            @endforeach
-                                        </select>
-                                    </div>
-
-                                    <div class="mb-2">
-                                        <label class="my-1 fs-xs " style="font-size: 85% !important;">VEHICLE REGISTRATION <sup class="text-danger">*</sup></label><br>
-                                        <input class="form-control " data-options='{"removeItemButton":true,"placeholder":true}' name="registration" id="editableSelect" type="text" list="optionsList" placeholder="-- plate number --" style="height: 62% !important;" value="{{ $outTurnReport['registration'] }}">
-                                        <datalist id="optionsList">
-                                            @foreach($registrations as $registration => $transporter)
-                                                <option value="{{ $registration }}">{{ $registration }} </option>
-                                            @endforeach
-                                        </datalist>
-                                    </div>
-
-                                    <div class="mb-2">
-                                        <label class="my-1 fs-xs " style="font-size: 85% !important;">DRIVER'S ID NUMBER <sup class="text-danger">*</sup></label> <br>
-                                        <input id="idSelect" type="text" list="idList" id="idNumber" name="idNumber" class="form-control  idSelect" placeholder="-- driver's ID Number --" style="height: 52% !important;" value="{{ $outTurnReport['id_number'] }}">
-                                        <datalist id="idList">
-                                            @foreach($users as $user)
-                                                <option value="{{ $user->id_number }}">{{ $user->id_number }}</option>
-                                            @endforeach
-                                        </datalist>
-                                    </div>
-                                    <div class="mb-2">
-                                        <label class="my-1 fs-xs " style="font-size: 85% !important;">DRIVER'S NAME <sup class="text-danger">*</sup> </label>
-                                        <input type="text" name="driverName" id="driverName" class="form-control  driverName" style="height: 52% !important;" value="{{ $outTurnReport['driver_name'] }}">
-                                    </div>
-
-                                    <div class="mb-4">
-                                        <label class="my-1 fs-xs " style="font-size: 85% !important;">DRIVER'S PHONE NUMBER <sup class="text-danger">*</sup></label>
-                                        <input type="text" name="driverPhone" id="driverPhone" class="form-control  driverPhone" style="height: 68% !important;" value="{{ $outTurnReport['phone'] }}">
-                                    </div>
-
                                 </div>
 
-                                <div class="container p-3">
-                                    <label class="mb-2 fs-xs text-uppercase">CONTAINER DETAILS <sup class="text-danger">*</sup></label>
+                                <div id="inputFields-"></div>
 
-                                    <div class="header-row row g-1 align-items-center">
-                                        <div class="col-1 text-center fs-xs">#</div>
-                                        <div class="col-3 fs-xs">Container Number</div>
-                                        <div class="col-2 fs-xs">Container Tare Weight (kg)</div>
-                                        <div class="col-3 fs-xs">Seal Number</div>
-                                        <div class="col-2 fs-xs">Pallet Weight</div>
-                                        <div class="col-1"></div>
+                                <div class="row mb-3 mx-2 my-2" id="extraBlendBalance"></div>
+
+                                <div class="row mb-2 mx-2">
+                                    <div class="col-md-6">
+                                        <span class="h6 fs-xs " style="font-size: 95% !important;">TOTAL BLEND BALANCE </span>
                                     </div>
-
-                                    <div id="containersWrapper"></div>
-
-                                    <div class="mt-2 d-flex gap-2">
-                                        <button type="button" class="btn btn-outline-primary btn-sm" id="addContainerBtn">+ Add</button>
-                                    </div>
-
-                                    <div class="mt-3" id="output" style="display: none;">
-                                        <small class="fw-bold">Captured Data:</small>
-                                        <pre id="outputData" class="bg-light p-2 mt-1" style="font-size: 11px; max-height: 200px; overflow-y: auto;"></pre>
-                                    </div>
+                                    <div class="col-md-6"><span class=" text-info" id="totalBlendBalance"></span></div>
                                 </div>
 
                             </fieldset>
+
+                            <fieldset class="border py-2">
+                                <legend class="float-none w-auto fw-bolder p-2 h6">BLEND OUTTURN </legend>
+                                <div class="row mb-2 mx-2 my-3">
+                                    <div class="col-md-6">
+                                        <span class="h6 fs-xs  m-2" style="font-size: 95% !important;">SWEEPINGS</span>
+                                    </div>
+
+                                    <div class="col-md-6">
+                                            <span class="fs-sm">
+                                                <input type="number" min="0" inputmode="numeric" class="form-control sweepings" id="sweepings" step="0.1" name="sweepings" placeholder="WEIGHT OF SWEEPINGS" required value="{{ $outTurnReport['sweepings'] }}">
+                                            </span>
+                                    </div>
+                                </div>
+
+                                <div class="row mb-2 mx-2 my-3">
+                                    <div class="col-md-6">
+                                        <span class="h6 fs-xs  m-2" style="font-size: 95% !important;">CYCLONE/DUST</span>
+                                    </div>
+
+                                    <div class="col-md-6">
+                                            <span class="fs-sm">
+                                                <input type="number" min="0" inputmode="numeric" class="form-control sweepings" id="cDust" step="0.1" name="cDust" placeholder="WEIGHT OF CYCLONE/DUST" required value="{{ $outTurnReport['c_dust'] }}">
+                                            </span>
+                                    </div>
+                                </div>
+
+
+                                <div class="row mb-2 mx-2 my-3">
+                                    <div class="col-md-6">
+                                        <span class="h6 fs-xs  m-2" style="font-size: 95% !important;">FIBRE</span>
+                                    </div>
+
+                                    <div class="col-md-6">
+                                            <span class="fs-sm">
+                                                <input type="number" min="0" inputmode="numeric" class="form-control sweepings" id="fibre" step="0.1" name="fibre" placeholder="WEIGHT OF FIBRE" required value="{{ $outTurnReport['fibre'] }}">
+                                            </span>
+                                    </div>
+                                </div>
+
+                                <div class="row mb-4 mx-2 my-3">
+                                    <div class="col-md-6">
+                                        <span class="h6 fs-xs  m-2" style="font-size: 95% !important;">SIEVED DUST</span>
+                                    </div>
+
+                                    <div class="col-md-6">
+                                            <span class="fs-sm">
+                                                <input type="number" min="0" inputmode="numeric" class="form-control sweepings" id="bDust" step="0.1" name="bDust" placeholder="WEIGHT OF BROWN DUST" required value="{{ $outTurnReport['b_dust'] }}">
+                                            </span>
+                                    </div>
+                                </div>
+
+                                <div class="row mb-4 mx-2 my-3">
+                                    <div class="col-md-6">
+                                        <span class="h6 fs-xs  m-2" style="font-size: 95% !important;">TARE WEIGHT VARIANCE</span>
+                                    </div>
+
+                                    <div class="col-md-6">
+                                            <span class="fs-sm">
+                                            <input type="number" min="0" inputmode="numeric" class="form-control tareVariance" id="tVariance" step="0.01" name="tareVariance" value="{{ $outTurnReport['variance'] }}"  placeholder="TARE VARIANCE" required >
+                                            </span>
+                                    </div>
+                                    <input type="hidden" id="totalPackages">
+                                </div>
+
+                                <div class="row mb-2 mx-2">
+                                    <div class="col-md-6">
+                                        <span class="h6 fs-xs " style="font-size: 95% !important;">OTHER BALANCES</span>
+                                    </div>
+                                    <div class="col-md-6"><span class=" text-danger" id="otherBlendBalance"></span></div>
+                                </div>
+
+                                <div class="row mb-2 mx-2">
+                                    <div class="col-md-6">
+                                        <span class="h6 " style="font-size: 90% !important;">PRODUCTION WEIGHT <sup class="text-danger">*</sup></span>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="col-md-6"><span class=" text-success" id="outputWeight"></span></div>
+                                    </div>
+                                </div>
+
+                                <div class="row mb-2 mx-2">
+                                    <div class="col-md-4"><span class="h6 fs-xs " style="font-size: 85% !important;">GAIN/LOSS</span> </div>
+                                    <div class="col-md-2"><span class="text-primary" id="gainWeight"></span></div>
+                                    <div class="col-md-3"><span class="h6 fs-xs " style="font-size: 85% !important;">GAIN/LOSS(%) </span> </div>
+                                    <div class="col-md-3"> <span class="text-info" id="gainPercent"></span> </div>
+                                </div>
+                            </fieldset>
+                        </div>
+
+                        <fieldset class="border py-2">
+                            <legend class="float-none w-auto p-2 h6 fw-bolder">PACKAGING</legend>
+                            <div class="row row-cols-sm-2 g-2 mx-1">
+                                <div class="mb-2">
+                                    <label class="my-1 fs-xs" style="font-size: 85% !important;">PACKAGE TARE <sup class="text-danger">*</sup></label>
+                                    <select class="form-select js-choice" name="packageTare" data-options='{"removeItemButton":true,"placeholder":true}'>
+                                        <option disabled selected value="">-- select package tare --</option>
+                                        @php $increment = 0.1; @endphp
+                                        @for ($i = 0.1; $i <= 1; $i += $increment)
+                                            <option @if($outTurnReport['packageTare'] == $i) selected @endif value="{{ $i }}">{{ number_format($i, 1) }} Kgs</option>
+                                        @endfor
+                                    </select>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="my-1 fs-xs" style="font-size: 85% !important;">BLEND DATE <sup class="text-danger">*</sup></label>
+                                    <input type="date" name="blendDate" class="form-control" required value="{{ $outTurnReport['blend_date'] ? \Carbon\Carbon::parse($outTurnReport['blend_date'])->format('Y-m-d') : '' }}">
+                                </div>
+                            </div>
+                        </fieldset>
 
                         <fieldset class="border py-2">
                             <legend class="float-none w-auto p-2 h6 fw-bolder">SUPERVISORS DETAILS</legend>
@@ -519,335 +309,6 @@
 
         </div>
     </div>
-    <script>
-        // Pass existing containers data to JavaScript
-        window.existingContainersData = @json($containerNumbers ?? []);
-    </script>
-    <script>
-        // Container management script - place this in your blade file
-
-        let containerCount = 0;
-
-        function createContainerRow(existingData = null) {
-            containerCount++;
-            const id = `container-${containerCount}`;
-
-            const row = document.createElement('div');
-            row.className = 'container-row row g-1 align-items-center';
-            row.id = id;
-
-            // Store container_id if it exists (for updates)
-            if (existingData?.container_id) {
-                row.setAttribute('data-container-id', existingData.container_id);
-            }
-
-            row.innerHTML = `
-        <div class="col-1 text-center" style="font-size: 12px; color: #6c757d;">${containerCount}</div>
-        <div class="col-3">
-            <input type="text" class="form-control compact-input" data-field="containerNumber" placeholder="ABCU1234567" value="${existingData?.container_number || ''}" required>
-        </div>
-        <div class="col-2">
-            <input type="number" class="form-control compact-input" data-field="containerTareWeight" placeholder="2200" step="0.01" value="${existingData?.tare_weight || ''}">
-        </div>
-        <div class="col-3">
-            <input type="text" class="form-control compact-input" data-field="sealNumber" placeholder="SN123456" value="${existingData?.seal_number || ''}" required>
-        </div>
-        <div class="col-2">
-            <input type="number" class="form-control compact-input" data-field="palletWeight" placeholder="100" step="0.01" value="${existingData?.pallet_weight || ''}">
-        </div>
-        <div class="col-1 text-center">
-            <button type="button" class="remove-btn" onclick="removeContainer('${id}')">&times;</button>
-        </div>
-    `;
-
-            return row;
-        }
-
-        function removeContainer(id) {
-            const row = document.getElementById(id);
-            if (row) {
-                row.remove();
-                renumberContainers();
-            }
-        }
-
-        function renumberContainers() {
-            const rows = document.querySelectorAll('.container-row');
-            rows.forEach((row, index) => {
-                row.querySelector('.col-1').textContent = index + 1;
-            });
-        }
-
-        function collectContainerData() {
-            const containerRows = document.querySelectorAll('.container-row');
-            const data = [];
-
-            containerRows.forEach((row, index) => {
-                const containerId = row.getAttribute('data-container-id') || null;
-                const containerNumber = row.querySelector('[data-field="containerNumber"]').value.trim();
-                const containerTareWeight = row.querySelector('[data-field="containerTareWeight"]').value.trim();
-                const sealNumber = row.querySelector('[data-field="sealNumber"]').value.trim();
-                const palletWeight = row.querySelector('[data-field="palletWeight"]').value.trim();
-
-                if (containerNumber && sealNumber) {
-                    data.push({
-                        container_id: containerId, // Will be null for new containers
-                        containerNumber,
-                        containerTareWeight: containerTareWeight ? parseFloat(containerTareWeight) : null,
-                        sealNumber,
-                        palletWeight: palletWeight ? parseFloat(palletWeight) : null
-                    });
-                }
-            });
-
-            return data;
-        }
-
-        function addContainersToForm(form) {
-            const data = collectContainerData();
-
-            if (data.length === 0) {
-                alert('Please add at least one container with all required fields filled.');
-                return false;
-            }
-
-            // Remove any existing container hidden inputs
-            const existingInputs = form.querySelectorAll('input[name^="containers["]');
-            existingInputs.forEach(input => input.remove());
-
-            // Add hidden inputs for each container
-            data.forEach((container, index) => {
-                // Container ID (for existing containers)
-                if (container.container_id) {
-                    const containerIdInput = document.createElement('input');
-                    containerIdInput.type = 'hidden';
-                    containerIdInput.name = `containers[${index}][container_id]`;
-                    containerIdInput.value = container.container_id;
-                    form.appendChild(containerIdInput);
-                }
-
-                // Container Number
-                const containerNumberInput = document.createElement('input');
-                containerNumberInput.type = 'hidden';
-                containerNumberInput.name = `containers[${index}][containerNumber]`;
-                containerNumberInput.value = container.containerNumber;
-                form.appendChild(containerNumberInput);
-
-                // Container Tare Weight
-                const containerTareWeightInput = document.createElement('input');
-                containerTareWeightInput.type = 'hidden';
-                containerTareWeightInput.name = `containers[${index}][containerTareWeight]`;
-                containerTareWeightInput.value = container.containerTareWeight !== null ? container.containerTareWeight : '';
-                form.appendChild(containerTareWeightInput);
-
-                // Seal Number
-                const sealNumberInput = document.createElement('input');
-                sealNumberInput.type = 'hidden';
-                sealNumberInput.name = `containers[${index}][sealNumber]`;
-                sealNumberInput.value = container.sealNumber;
-                form.appendChild(sealNumberInput);
-
-                // Pallet Weight
-                const palletWeightInput = document.createElement('input');
-                palletWeightInput.type = 'hidden';
-                palletWeightInput.name = `containers[${index}][palletWeight]`;
-                palletWeightInput.value = container.palletWeight !== null ? container.palletWeight : '';
-                form.appendChild(palletWeightInput);
-            });
-
-            console.log('Containers being submitted:', data);
-            return true;
-        }
-
-        // Add container button
-        document.getElementById('addContainerBtn').addEventListener('click', () => {
-            const wrapper = document.getElementById('containersWrapper');
-            const row = createContainerRow();
-            wrapper.appendChild(row);
-        });
-
-        // Intercept the submit button click BEFORE the form submits
-        document.getElementById('submitBtn').addEventListener('click', function(e) {
-            e.preventDefault();
-
-            const form = this.closest('form');
-
-            // First add containers to form
-            const containersValid = addContainersToForm(form);
-
-            if (!containersValid) {
-                return false;
-            }
-
-            // Then show the confirmation
-            if (confirm('Make sure all required fields are filled in. Are you sure you want to continue with submission?')) {
-                form.submit();
-            }
-        });
-
-        // Load existing containers when page loads
-        window.addEventListener('DOMContentLoaded', function() {
-            // Get existing containers from backend (passed from Laravel)
-            const existingContainers = window.existingContainersData || [];
-
-            if (existingContainers.length > 0) {
-                const wrapper = document.getElementById('containersWrapper');
-                existingContainers.forEach(containerData => {
-                    const row = createContainerRow(containerData);
-                    wrapper.appendChild(row);
-                });
-            } else {
-                // If no existing containers, add one empty row
-                document.getElementById('addContainerBtn').click();
-            }
-        });
-    //     let containerCount = 0;
-    //
-    //     function createContainerRow() {
-    //         containerCount++;
-    //         const id = `container-${containerCount}`;
-    //
-    //         const row = document.createElement('div');
-    //         row.className = 'container-row row g-1 align-items-center';
-    //         row.id = id;
-    //         row.innerHTML = `
-    //     <div class="col-1 text-center" style="font-size: 12px; color: #6c757d;">${containerCount}</div>
-    //     <div class="col-3">
-    //         <input type="text" class="form-control compact-input" data-field="containerNumber" placeholder="ABCU1234567" required>
-    //     </div>
-    //     <div class="col-2">
-    //         <input type="number" class="form-control compact-input" data-field="tareWeight" placeholder="2200" step="0.01">
-    //     </div>
-    //     <div class="col-3">
-    //         <input type="text" class="form-control compact-input" data-field="sealNumber" placeholder="SN123456" required>
-    //     </div>
-    //     <div class="col-2">
-    //         <input type="number" class="form-control compact-input" data-field="palletWeight" placeholder="45" step="0.01">
-    //     </div>
-    //     <div class="col-1 text-center">
-    //         <button type="button" class="remove-btn" onclick="removeContainer('${id}')">&times;</button>
-    //     </div>
-    // `;
-    //
-    //         return row;
-    //     }
-    //
-    //     function removeContainer(id) {
-    //         const row = document.getElementById(id);
-    //         if (row) {
-    //             row.remove();
-    //             renumberContainers();
-    //         }
-    //     }
-    //
-    //     function renumberContainers() {
-    //         const rows = document.querySelectorAll('.container-row');
-    //         rows.forEach((row, index) => {
-    //             row.querySelector('.col-1').textContent = index + 1;
-    //         });
-    //     }
-    //
-    //     function collectContainerData() {
-    //         const containerRows = document.querySelectorAll('.container-row');
-    //         const data = [];
-    //
-    //         containerRows.forEach((row, index) => {
-    //             const containerNumber = row.querySelector('[data-field="containerNumber"]').value.trim();
-    //             const tareWeight = row.querySelector('[data-field="tareWeight"]').value.trim();
-    //             const sealNumber = row.querySelector('[data-field="sealNumber"]').value.trim();
-    //             const palletWeight = row.querySelector('[data-field="palletWeight"]').value.trim();
-    //
-    //             if (containerNumber && sealNumber) {
-    //                 data.push({
-    //                     containerNumber,
-    //                     tareWeight: tareWeight ? parseFloat(tareWeight) : null,
-    //                     sealNumber,
-    //                     palletWeight: palletWeight ? parseFloat(palletWeight) : null
-    //                 });
-    //             }
-    //         });
-    //
-    //         return data;
-    //     }
-    //
-    //     function addContainersToForm(form) {
-    //         const data = collectContainerData();
-    //
-    //         if (data.length === 0) {
-    //             alert('Please add at least one container with all required fields filled.');
-    //             return false;
-    //         }
-    //
-    //         // Remove any existing container hidden inputs
-    //         const existingInputs = form.querySelectorAll('input[name^="containers["]');
-    //         existingInputs.forEach(input => input.remove());
-    //
-    //         // Add hidden inputs for each container
-    //         data.forEach((container, index) => {
-    //             // Container Number
-    //             const containerNumberInput = document.createElement('input');
-    //             containerNumberInput.type = 'hidden';
-    //             containerNumberInput.name = `containers[${index}][containerNumber]`;
-    //             containerNumberInput.value = container.containerNumber;
-    //             form.appendChild(containerNumberInput);
-    //
-    //             // Tare Weight
-    //             const tareWeightInput = document.createElement('input');
-    //             tareWeightInput.type = 'hidden';
-    //             tareWeightInput.name = `containers[${index}][tareWeight]`;
-    //             tareWeightInput.value = container.tareWeight !== null ? container.tareWeight : '';
-    //             form.appendChild(tareWeightInput);
-    //
-    //             // Seal Number
-    //             const sealNumberInput = document.createElement('input');
-    //             sealNumberInput.type = 'hidden';
-    //             sealNumberInput.name = `containers[${index}][sealNumber]`;
-    //             sealNumberInput.value = container.sealNumber;
-    //             form.appendChild(sealNumberInput);
-    //
-    //             // Pallet Number
-    //             const palletNumberInput = document.createElement('input');
-    //             palletNumberInput.type = 'hidden';
-    //             palletNumberInput.name = `containers[${index}][palletWeight]`;
-    //             palletNumberInput.value = container.palletWeight;
-    //             form.appendChild(palletNumberInput);
-    //         });
-    //
-    //         console.log('Containers being submitted:', data);
-    //         return true;
-    //     }
-    //
-    //     // Add container button
-    //     document.getElementById('addContainerBtn').addEventListener('click', () => {
-    //         const wrapper = document.getElementById('containersWrapper');
-    //         const row = createContainerRow();
-    //         wrapper.appendChild(row);
-    //     });
-    //
-    //     // Intercept the submit button click BEFORE the form submits
-    //     document.getElementById('submitBtn').addEventListener('click', function(e) {
-    //         e.preventDefault(); // Prevent immediate submission
-    //
-    //         const form = this.closest('form');
-    //
-    //         // First add containers to form
-    //         const containersValid = addContainersToForm(form);
-    //
-    //         if (!containersValid) {
-    //             return false;
-    //         }
-    //
-    //         // Then show the confirmation
-    //         if (confirm('Make sure all required fields are filled in. Are you sure you want to continue with submission?')) {
-    //             form.submit(); // Submit the form programmatically
-    //         }
-    //     });
-    //
-    //     // Add the first container by default when page loads
-    //     window.addEventListener('DOMContentLoaded', function() {
-    //         document.getElementById('addContainerBtn').click();
-    //     });
-    </script>
 @endsection
 <script src="https://code.jquery.com/jquery-3.7.1.js"></script>
 
@@ -871,7 +332,6 @@
 
         function appendList() {
             var fieldsBlendNumbers = parseFloat($('#blendNumbers').val());
-            var totalBalance = 0; // Initialize total balance
             var li = ''; // Initialize an empty string to store list items
             for (var i = 1; i <= fieldsBlendNumbers; i++) {
                 // Concatenate each list item to the 'li' variable
@@ -894,6 +354,7 @@
                 calculateBlendBalance();
             });
         }
+
         // Function to calculate gain/loss weight and percentage
         function calculateGainLoss() {
             var totalShipped = parseFloat($('#shipmentTotal').text());
@@ -970,11 +431,9 @@
                 var weight = parseFloat($(this).val()) || 0; // Fallback to 0 if NaN
                 var index = $(this).attr('id').replace('weight', ''); // Get the index of the current weight input
                 var packages = parseFloat($('#packages' + index).val()) || 0; // Get corresponding packages input by index
-                console.log("Weight: " + weight, "Packages: " + packages); // Debugging
                 // Multiply weight by packages and add to grand total
                 grandBlendBalance += weight * packages;
             });
-            console.log("Grand Blend Balance: " + grandBlendBalance); // Debugging
             // Update blend balance in the corresponding HTML element
             $('#totalBlendBalance').text(isNaN(grandBlendBalance) ? '' : grandBlendBalance.toFixed(2));
             // Trigger gain/loss calculation after grand balance is updated
@@ -988,10 +447,8 @@
             var sweepings =  $('#sweepings').val();
             var tVariance = $('#tVariance').val();
             var totalPackages = $('#totalPackages').val();
-            console.log(totalPackages)
             var balance = parseFloat(bDust) + parseFloat(cDust) + parseFloat(fibre) + parseFloat(sweepings) + (parseFloat(totalPackages) * tVariance);
 
-            // console.log(balance, tVariance, sweepings, fibre, cDust, bDust, totalPackages)
             $('#otherBlendBalance').text(isNaN(parseFloat(balance)) ? '' : parseFloat(balance).toFixed(2));
         }
 
@@ -1004,116 +461,31 @@
             calculateBlendBalance()
             grandBalance()
             calculateGainLoss()
-
         });
-
-        $('.idSelect').on('change', function () {
-
-        var idNumber = $(this).val();
-        console.log(idNumber)
-
-        $.ajax({
-            url: '{{ route('clerk.fetchIdNumber') }}',
-            method: 'GET',
-            data: {idNumber},
-            dataType: 'json',
-            success: function (response) {
-                $('.driverName').val(response.driver_name)
-                $('.driverPhone').val(response.driver_phone)
-            },
-            error: function (xhr, status, error) {
-                // Function to handle errors
-                console.error('Error:', error);
-                $('#driverName').val('')
-                $('#driverPhone').val('')
-            }
-        });
-    });
 
     });
-
-    const existingContainers = @json($containerNumbers);
-    console.log(existingContainers)
-    document.addEventListener('DOMContentLoaded', function () {
-        const input = document.getElementById('containerNumbers');
-
-        const choices = new Choices(input, {
-            delimiter: ',',
-            editItems: true,
-            removeItemButton: true,
-        });
-
-        // Load existing values from backend
-        existingContainers.forEach(container => {
-            choices.setValue([{ value: container, label: container }]);
-        });
-    });
-
-
-    function addTag(form) {
-        const tagInput = form.querySelector('.tagsInput');
-        const tagText = tagInput.value.trim();
-        const tagContainer = form.querySelector('.tag-container');
-        const hiddenInput = form.querySelector('.hiddenTagsInput');
-
-        if (tagText !== '') {
-            const tag = document.createElement('div');
-            tag.classList.add('tag');
-
-            const tagTextSpan = document.createElement('span');
-            tagTextSpan.textContent = tagText;
-
-            const removeButton = document.createElement('button');
-            removeButton.classList.add('remove-button');
-            removeButton.textContent = 'x';
-            removeButton.addEventListener('click', function() {
-                tagContainer.removeChild(tag);
-                updateHiddenInputValue(form);
-            });
-
-            tag.appendChild(tagTextSpan);
-            tag.appendChild(removeButton);
-
-            tagContainer.appendChild(tag);
-            tagInput.value = '';
-
-            updateHiddenInputValue(form);
-        }
-
-        // Prevent form submission on Enter key press
-        tagInput.addEventListener('keydown', function(event) {
-            if (event.key === 'Enter') {
-                event.preventDefault();
-                addTag(form);
-            }
-        });
-    }
-
-    function updateHiddenInputValue(form) {
-        const tagContainer = form.querySelector('.tag-container');
-        const tags = tagContainer.querySelectorAll('.tag');
-        const hiddenInput = form.querySelector('.hiddenTagsInput');
-
-        let tagValues = [];
-        tags.forEach(tag => {
-            tagValues.push(tag.querySelector('span').textContent);
-        });
-
-        hiddenInput.value = tagValues.join(',');
-    }
-
-    /*document.querySelectorAll('.tagForm').forEach(form => {
-        /!* form.addEventListener('submit', function(event) {
-             event.preventDefault();
-             addTag(form);
-         });*!/
-
-        form.querySelector('.tagsInput').addEventListener('keydown', function(event) {
-            if (event.key === 'Enter') {
-                event.preventDefault();
-                addTag(form);
-            }
-        });
-    });*/
 </script>
 
+<script>
+    document.addEventListener('click', function (e) {
+        var btn = e.target.closest('#submitBtn');
+        if (!btn) return;
+
+        console.log('submitBtn clicked'); // should always log if delegation is working
+
+        e.preventDefault();
+
+        var form = btn.closest('form');
+        if (!form) {
+            console.error('No parent <form> found for submitBtn');
+            return;
+        }
+
+        if (confirm('Make sure all required fields are filled in. Are you sure you want to continue with submission?')) {
+            console.log('Submitting form to', form.action);
+            form.submit();
+        } else {
+            console.log('Submission cancelled by user');
+        }
+    });
+</script>

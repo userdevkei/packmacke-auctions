@@ -45,6 +45,11 @@ use BaconQrCode\Encoder\QrCode;
 use Carbon\Carbon;
 use DateTime;
 use Exception;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Border;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use function PHPUnit\Framework\isEmpty;
 use function Symfony\Component\Translation\t;
 use Illuminate\Http\Request;
@@ -223,56 +228,71 @@ class ClerkController extends Controller
 
     public function index()
     {
+        $clients = Client::all();
+        return view('clerk::welcome')->with(['clients' => $clients]);
+    }
+
+    public function dashboardStats()
+    {
         $orders = DeliveryOrder::leftJoin('loading_instructions', 'loading_instructions.delivery_id', '=', 'delivery_orders.delivery_id')
-            ->select('loading_instructions.status as load_status', 'loading_instructions.deleted_at', 'delivery_orders.created_at as date_received', 'loading_number')
             ->whereNull('delivery_orders.deleted_at');
-        $uncollected = clone $orders;
-        $late = clone $orders;
-        $noTCI = clone $orders;
-        $overstayed = clone $orders;
-        $uncollected = $uncollected->where('loading_instructions.status', 1)->where('loading_instructions.deleted_at', '=', null)->get();
-        $threshold = Carbon::now();
-        $late = $late->whereRaw("DATE_ADD(loading_instructions.created_at, INTERVAL 2 DAY) <= '$threshold'")->where('loading_instructions.status', 1)->where('loading_instructions.deleted_at', '=', null)->get();
-        $noTCI = $noTCI->where('delivery_orders.delivery_type', 1)
-                ->where(function ($noTCI) {
-                    $noTCI->where('delivery_orders.status', 0)
-                        ->orWhereNull('delivery_orders.status'); // Fixed: checks for null status
-                })
-                ->where(function ($noTCI) {
-                    $noTCI->whereNull('loading_instructions.delivery_id')  // No matching loading instruction
-                        ->orWhereNotNull('loading_instructions.deleted_at');  // Exists but only where deleted_at is not null
-                })
-                ->get();
-        $now = \Carbon\Carbon::now();
-        $overstayed = $overstayed->whereRaw("DATE_ADD(delivery_orders.prompt_date, INTERVAL 7 DAY) <= '$now'")
+
+        $uncollected = (clone $orders)
             ->where('loading_instructions.status', 1)
-            ->where('loading_instructions.deleted_at', '=', null)
-            ->get();
-        $internal = Transfers::where('transfers.status', '<', 3)
-            ->orWhere('transfers.status', null)
+            ->whereNull('loading_instructions.deleted_at')
+            ->count();
+
+        $threshold = Carbon::now();
+        $late = (clone $orders)
+            ->whereRaw("DATE_ADD(loading_instructions.created_at, INTERVAL 2 DAY) <= ?", [$threshold])
+            ->whereNull('loading_instructions.deleted_at')
+            ->where('loading_instructions.status', 1)
+            ->count();
+
+        $noTCI = (clone $orders)
+            ->where('delivery_orders.delivery_type', 1)
+            ->where(function ($q) {
+                $q->where('delivery_orders.status', 0)->orWhereNull('delivery_orders.status');
+            })
+            ->where(function ($q) {
+                $q->whereNull('loading_instructions.delivery_id')
+                    ->orWhereNotNull('loading_instructions.deleted_at');
+            })
+            ->count();
+
+        $now = Carbon::now();
+        $overstayed = (clone $orders)
+            ->whereRaw("DATE_ADD(delivery_orders.prompt_date, INTERVAL 7 DAY) <= ?", [$now])
+            ->where('loading_instructions.status', 1)
+            ->whereNull('loading_instructions.deleted_at')
+            ->count();
+
+        $internal = Transfers::where(function ($q) {
+            $q->where('transfers.status', '<', 3)->orWhereNull('transfers.status');
+        })
             ->whereNull('transfers.deleted_at')
-            ->latest('transfers.created_at')
-            ->get()
-            ->groupBy('delivery_number');
-        $external = ExternalTransfer::latest('external_transfers.created_at')
-            ->where('external_transfers.status', '<', 3)
-            ->orWhere('external_transfers.status', null)
+            ->distinct()
+            ->count('delivery_number');
+
+        $external = ExternalTransfer::where(function ($q) {
+            $q->where('external_transfers.status', '<', 3)->orWhereNull('external_transfers.status');
+        })
             ->whereNull('external_transfers.deleted_at')
-            ->orderBy('delivery_number', 'desc')
-            ->get()
-            ->groupBy('delivery_number');
-        $si = ShippingInstruction::latest('shipping_instructions.created_at')
-            ->where('shipping_instructions.status', '<', 4)
-            ->orWhere('shipping_instructions.status', null)
+            ->distinct()
+            ->count('delivery_number');
+
+        $si = ShippingInstruction::where(function ($q) {
+            $q->where('shipping_instructions.status', '<', 4)->orWhereNull('shipping_instructions.status');
+        })
             ->whereNull('shipping_instructions.deleted_at')
-            ->get();
-        $blend = DB::table('blend_sheets')->where(function ($query) {
-                $query->where('blend_sheets.status', '<', 4)
-                    ->orWhereNull('blend_sheets.status');
+            ->count();
+
+        $blend = DB::table('blend_sheets')
+            ->where(function ($q) {
+                $q->where('blend_sheets.status', '<', 4)->orWhereNull('blend_sheets.status');
             })
             ->whereNull('blend_sheets.deleted_at')
-            ->latest('blend_sheets.created_at')
-            ->get();
+            ->count();
 
         $stocks = DB::table('currentstock')
             ->select('client_name')
@@ -281,99 +301,168 @@ class ClerkController extends Controller
             ->orderBy('net_weight', 'desc')
             ->where('current_stock', '>', 0)
             ->get();
-        $tcis = LoadingInstruction::whereIn('status',[null, 0, 1])->whereNull('deleted_at')->select('loading_number')->get()->groupBy('loading_number')->count();
-        $clients = Client::all();
-        return view('clerk::welcome')->with(['blend' => $blend, 'si' => $si, 'internal' => $internal, 'external' => $external, 'uncollected' => $uncollected, 'late' => $late, 'noTCI' => $noTCI, 'overstayed' => $overstayed, 'tcis' => $tcis, 'clients' => $clients, 'stocks' => $stocks]);
+
+        $clientsCount = Client::count();
+
+        return response()->json([
+            'uncollected' => $uncollected,
+            'late' => $late,
+            'noTCI' => $noTCI,
+            'overstayed' => $overstayed,
+            'internal' => $internal,
+            'external' => $external,
+            'si' => $si,
+            'blend' => $blend,
+            'clientsCount' => $clientsCount,
+            'stockedCount' => $stocks->count(),
+            'topClients' => $stocks->take(6)->values(),
+        ]);
     }
-    public function dashboardReport($id)
+
+    public function dashboardReport($value)
     {
-        $id = base64_decode($id);
-        $orders = DeliveryOrder::join('users as u', 'u.user_id', '=', 'delivery_orders.created_by')
-            ->join('gardens as g', 'g.garden_id', '=', 'delivery_orders.garden_id')
-            ->join('grades as gr', 'gr.grade_id', '=', 'delivery_orders.grade_id')
-            ->join('brokers as br', 'br.broker_id', '=', 'delivery_orders.broker_id')
-            ->join('warehouses as wh', 'wh.warehouse_id', '=', 'delivery_orders.warehouse_id')
-            ->leftJoin('sub_warehouses as sub', 'sub.sub_warehouse_id', '=', 'delivery_orders.sub_warehouse_id')
-            ->join('clients as cl', 'cl.client_id', '=', 'delivery_orders.client_id')
-            ->leftJoin('loading_instructions as li', function ($join) {
-                $join->on('li.delivery_id', '=', 'delivery_orders.delivery_id')
-                    ->whereNull('li.deleted_at');
-            })
-            ->leftJoin('foreign_teas as ft', function ($join) {
-                $join->on('ft.delivery_order_id', '=', 'delivery_orders.delivery_id')
-                    ->whereNull('ft.deleted_at');
-            })
-            ->leftJoin('drivers as dr', 'dr.driver_id', '=', 'li.driver_id')
-            ->leftJoin('transporters as tr', 'tr.transporter_id', '=', 'li.transporter_id')
-            ->leftJoin('stations as st', 'st.station_id', '=', 'li.station_id')
-            ->leftJoin('users as lu', 'lu.user_id', '=', 'li.created_by')
-            ->select('u.username', 'g.garden_name', 'gr.grade_name', 'br.broker_name', 'wh.warehouse_name', 'wh.warehouse_id', 'cl.client_name', 'delivery_orders.*', 'tr.transporter_id', 'tr.transporter_name', 'dr.driver_id', 'dr.driver_name', 'dr.id_number', 'dr.phone', 'li.loading_id', 'li.loading_number', 'li.status as load_status', 'li.registration', 'li.created_by as load_user_id', 'lu.username as load_user', 'st.station_name', 'st.station_id', 'sub.sub_warehouse_name', 'li.deleted_at', 'delivery_orders.created_at as date_received', 'collection', 'received', 'validated', 'tea_type')
-            ->whereNull('delivery_orders.deleted_at')
-            ->where('delivery_orders.delivery_type', 1)
-            ->orderBy('delivery_orders.created_at', 'desc');
-        // Clone the query builder instance for each variable
-        $uncollected = clone $orders;
-        $late = clone $orders;
-        $noTCI = clone $orders;
-        $overstayed = clone $orders;
-        $uncollected = $uncollected->whereIn('li.collection', ['in_hand', 'under_collection'])->get();
-        $threshold = Carbon::now();
-        $late = $late->whereRaw("DATE_ADD(li.created_at, INTERVAL 2 DAY) <= '$threshold'")->where('li.status', 1)->get();
-        $noTCI = $noTCI->where('delivery_orders.delivery_type', 1)
-                ->where(function ($noTCI) {
-                    $noTCI->where('delivery_orders.status', 0)
-                        ->orWhereNull('delivery_orders.status'); // Fixed: checks for null status
+        $id = (int)base64_decode($value);
+        $now = Carbon::now();
+
+        // --- ids 1-4: uncollected / late / noTCI / overstayed ------------------
+        if ($id >= 1 && $id <= 4) {
+            $rows = DeliveryOrder::join('users as u', 'u.user_id', '=', 'delivery_orders.created_by')
+                ->join('gardens as g', 'g.garden_id', '=', 'delivery_orders.garden_id')
+                ->join('grades as gr', 'gr.grade_id', '=', 'delivery_orders.grade_id')
+                ->join('brokers as br', 'br.broker_id', '=', 'delivery_orders.broker_id')
+                ->join('warehouses as wh', 'wh.warehouse_id', '=', 'delivery_orders.warehouse_id')
+                ->leftJoin('sub_warehouses as sub', 'sub.sub_warehouse_id', '=', 'delivery_orders.sub_warehouse_id')
+                ->join('clients as cl', 'cl.client_id', '=', 'delivery_orders.client_id')
+                ->leftJoin('loading_instructions as li', function ($join) {
+                    $join->on('li.delivery_id', '=', 'delivery_orders.delivery_id')->whereNull('li.deleted_at');
                 })
-                ->where(function ($noTCI) {
-                    $noTCI->whereNull('li.delivery_id')  // No matching loading instruction
-                        ->orWhereNotNull('li.deleted_at');  // Exists but only where deleted_at is not null
+                ->leftJoin('foreign_teas as ft', function ($join) {
+                    $join->on('ft.delivery_order_id', '=', 'delivery_orders.delivery_id')->whereNull('ft.deleted_at');
                 })
+                ->leftJoin('drivers as dr', 'dr.driver_id', '=', 'li.driver_id')
+                ->leftJoin('transporters as tr', 'tr.transporter_id', '=', 'li.transporter_id')
+                ->leftJoin('stations as st', 'st.station_id', '=', 'li.station_id')
+                ->leftJoin('users as lu', 'lu.user_id', '=', 'li.created_by')
+                ->select(
+                    'u.username', 'g.garden_name', 'gr.grade_name', 'br.broker_name', 'wh.warehouse_name',
+                    'wh.warehouse_id', 'cl.client_name', 'delivery_orders.*', 'tr.transporter_id', 'tr.transporter_name',
+                    'dr.driver_id', 'dr.driver_name', 'dr.id_number', 'dr.phone', 'li.loading_id', 'li.loading_number',
+                    'li.status as load_status', 'li.registration', 'li.created_by as load_user_id',
+                    'lu.username as load_user', 'st.station_name', 'st.station_id', 'sub.sub_warehouse_name',
+                    'li.deleted_at', 'delivery_orders.created_at as date_received', 'collection', 'received',
+                    'validated', 'tea_type'
+                )
+                ->selectRaw("CASE WHEN li.collection IN ('in_hand','under_collection') THEN 1 ELSE 0 END as is_uncollected")
+                ->selectRaw(
+                    "CASE WHEN li.status = 1 AND DATE_ADD(li.created_at, INTERVAL 2 DAY) <= ? THEN 1 ELSE 0 END as is_late",
+                    [$now]
+                )
+                ->selectRaw(
+                    "CASE WHEN delivery_orders.delivery_type = 1
+                      AND (delivery_orders.status = 0 OR delivery_orders.status IS NULL)
+                      AND (li.delivery_id IS NULL OR li.deleted_at IS NOT NULL)
+                 THEN 1 ELSE 0 END as is_no_tci"
+                )
+                ->selectRaw(
+                    "CASE WHEN li.status = 1 AND DATE_ADD(delivery_orders.prompt_date, INTERVAL 7 DAY) <= ? THEN 1 ELSE 0 END as is_overstayed",
+                    [$now]
+                )
+                ->whereNull('delivery_orders.deleted_at')
+                ->where('delivery_orders.delivery_type', 1)
+                ->orderBy('delivery_orders.created_at', 'desc')
                 ->get();
-        // $noTCI->whereNull('li.loading_number')->get();
-        $now = \Carbon\Carbon::now();
-        $overstayed = $overstayed->whereRaw("DATE_ADD(delivery_orders.prompt_date, INTERVAL 7 DAY) <= '$now'")->where('li.status', 1)->get();
-        $internal = Transfers::leftJoin('stations', 'stations.station_id', '=', 'transfers.station_id')
-            ->leftJoin('stations as destination_station', 'destination_station.station_id', '=', 'transfers.destination')
-            ->leftJoin('delivery_orders', 'delivery_orders.delivery_id', '=', 'transfers.delivery_id')
-            ->join('clients', 'clients.client_id', '=', 'delivery_orders.client_id')
-            ->leftJoin('currentstock', function($join) {
-                $join->on('currentstock.delivery_id', '=', 'transfers.delivery_id')
-                    ->on('currentstock.stock_id', '=', 'transfers.stock_id');
-            })
-            ->select('transfers.created_at', 'stations.station_name', 'clients.client_name', 'destination', 'destination_station.station_name as destination_name', 'transfers.status', 'transfers.delivery_number')
-            ->selectRaw('SUM(transfers.requested_palettes) as total_palettes, SUM(transfers.requested_weight) as total_weight')
-            ->where(function ($query) {
-                $query->where('transfers.status', '<', 3)
-                    ->orWhereNull('transfers.status');
-            })
-            ->whereNull('transfers.deleted_at')
-            ->latest('transfers.created_at')
-            ->groupBy('transfers.created_at', 'stations.station_name', 'clients.client_name', 'transfers.destination', 'destination_station.station_name', 'transfers.status', 'transfers.delivery_number', 'stations.station_name')
-            ->get();
-        $external = ExternalTransfer::join('currentstock', 'currentstock.stock_id', '=', 'external_transfers.stock_id')
-            ->leftJoin('warehouses', 'warehouses.warehouse_id', '=', 'external_transfers.warehouse_id')
-            ->select('external_transfers.created_at', 'currentstock.client_name', 'external_transfers.status', 'warehouses.warehouse_name', 'external_transfers.delivery_number', 'currentstock.stocked_at as station_name', 'warehouses.warehouse_name as destination_name')
-            ->latest('external_transfers.created_at')
-            ->where('external_transfers.status', '<', 3)
-            ->orWhere('external_transfers.status', null)
-            ->whereNull('external_transfers.deleted_at')
-            ->orderBy('delivery_number', 'desc')
-            ->selectRaw('SUM(external_transfers.transferred_palettes) as total_palettes')
-            ->selectRaw('SUM(external_transfers.transferred_weight) as total_weight')
-            ->groupBy('external_transfers.created_at', 'currentstock.client_name', 'external_transfers.status', 'warehouses.warehouse_name', 'external_transfers.delivery_number', 'currentstock.stocked_at', 'warehouses.warehouse_name')
-            ->get();
-        $si = ShippingInstruction::join('clients', 'clients.client_id', '=', 'shipping_instructions.client_id')
-            ->join('destinations', 'destinations.destination_id', '=', 'shipping_instructions.destination_id')
-            ->join('stations', 'stations.station_id', '=', 'shipping_instructions.station_id')
-            ->leftJoin('clearing_agents', 'clearing_agents.agent_id', '=', 'shipping_instructions.clearing_agent')
-            ->leftJoin('transporters', 'transporters.transporter_id', '=', 'shipping_instructions.transporter_id')
-            ->select('shipping_instructions.shipping_id', 'shipping_instructions.created_at', 'clients.client_name', 'shipping_instructions.clearing_agent', 'shipping_number', 'vessel_name', 'port_name', 'load_type', 'container_size', 'shipping_mark', 'consignee', 'shipping_instructions.status', 'shipping_instructions', 'escort', 'seal_number', 'agent_name', 'ship_date', 'container_number', 'container_tare', 'station_name')
-            ->latest('shipping_instructions.created_at')
-            ->where('shipping_instructions.status', '<', 4)
-            ->orWhere('shipping_instructions.status', null)
-            ->whereNull('shipping_instructions.deleted_at')
-            ->get();
-        $blend = DB::table('blend_sheets')
+
+            $report = match ($id) {
+                1 => $rows->where('is_uncollected', 1)->values(),
+                2 => $rows->where('is_late', 1)->values(),
+                3 => $rows->where('is_no_tci', 1)->values(),
+                4 => $rows->where('is_overstayed', 1)->values(),
+            };
+
+            return view('clerk::dashboard.collections')->with(['orders' => $report, 'id' => $id]);
+        }
+
+
+        // --- id 5: internal transfers ------------------------------------------
+        if ($id == 5) {
+            $report = Transfers::leftJoin('stations', 'stations.station_id', '=', 'transfers.station_id')
+                ->leftJoin('stations as destination_station', 'destination_station.station_id', '=', 'transfers.destination')
+                ->leftJoin('delivery_orders', 'delivery_orders.delivery_id', '=', 'transfers.delivery_id')
+                ->join('clients', 'clients.client_id', '=', 'delivery_orders.client_id')
+                ->leftJoin('currentstock', function ($join) {
+                    $join->on('currentstock.delivery_id', '=', 'transfers.delivery_id')
+                        ->on('currentstock.stock_id', '=', 'transfers.stock_id');
+                })
+                ->select(
+                    'transfers.created_at', 'stations.station_name', 'clients.client_name', 'destination',
+                    'destination_station.station_name as destination_name', 'transfers.status', 'transfers.delivery_number'
+                )
+                ->selectRaw('SUM(transfers.requested_palettes) as total_palettes, SUM(transfers.requested_weight) as total_weight')
+                ->where(function ($q) {
+                    $q->where('transfers.status', '<', 3)->orWhereNull('transfers.status');
+                })
+                ->whereNull('transfers.deleted_at')
+                ->groupBy(
+                    'transfers.created_at', 'stations.station_name', 'clients.client_name', 'transfers.destination',
+                    'destination_station.station_name', 'transfers.status', 'transfers.delivery_number'
+                )
+                ->latest('transfers.created_at')
+                ->get();
+
+            return view('clerk::dashboard.transfers')->with(['orders' => $report, 'id' => $id]);
+        }
+
+        // --- id 6: external transfers -------------------------------------------
+        if ($id == 6) {
+            $report = ExternalTransfer::join('currentstock', 'currentstock.stock_id', '=', 'external_transfers.stock_id')
+                ->leftJoin('warehouses', 'warehouses.warehouse_id', '=', 'external_transfers.warehouse_id')
+                ->select(
+                    'external_transfers.created_at', 'currentstock.client_name', 'external_transfers.status',
+                    'warehouses.warehouse_name', 'external_transfers.delivery_number',
+                    'currentstock.stocked_at as station_name', 'warehouses.warehouse_name as destination_name'
+                )
+                ->selectRaw('SUM(external_transfers.transferred_palettes) as total_palettes, SUM(external_transfers.transferred_weight) as total_weight')
+                ->where(function ($q) {
+                    $q->where('external_transfers.status', '<', 3)->orWhereNull('external_transfers.status');
+                })
+                ->whereNull('external_transfers.deleted_at')
+                ->groupBy(
+                    'external_transfers.created_at', 'currentstock.client_name', 'external_transfers.status',
+                    'warehouses.warehouse_name', 'external_transfers.delivery_number', 'currentstock.stocked_at'
+                )
+                ->orderBy('delivery_number', 'desc')
+                ->latest('external_transfers.created_at')
+                ->get();
+
+            return view('clerk::dashboard.transfers')->with(['orders' => $report, 'id' => $id]);
+        }
+
+        // --- id 7: shipping instructions ----------------------------------------
+        if ($id == 7) {
+            $report = ShippingInstruction::join('clients', 'clients.client_id', '=', 'shipping_instructions.client_id')
+                ->join('destinations', 'destinations.destination_id', '=', 'shipping_instructions.destination_id')
+                ->join('stations', 'stations.station_id', '=', 'shipping_instructions.station_id')
+                ->leftJoin('clearing_agents', 'clearing_agents.agent_id', '=', 'shipping_instructions.clearing_agent')
+                ->leftJoin('transporters', 'transporters.transporter_id', '=', 'shipping_instructions.transporter_id')
+                ->select(
+                    'shipping_instructions.shipping_id', 'shipping_instructions.created_at', 'clients.client_name',
+                    'shipping_instructions.clearing_agent', 'shipping_number', 'vessel_name', 'port_name', 'load_type',
+                    'container_size', 'shipping_mark', 'consignee', 'shipping_instructions.status',
+                    'shipping_instructions', 'escort', 'seal_number', 'agent_name', 'ship_date', 'container_number',
+                    'container_tare', 'station_name'
+                )
+                ->where(function ($q) {
+                    $q->where('shipping_instructions.status', '<', 4)->orWhereNull('shipping_instructions.status');
+                })
+                ->whereNull('shipping_instructions.deleted_at')
+                ->latest('shipping_instructions.created_at')
+                ->get();
+
+            return view('clerk::dashboard.sis')->with(['orders' => $report, 'id' => $id]);
+        }
+
+        // --- id 8+: blend sheets --------------------------------------------------
+        $report = DB::table('blend_sheets')
             ->join('clients', 'clients.client_id', '=', 'blend_sheets.client_id')
             ->join('destinations', 'destinations.destination_id', '=', 'blend_sheets.destination_id')
             ->leftJoin('blend_teas', 'blend_teas.blend_id', '=', 'blend_sheets.blend_id')
@@ -381,27 +470,38 @@ class ClerkController extends Controller
             ->leftJoin('clearing_agents', 'clearing_agents.agent_id', '=', 'blend_sheets.agent_id')
             ->leftJoin('transporters', 'transporters.transporter_id', '=', 'blend_sheets.transporter_id')
             ->leftJoin('stations', 'stations.station_id', '=', 'blend_sheets.station_id')
-            ->select('blend_sheets.created_at', 'blend_sheets.blend_id as shipping_id', 'blend_sheets.client_id', 'client_name', 'clients.phone as cPhone', 'email', 'blend_number as shipping_number', 'vessel_name', 'blend_sheets.destination_id', 'port_name', 'shipping_mark', 'consignee', 'contract', 'grade', 'garden', 'blend_date', 'blend_sheets.status', 'container_size', 'clients.address', 'package_type', 'registration', 'transporter_name', 'transporters.transporter_id', 'driver_name', 'drivers.phone as driver_phone', 'container_tare', 'blend_shipped', 'agent_name', 'seal_number', 'escort', 'output_packages', 'output_weight', 'blend_sheets.packet_tare', 'blend_sheets.agent_id', 'id_number', 'stations.station_id', 'stations.station_name', 'stations.location_id', 'standard_details')
-            ->selectRaw('SUM(blend_teas.blended_packages) as input_packages')
-            ->selectRaw('SUM(blend_teas.blended_weight) as input_weight')
-            ->groupBy('created_at', 'blend_sheets.blend_id', 'blend_sheets.client_id', 'client_name', 'clients.phone', 'email', 'blend_number', 'vessel_name', 'blend_sheets.destination_id', 'port_name', 'shipping_mark', 'consignee', 'contract', 'grade', 'garden', 'blend_date', 'blend_sheets.status', 'container_size', 'clients.address', 'package_type', 'registration', 'transporter_name', 'driver_name', 'driver_phone', 'container_tare', 'blend_shipped', 'agent_name', 'seal_number', 'escort', 'output_packages', 'output_weight', 'packet_tare', 'agent_id', 'transporter_id', 'id_number', 'station_id', 'station_name', 'standard_details', 'location_id')
-            ->where(function ($query) {
-                $query->where('blend_sheets.status', '<', 4)
-                    ->orWhereNull('blend_sheets.status');
+            ->select(
+                'blend_sheets.created_at', 'blend_sheets.blend_id as shipping_id', 'blend_sheets.client_id',
+                'client_name', 'clients.phone as cPhone', 'email', 'blend_number as shipping_number', 'vessel_name',
+                'blend_sheets.destination_id', 'port_name', 'shipping_mark', 'consignee', 'contract', 'grade', 'garden',
+                'blend_date', 'blend_sheets.status', 'container_size', 'clients.address', 'package_type', 'registration',
+                'transporter_name', 'transporters.transporter_id', 'driver_name', 'drivers.phone as driver_phone',
+                'container_tare', 'blend_shipped', 'agent_name', 'seal_number', 'escort', 'output_packages',
+                'output_weight', 'blend_sheets.packet_tare', 'blend_sheets.agent_id', 'id_number', 'stations.station_id',
+                'stations.station_name', 'stations.location_id', 'standard_details'
+            )
+            ->selectRaw('SUM(blend_teas.blended_packages) as input_packages, SUM(blend_teas.blended_weight) as input_weight')
+            ->where(function ($q) {
+                $q->where('blend_sheets.status', '<', 4)->orWhereNull('blend_sheets.status');
             })
             ->whereNull('blend_teas.deleted_at')
             ->whereNull('blend_sheets.deleted_at')
+            ->groupBy(
+                'created_at', 'blend_sheets.blend_id', 'blend_sheets.client_id', 'client_name', 'clients.phone', 'email',
+                'blend_number', 'vessel_name', 'blend_sheets.destination_id', 'port_name', 'shipping_mark', 'consignee',
+                'contract', 'grade', 'garden', 'blend_date', 'blend_sheets.status', 'container_size', 'clients.address',
+                'package_type', 'registration', 'transporter_name', 'driver_name', 'driver_phone', 'container_tare',
+                'blend_shipped', 'agent_name', 'seal_number', 'escort', 'output_packages', 'output_weight', 'packet_tare',
+                'agent_id', 'transporter_id', 'id_number', 'station_id', 'station_name', 'standard_details', 'location_id'
+            )
             ->latest('blend_sheets.created_at')
             ->get();
-        $id == 1 ? $report = $uncollected : ($id == 2 ? $report = $late : ($id == 3 ? $report = $noTCI : ($id == 4 ? $report = $overstayed : ($id == 5 ? $report = $internal : ($id == 6 ? $report = $external : ($id == 7 ? $report = $si : ($id == 8 ? $report = $blend : null )))))));
-        if ($id <= 4){
-            return view('clerk::dashboard.collections')->with(['orders' => $report, 'id' => $id]);
-        }elseif ($id >= 5 && $id <= 6){
-            return view('clerk::dashboard.transfers')->with(['orders' => $report, 'id' => $id]);
-        }elseif($id >= 7){
-            return view('clerk::dashboard.sis')->with(['orders' => $report, 'id' => $id]);
-        }
+
+        $agents = ClearingAgent::all();
+
+        return view('clerk::dashboard.sis')->with(['orders' => $report, 'id' => $id, 'agents' => $agents]);
     }
+
     public function viewInternalTransfers(Request $request)
     {
         $from = $request->get('from') ?? Carbon::now()->startOfMonth();
@@ -432,6 +532,11 @@ class ClerkController extends Controller
             )
             ->selectRaw('SUM(transfers.requested_palettes) as total_palettes')
             ->selectRaw('SUM(transfers.requested_weight) as total_weight')
+//            ->whereBetween('transfers.created_at', [$from, $to])
+            ->where(function ($q) {
+                $q->whereNull('clients.deleted_at')
+                    ->orWhereNull('delivery_orders.client_id');
+            })
             ->groupBy(
                 'transfers.delivery_number',
                 'stations.station_name',
@@ -444,22 +549,23 @@ class ClerkController extends Controller
                 'warehouse_locations.location_id',
                 'stations.location_id'
             )
-            // ->whereBetween('transfers.created_at', [$from, $to])
             ->orderBy('transfers.created_at', 'desc')
+            ->whereNull('transfers.deleted_at')
             ->take(2000)
             ->get();
 
         return view('clerk::transfers.internalTransfers')->with(['transfers' => $transfers, 'to' => $to, 'from' => $from]);
     }
+
     public function prepareToReceiveTransfer($id)
     {
         $transfers = Transfers::leftJoin('blendBalances', function ($join) {
-               $join->on('blendBalances.blend_balance_id', '=', 'transfers.stock_id')
-                   ->on('blendBalances.blend_id', '=', 'transfers.delivery_id');
-                })
-               ->leftJoin('delivery_orders', function ($join) {
-                   $join->on('delivery_orders.delivery_id', '=', 'transfers.delivery_id');
-               })
+            $join->on('blendBalances.blend_balance_id', '=', 'transfers.stock_id')
+                ->on('blendBalances.blend_id', '=', 'transfers.delivery_id');
+        })
+            ->leftJoin('delivery_orders', function ($join) {
+                $join->on('delivery_orders.delivery_id', '=', 'transfers.delivery_id');
+            })
             ->join('stations', 'stations.station_id', '=', 'transfers.station_id')
             ->leftJoin('grades', 'grades.grade_id', '=', 'delivery_orders.grade_id')
             ->leftJoin('gardens', 'gardens.garden_id', '=', 'delivery_orders.garden_id')
@@ -471,22 +577,23 @@ class ClerkController extends Controller
             ->orderBy('transfers.created_at', 'desc')
             ->select('stations.station_name', 'stations.station_id', 'clients.client_name', 'destination_station.station_name as destination_name', 'destination_station.station_id as destination', 'transfers.status', 'transfers.delivery_number', 'transfers.created_at', 'warehouse_locations.location_id', 'stations.location_id as origin', 'transfers.requested_palettes', 'transfers.requested_weight', 'garden_name', 'grade_name', 'invoice_number', 'lot_number', 'stock_id', 'registration', 'driver_name', 'id_number', 'drivers.phone', 'transporters.transporter_id', 'transporter_name', 'transfer_id', 'garden', 'grade', 'blend_number', DB::raw("CASE WHEN blendBalances.blend_balance_id IS NOT NULL THEN 2 WHEN delivery_orders.delivery_id IS NOT NULL THEN 1 ELSE NULL END AS transfer_type"))
             ->where(['delivery_number' => base64_decode($id)])
-            ->whereIn('transfers.status', [1, 2, 3])
+            ->whereIn('transfers.status', [2, 3])
             ->get();
 
         $transporters = Transporter::all();
         $registrations = Transfers::pluck('registration')->toArray();
         $drivers = Driver::all();
         $stations = WarehouseBay::where('station_id', $transfers[0]->destination)->get();
-       return view('clerk::transfers.prepareToReceiveTransfer')->with(['transfers' => $transfers, 'transporters' => $transporters, 'registrations' => $registrations, 'users' => $drivers, 'stations' => $stations]);
+        return view('clerk::transfers.prepareToReceiveTransfer')->with(['transfers' => $transfers, 'transporters' => $transporters, 'registrations' => $registrations, 'users' => $drivers, 'stations' => $stations]);
     }
+
     public function viewInternalTransferDetails($id)
     {
-       $transfers = Transfers::leftJoin('blendBalances', function ($join) {
-                $join->on('blendBalances.blend_balance_id', '=', 'transfers.stock_id')
-                    ->on('blendBalances.blend_id', '=', 'transfers.delivery_id');
-            })
-            ->leftJoin('delivery_orders', function ($join){
+        $transfers = Transfers::leftJoin('blendBalances', function ($join) {
+            $join->on('blendBalances.blend_balance_id', '=', 'transfers.stock_id')
+                ->on('blendBalances.blend_id', '=', 'transfers.delivery_id');
+        })
+            ->leftJoin('delivery_orders', function ($join) {
                 $join->on('delivery_orders.delivery_id', '=', 'transfers.delivery_id');
             })
             ->join('stations', 'stations.station_id', '=', 'transfers.station_id')
@@ -506,6 +613,7 @@ class ClerkController extends Controller
             ->get();
         return view('clerk::transfers.viewInternalTransfer')->with(['transfers' => $transfers]);
     }
+
     public function viewExternalTransferDetails($id)
     {
         $transfers = ExternalTransfer::leftJoin('blendBalances', function ($join) {
@@ -522,147 +630,163 @@ class ClerkController extends Controller
             ->leftjoin('other_destinations', 'other_destinations.warehouse_id', '=', 'external_transfers.warehouse_id')
             ->leftJoin('gardens', 'gardens.garden_id', '=', 'delivery_orders.garden_id')
             ->leftJoin('grades', 'grades.grade_id', '=', 'delivery_orders.grade_id')
-            ->select('ex_transfer_id', 'external_transfers.status', DB::raw('COALESCE(clients.client_name, blendBalances.client_name) as client_name'), DB::raw('COALESCE(warehouses.warehouse_name, other_destinations.warehouse_name) as warehouse_name'), DB::raw('COALESCE(stations.station_name, blendBalances.station_name) as station_name'), 'external_transfers.delivery_number', DB::raw('DATE(external_transfers.created_at) as created_at'), 'location_id', DB::raw('COALESCE(gardens.garden_name, blendBalances.garden) as garden_name'),DB::raw('COALESCE(grades.grade_name, blendBalances.grade) as grade_name'), DB::raw('COALESCE(delivery_orders.invoice_number, blendBalances.blend_number) as invoice_number'), 'external_transfers.transferred_palettes', 'external_transfers.transferred_weight', 'delivery_orders.lot_number', 'release_date', 'lot')
+            ->select('ex_transfer_id', 'external_transfers.status', DB::raw('COALESCE(clients.client_name, blendBalances.client_name) as client_name'), DB::raw('COALESCE(warehouses.warehouse_name, other_destinations.warehouse_name) as warehouse_name'), DB::raw('COALESCE(stations.station_name, blendBalances.station_name) as station_name'), 'external_transfers.delivery_number', DB::raw('DATE(external_transfers.created_at) as created_at'), 'location_id', DB::raw('COALESCE(gardens.garden_name, blendBalances.garden) as garden_name'), DB::raw('COALESCE(grades.grade_name, blendBalances.grade) as grade_name'), DB::raw('COALESCE(delivery_orders.invoice_number, blendBalances.blend_number) as invoice_number'), 'external_transfers.transferred_palettes', 'external_transfers.transferred_weight', 'delivery_orders.lot_number', 'release_date', 'lot')
             ->where(['external_transfers.delivery_number' => base64_decode($id)])
             ->get();
 
         return view('clerk::transfers.viewExternalTransfer')->with(['transfers' => $transfers]);
     }
 
-public function viewExternalTransfers(Request $request)
-{
-    $from = $request->get('from') ?? Carbon::now()->startOfMonth();
-    $to = $request->get('to') ?? Carbon::now();
+    public function viewExternalTransfers(Request $request)
+    {
+        $from = $request->get('from') ?? Carbon::now()->startOfMonth();
+        $to = $request->get('to') ?? Carbon::now();
 
-    $transfers = DB::table('external_transfers')
-    ->leftJoin('blendBalances', function ($join) {
-        $join->on('blendBalances.blend_balance_id', '=', 'external_transfers.stock_id')
-            ->on('blendBalances.blend_id', '=', 'external_transfers.delivery_id');
-    })
-    // Force 1 row per delivery_id using MIN(client_id)
-    ->leftJoin(DB::raw('(
-        SELECT delivery_id, MIN(client_id) as client_id
-        FROM delivery_orders
-        WHERE deleted_at IS NULL
-        GROUP BY delivery_id
-    ) as delivery_orders'), 'delivery_orders.delivery_id', '=', 'external_transfers.delivery_id')
-    ->leftJoin('clients', 'clients.client_id', '=', 'delivery_orders.client_id')
-    // Force 1 row per delivery_id using MIN(client_id)
-    ->leftJoin(DB::raw('(
-        SELECT delivery_id, MIN(client_id) as client_id
-        FROM auctions
-        WHERE deleted_at IS NULL
-        GROUP BY delivery_id
-    ) as auctions'), 'auctions.delivery_id', '=', 'external_transfers.delivery_id')
-    ->leftJoin('clients as buyer', 'buyer.client_id', '=', 'auctions.client_id')
-    // Force 1 row per stock_id
-    ->leftJoin(DB::raw('(
-        SELECT stock_id, MIN(station_id) as station_id
-        FROM stock_ins
-        GROUP BY stock_id
-    ) as stock_ins'), 'stock_ins.stock_id', '=', 'external_transfers.stock_id')
-    ->leftJoin('stations', 'stations.station_id', '=', 'stock_ins.station_id')
-    ->leftJoin('warehouse_locations', 'warehouse_locations.location_id', '=', 'stations.location_id')
-    ->leftJoin('warehouses', 'warehouses.warehouse_id', '=', 'external_transfers.warehouse_id')
-    ->leftJoin('other_destinations', 'other_destinations.warehouse_id', '=', 'external_transfers.warehouse_id')
-    ->leftJoin('transporters', 'transporters.transporter_id', '=', 'external_transfers.transporter_id')
-    ->leftJoin('other_transporters', 'other_transporters.transporter_id', '=', 'external_transfers.transporter_id')
-    ->leftJoin('drivers', 'drivers.driver_id', '=', 'external_transfers.driver_id')
-    ->select([
-        'external_transfers.delivery_number',
-        'external_transfers.status',
-        'external_transfers.warehouse_id',
-        'external_transfers.registration',
-        'external_transfers.release_date',
-        'external_transfers.lot',
-        'external_transfers.created_at',
-        'warehouse_locations.location_id',
+        $transfers = DB::table('external_transfers')
+            ->leftJoin('blendBalances', function ($join) {
+                $join->on('blendBalances.blend_balance_id', '=', 'external_transfers.stock_id')
+                    ->on('blendBalances.blend_id', '=', 'external_transfers.delivery_id');
+            })
+            ->leftJoin('delivery_orders', function ($join) {
+                $join->on('delivery_orders.delivery_id', '=', 'external_transfers.delivery_id')
+                    ->whereNull('delivery_orders.deleted_at');
+            })
+            ->leftJoin('clients', 'clients.client_id', '=', 'delivery_orders.client_id')
+            ->leftJoin('auctions', function ($join) {
+                $join->on('auctions.delivery_id', '=', 'external_transfers.delivery_id')
+                    ->whereNull('auctions.deleted_at');
+            })
+            ->leftJoin('clients as buyer', 'buyer.client_id', '=', 'auctions.client_id')
+            ->leftJoin('stock_ins', function ($join) {
+                $join->on('stock_ins.stock_id', '=', 'external_transfers.stock_id')
+                    ->whereNull('stock_ins.deleted_at');
+            })
+            ->leftJoin('stations', 'stations.station_id', '=', 'stock_ins.station_id')
+            ->leftJoin('warehouse_locations', 'warehouse_locations.location_id', '=', 'stations.location_id')
+            ->leftJoin('warehouses', 'warehouses.warehouse_id', '=', 'external_transfers.warehouse_id')
+            ->leftJoin('other_destinations', 'other_destinations.warehouse_id', '=', 'external_transfers.warehouse_id')
+            ->leftJoin('transporters', 'transporters.transporter_id', '=', 'external_transfers.transporter_id')
+            ->leftJoin('other_transporters', 'other_transporters.transporter_id', '=', 'external_transfers.transporter_id')
+            ->leftJoin('drivers', 'drivers.driver_id', '=', 'external_transfers.driver_id')
+            ->select([
+                'external_transfers.delivery_number',
+                'external_transfers.status',
+                'external_transfers.warehouse_id',
+                'external_transfers.registration',
+                'external_transfers.release_date',
+                'external_transfers.lot',
+                'external_transfers.created_at',
+                'warehouse_locations.location_id',
+                DB::raw("COALESCE(clients.client_name, blendBalances.client_name, '') as client_name"),
+                DB::raw("COALESCE(warehouses.warehouse_name, other_destinations.warehouse_name, '') as warehouse_name"),
+                DB::raw("COALESCE(stations.station_name, blendBalances.station_name, '') as station_name"),
+                DB::raw("COALESCE(transporters.transporter_id, other_transporters.transporter_id) as transporter_id"),
+                DB::raw("COALESCE(transporters.transporter_name, other_transporters.transporter_name, '') as transporter_name"),
+                'buyer.client_name as buyer_name',
+                'drivers.driver_id',
+                'drivers.driver_name',
+                'drivers.phone',
+                'drivers.id_number',
+                DB::raw('SUM(external_transfers.transferred_palettes) as total_palettes'),
+                DB::raw('SUM(external_transfers.transferred_weight) as total_weight'),
+                'external_transfers.created_by',
+            ])
+            ->whereNull('external_transfers.deleted_at')
+            ->whereBetween('external_transfers.created_at', [$from, $to])
+            ->where(function ($q) {
+                $q->whereNull('clients.deleted_at')
+                    ->orWhereNull('delivery_orders.client_id');
+            })
+            ->groupBy([
+                'external_transfers.delivery_number',
+                'external_transfers.status',
+                'external_transfers.warehouse_id',
+                'external_transfers.registration',
+                'external_transfers.release_date',
+                'external_transfers.lot',
+                'external_transfers.created_at',
+                'warehouse_locations.location_id',
+                'clients.client_name',
+                'blendBalances.client_name',
+                'warehouses.warehouse_name',
+                'other_destinations.warehouse_name',
+                'stations.station_name',
+                'blendBalances.station_name',
+                'transporters.transporter_id',
+                'other_transporters.transporter_id',
+                'transporters.transporter_name',
+                'other_transporters.transporter_name',
+                'buyer.client_name',
+                'drivers.driver_id',
+                'drivers.driver_name',
+                'drivers.phone',
+                'drivers.id_number',
+                'external_transfers.created_by',
+            ])
+            ->orderByDesc('external_transfers.delivery_number')
+            ->orderByDesc('external_transfers.created_at')
+            ->get();
 
-        DB::raw("COALESCE(clients.client_name, blendBalances.client_name, '') as client_name"),
-        DB::raw("COALESCE(warehouses.warehouse_name, other_destinations.warehouse_name, '') as warehouse_name"),
-        DB::raw("COALESCE(stations.station_name, blendBalances.station_name, '') as station_name"),
-        DB::raw("COALESCE(transporters.transporter_id, other_transporters.transporter_id) as transporter_id"),
-        DB::raw("COALESCE(transporters.transporter_name, other_transporters.transporter_name, '') as transporter_name"),
+        // Cache static lookups
+        $warehouses = Cache::remember('all_warehouses', 3600, function () {
+            return Warehouse::select('warehouse_id', 'warehouse_name')
+                ->orderBy('warehouse_name')
+                ->get()
+                ->concat(
+                    OtherDestination::select('warehouse_id', 'warehouse_name')
+                        ->orderBy('warehouse_name')
+                        ->get()
+                );
+        });
 
-        'buyer.client_name as buyer_name',
-        'drivers.driver_id',
-        'drivers.driver_name',
-        'drivers.phone',
-        'drivers.id_number',
+        $transporters = Cache::remember('all_transporters', 3600, function () {
+            return Transporter::select('transporter_id', 'transporter_name')
+                ->orderBy('transporter_name')
+                ->get()
+                ->concat(
+                    OtherTransporter::select('transporter_id', 'transporter_name')
+                        ->orderBy('transporter_name')
+                        ->get()
+                );
+        });
 
-        DB::raw('SUM(external_transfers.transferred_palettes) as total_palettes'),
-        DB::raw('SUM(external_transfers.transferred_weight) as total_weight')
-    ])
-    ->groupBy([
-        'external_transfers.delivery_number',
-        'external_transfers.lot',
-    ])
-    ->orderByDesc('external_transfers.delivery_number')
-    ->whereNull('external_transfers.deleted_at')
-    ->get();
+        $users = Driver::select('id_number', 'driver_name')
+            ->orderBy('driver_name')
+            ->get();
 
-    // Cache static lookups
-    $warehouses = Cache::remember('all_warehouses', 3600, function () {
-        return Warehouse::select('warehouse_id', 'warehouse_name')
-            ->orderBy('warehouse_name')
-            ->get()
-            ->concat(
-                OtherDestination::select('warehouse_id', 'warehouse_name')
-                    ->orderBy('warehouse_name')
-                    ->get()
-            );
-    });
-
-    $transporters = Cache::remember('all_transporters', 3600, function () {
-        return Transporter::select('transporter_id', 'transporter_name')
-            ->orderBy('transporter_name')
-            ->get()
-            ->concat(
-                OtherTransporter::select('transporter_id', 'transporter_name')
-                    ->orderBy('transporter_name')
-                    ->get()
-            );
-    });
-
-    $users = Driver::select('id_number', 'driver_name')
-        ->orderBy('driver_name')
-        ->get();
-
-    return view('clerk::transfers.externalTransfers')
-        ->with([
-            'transfers' => $transfers,
-            'warehouses' => $warehouses,
-            'transporters' => $transporters,
-            'users' => $users,
-            'from' => $from,
-            'to' => $to
-        ]);
-}
+        return view('clerk::transfers.externalTransfers')
+            ->with([
+                'transfers' => $transfers,
+                'warehouses' => $warehouses,
+                'transporters' => $transporters,
+                'users' => $users,
+                'from' => $from,
+                'to' => $to,
+            ]);
+    }
 
     public function selectClients(Request $request)
     {
-        $teas = DB::table('currentstock')->select('client_name', 'client_id')
+        $warehouseId = $request->warehouseId;
+
+        $data = DB::table('currentstock')
+            ->select('client_id', 'client_name')
+            ->where('station_id', $warehouseId)
             ->where('current_stock', '>', 0)
             ->where('current_weight', '>', 0)
-            ->where(['station_id' => $request->warehouseId])
-            ->select('client_id', 'client_name')
+            ->union(
+                DB::table('blendBalances')
+                    ->select('client_id', 'client_name')
+                    ->where('station_id', $warehouseId)
+                    ->where('current_packages', '>', 0)
+                    ->where('current_weight', '>', 0)
+            )
             ->orderBy('client_name')
-            ->groupBy(['client_id', 'client_name'])
             ->get();
-
-        $blends = DB::table('blendBalances')->where('current_packages', '>', 0)
-            ->where('current_weight', '>', 0)
-            ->where('current_packages', '>', 0)
-            ->where(['station_id' => $request->warehouseId])
-            ->select('client_id','client_name')
-            ->get();
-
-        $data = $teas->merge($blends)->unique(function ($item) {
-            return $item->client_id . '|' . $item->client_name;
-        })->values();
 
         return response()->json($data);
     }
+
     public function selectClient(Request $request)
     {
         $data = DB::table('currentstock')
@@ -671,19 +795,20 @@ public function viewExternalTransfers(Request $request)
             ->whereNotNull('current_weight')
             ->where('current_weight', '>', 0)
             ->where(['station_id' => $request->warehouseId, 'client_id' => $request->clientId])
-            ->where( 'current_stock', '>', 0)
+            ->where('current_stock', '>', 0)
             ->select('client_name', 'garden_name', 'grade_name', 'order_number', 'invoice_number', 'sale_number', 'current_stock', 'current_weight', 'stock_id')
             ->orderBy('client_name')
             ->get();
 
         return response()->json($data);
     }
+
     public function prepareInternalTransfer(Request $request)
     {
         $teas = DB::table('currentstock')->where('current_stock', '>', 0)
             ->where('current_weight', '>', 0)
             ->where(['station_id' => $request->station, 'client_id' => $request->client])
-            ->select('client_id', 'stock_id', 'order_number', 'garden_name', 'grade_name', 'invoice_number', 'lot_number', 'current_stock', 'current_weight',  DB::raw("1 as type"))
+            ->select('client_id', 'stock_id', 'order_number', 'garden_name', 'grade_name', 'invoice_number', 'lot_number', 'current_stock', 'current_weight', DB::raw("1 as type"))
             ->get();
 
         $balances = DB::table('blendBalances')->where('current_packages', '>', 0)
@@ -708,6 +833,7 @@ public function viewExternalTransfers(Request $request)
         $drivers = Driver::all();
         return view('clerk::transfers.prepareInternalTransfer')->with(['transfers' => $transfers, 'client' => $client, 'station' => $station, 'destination' => $destination, 'transporters' => $transporters, 'registrations' => $registrations, 'users' => $drivers]);
     }
+
     public function prepareExternalTransfer(Request $request)
     {
         $teas = DB::table('currentstock')->where('current_stock', '>', 0)
@@ -740,22 +866,23 @@ public function viewExternalTransfers(Request $request)
         $drivers = Driver::all();
         return view('clerk::transfers.prepareExternalTransfer')->with(['transfers' => $transfers, 'client' => $client, 'station' => $station, 'destinations' => $destinations, 'transporters' => $transporters, 'registrations' => $registrations, 'users' => $drivers]);
     }
+
     public function registerInternalRequest(Request $request)
     {
-      $requestData = json_decode($request->allDeliveries, true);
-      if(empty($requestData)){
-          return redirect()->route('clerk.viewInternalTransfers')->with('error', 'Oops! Data not well captured');
-      }
+        $requestData = json_decode($request->allDeliveries, true);
+        if (empty($requestData)) {
+            return redirect()->route('clerk.viewInternalTransfers')->with('error', 'Oops! Data not well captured');
+        }
         if (isset($requestData['deliveries']) && !empty($requestData['deliveries'])) {
             DB::beginTransaction();
             try {
                 $customId = new CustomIds();
                 $driver = Driver::where('id_number', $request->idNumber)->first();
-                if ($driver || $request->idNumber === null){
+                if ($driver || $request->idNumber === null) {
                     $delID = Transfers::newDelivery();
                     foreach ($requestData['deliveries'] as $key => $delivery) {
                         $transferId = $customId->generateId();
-                         $stock = StockIn::where('stock_id', $delivery['deliveryId'])->first()
+                        $stock = StockIn::where('stock_id', $delivery['deliveryId'])->first()
                             ?? DB::table('blendBalances')->where('blend_balance_id', $delivery['deliveryId'])
                                 ->select('blend_balance_id as stock_id', 'blend_id as delivery_id')
                                 ->first();
@@ -777,7 +904,7 @@ public function viewExternalTransfers(Request $request)
                         ];
                         Transfers::create($transfer);
                     }
-                }else {
+                } else {
                     $driverId = $customId->generateId();
                     $newDriver = [
                         'driver_id' => $driverId,
@@ -819,12 +946,13 @@ public function viewExternalTransfers(Request $request)
                 // Rollback the transaction if an exception occurs
                 DB::rollback();
                 // Handle or log the exception
-                return redirect()->route('clerk.viewInternalTransfers')->with('error', 'Oops! An error occurred please try again '.$e->getMessage());
+                return redirect()->route('clerk.viewInternalTransfers')->with('error', 'Oops! An error occurred please try again ' . $e->getMessage());
             }
-        }else {
+        } else {
             return redirect()->back()->with('error', "Oops! You need to select at least 1 tea and the number of palettes and weight you are requesting to proceed");
         }
     }
+
     public function registerExternalRequest(Request $request)
     {
         // Handle custom warehouse
@@ -869,7 +997,7 @@ public function viewExternalTransfers(Request $request)
                             ?? DB::table('blendBalances')->where('blend_balance_id', $delivery['deliveryId'])
                                 ->select('blend_balance_id as stock_id', 'blend_id as delivery_id')
                                 ->first();
-                       $transfer = [
+                        $transfer = [
                             'stock_id' => $stock->stock_id,
                             'ex_transfer_id' => $transferId,
                             'delivery_number' => $delID,
@@ -903,7 +1031,7 @@ public function viewExternalTransfers(Request $request)
                             ?? DB::table('blendBalances')->where('blend_balance_id', $delivery['deliveryId'])
                                 ->select('blend_balance_id as stock_id', 'blend_id as delivery_id')
                                 ->first();
-                       $transfer = [
+                        $transfer = [
                             'stock_id' => $stock->stock_id,
                             'ex_transfer_id' => $transferId,
                             'delivery_number' => $delID,
@@ -917,7 +1045,7 @@ public function viewExternalTransfers(Request $request)
                             'transferred_weight' => $delivery['weight'],
                             'created_by' => auth()->user()->user_id,
                             'status' => 0,
-                           'buyer_id' => $delivery['buyerId']
+                            'buyer_id' => $delivery['buyerId']
                         ];
 
                         ExternalTransfer::create($transfer);
@@ -930,71 +1058,97 @@ public function viewExternalTransfers(Request $request)
 //                // Rollback the transaction if an exception occurs
                 DB::rollback();
 //                // Handle or log the exception
-                return redirect()->route('clerk.viewExternalTransfers')->with('error', 'Oops! An error occurred please try again '.$e);
+                return redirect()->route('clerk.viewExternalTransfers')->with('error', 'Oops! An error occurred please try again ' . $e);
             }
         }
     }
-    public function initiateTransfer($id)
-    {
-        if (auth()->user()->role_id == 3){
-            Transfers::where('delivery_number', base64_decode($id))->update(['status' => 0]);
-            $this->logger->create();
-            return redirect()->back()->with('success', 'Success! Transfer request initiated successfully');
-        }elseif(auth()->user()->role_id == 2 || auth()->user()->hasPermission('transfer.internal.approve') || auth()->user()->role_id ==  3 && auth()->user()->hasPermission('transfer.internal.approve')) {
-            Transfers::where('delivery_number', base64_decode($id))->update(['status' => 1]);
-            Approval::create([
-                'approval_id' => (new CustomIds())->generateId(),
-                'job_id' => base64_decode($id),
-                'user_id' => auth()->user()->user_id,
-                'approval_date' => time(),
-                'order' => 1
-            ]);
-            $this->logger->create();
-            return redirect()->back()->with('success', 'Success! Transfer request approved successfully');
-        }else{
-            Transfers::where('delivery_number', base64_decode($id))->update(['status' => 2]);
-            $this->logger->create();
-            return redirect()->back()->with('success', 'Success! Transfer request release successfully');
-        }
-    }
+
     public function initiateExternalTransfer($id)
     {
-        $transfer = ExternalTransfer::where('delivery_number', base64_decode($id));
-        $transfer->update(['status' => 3]);
+        $deliveryNumber = base64_decode($id);
+        $transfers = ExternalTransfer::where('delivery_number', $deliveryNumber)->get();
+
+        if ($transfers->isEmpty()) {
+            return redirect()->back()->with('error', 'Transfer not found');
+        }
+
+        if ($transfers->contains(fn($t) => $t->status != 0)) {
+            return redirect()->back()->with('error', 'This transfer has already been initiated');
+        }
+
+        ExternalTransfer::where('delivery_number', $deliveryNumber)->update(['status' => 1]);
         $this->logger->create();
+
         return redirect()->back()->with('success', 'Success! Transfer request initiated successfully');
     }
+
     public function approveExternalTransfer($id)
     {
-        ExternalTransfer::where('delivery_number', base64_decode($id))->update(['status' => 2]);
+        if (!auth()->user()->hasPermission('transfer.external.approve')) {
+            return redirect()->back()->with('error', 'You do not have permission to approve this transfer');
+        }
+
+        $deliveryNumber = base64_decode($id);
+        $transfers = ExternalTransfer::where('delivery_number', $deliveryNumber)->get();
+
+        if ($transfers->isEmpty() || $transfers->contains(fn($t) => $t->status != 1)) {
+            return redirect()->back()->with('error', 'This transfer is not awaiting first approval');
+        }
+
+        ExternalTransfer::where('delivery_number', $deliveryNumber)->update(['status' => 2]);
+
         Approval::create([
             'approval_id' => (new CustomIds())->generateId(),
-            'job_id' => base64_decode($id),
+            'job_id' => $deliveryNumber,
             'user_id' => auth()->user()->user_id,
             'approval_date' => time(),
-            'order' => 1
+            'order' => 1,
         ]);
+
         $this->logger->create();
-        return redirect()->back()->with('success', 'Success! Transfer request approved successfully');
+
+        return redirect()->back()->with('success', 'Success! Transfer approved — awaiting release');
     }
 
     public function releaseExternalTransfer(Request $request, $id)
     {
+        if (!auth()->user()->hasPermission('transfer.external.release')) {
+            return redirect()->back()->with('error', 'You do not have permission to release this transfer');
+        }
 
-        if (!Driver::where('id_number', $request->idNumber)->exists()){
+        $request->validate([
+            'idNumber' => 'required',
+            'driverName' => 'required',
+            'driverPhone' => 'required',
+            'registration' => 'required',
+            'transporter' => 'required',
+        ]);
+
+        list($deliveryId, $lot) = explode(':', base64_decode($id));
+
+        $transfers = ExternalTransfer::where(['delivery_number' => $deliveryId, 'lot' => $lot])->get();
+
+        if ($transfers->isEmpty()) {
+            return redirect()->back()->with('error', 'Transfer not found');
+        }
+
+        if ($transfers->contains(fn($t) => $t->status != 2)) {
+            return redirect()->back()->with('error', 'This transfer has not received first approval yet');
+        }
+
+        if (!Driver::where('id_number', $request->idNumber)->exists()) {
             $driver = Driver::create([
                 'driver_id' => (new CustomIds())->generateId(),
                 'driver_name' => $request->driverName,
                 'id_number' => $request->idNumber,
                 'phone' => $request->driverPhone,
             ]);
-
             $driverId = $driver['driver_id'];
-        }else{
+        } else {
             $driverId = Driver::where('id_number', $request->idNumber)->first()->driver_id;
         }
 
-        if($request->transporter === 'other'){
+        if ($request->transporter === 'other') {
             $existingTransporter = Transporter::where('transporter_name', $request->transporter_other)->first();
             if ($existingTransporter) {
                 $transporterId = $existingTransporter->transporter_id;
@@ -1008,21 +1162,266 @@ public function viewExternalTransfers(Request $request)
                 Transporter::create($transporterDetails);
                 $transporterId = $transporterDetails['transporter_id'];
             }
-        }else{
+        } else {
             $transporterId = $request->transporter;
+        }
+
+        ExternalTransfer::where(['delivery_number' => $deliveryId, 'lot' => $lot])->update([
+            'warehouse_id' => $request->warehouse_id,
+            'status' => 3,
+            'driver_id' => $driverId,
+            'registration' => $request->registration,
+            'transporter_id' => $transporterId,
+        ]);
+
+        $this->logger->create();
+
+        return redirect()->back()->with('success', 'Success! Transfer released — awaiting final approval');
+    }
+
+    public function approveExternalTransferFinal($id)
+    {
+        if (!auth()->user()->hasPermission('transfer.external.approve.final')) {
+            return redirect()->back()->with('error', 'You do not have permission to give final approval on this transfer');
         }
 
         list($deliveryId, $lot) = explode(':', base64_decode($id));
 
-        ExternalTransfer::where(['delivery_number' => $deliveryId, 'lot' => $lot])->update([
-            'warehouse_id' => $request->warehouse_id,
-            'status' => 4,
-            'driver_id' => $driverId,
-            'registration' => $request->registration,
-            'transporter_id' => $transporterId
+        $transfers = ExternalTransfer::where(['delivery_number' => $deliveryId, 'lot' => $lot])->get();
+
+        if ($transfers->isEmpty()) {
+            return redirect()->back()->with('error', 'Transfer not found');
+        }
+
+        if ($transfers->contains(fn($t) => $t->status != 3)) {
+            return redirect()->back()->with('error', 'This transfer has not been released yet');
+        }
+
+        if ($transfers->contains(fn($t) => is_null($t->driver_id) || is_null($t->transporter_id) || is_null($t->registration))) {
+            return redirect()->back()->with('error', 'Cannot complete transfer — driver, transporter, or registration details are missing');
+        }
+
+        ExternalTransfer::where(['delivery_number' => $deliveryId, 'lot' => $lot])->update(['status' => 4]);
+
+        Approval::create([
+            'approval_id' => (new CustomIds())->generateId(),
+            'job_id' => $deliveryId,
+            'user_id' => auth()->user()->user_id,
+            'approval_date' => time(),
+            'order' => 2,
         ]);
+
         $this->logger->create();
-        return redirect()->back()->with('success', 'Success! Transfer request released successfully');
+
+        return redirect()->back()->with('success', 'Success! Transfer fully approved and completed');
+    }
+
+    public function initiateTransfer($id)
+    {
+        $deliveryNumber = base64_decode($id);
+        $transfers = Transfers::where('delivery_number', $deliveryNumber)->get();
+
+        if ($transfers->isEmpty()) {
+            return redirect()->back()->with('error', 'Transfer not found');
+        }
+
+        if ($transfers->contains(fn($t) => $t->status !== null)) {
+            return redirect()->back()->with('error', 'This transfer has already been initiated');
+        }
+
+        if ($transfers->contains(fn($t) => $t->created_by != auth()->user()->user_id)) {
+            return redirect()->back()->with('error', 'Only the user who created this transfer request can initiate it');
+        }
+
+        Transfers::where('delivery_number', $deliveryNumber)->update(['status' => 0]);
+        $this->logger->create();
+
+        return redirect()->back()->with('success', 'Success! Transfer request initiated successfully');
+    }
+
+    public function approveTransferFirst($id)
+    {
+        if (!auth()->user()->hasPermission('transfer.internal.approve')) {
+            return redirect()->back()->with('error', 'You do not have permission to approve this transfer');
+        }
+
+        $deliveryNumber = base64_decode($id);
+        $transfers = Transfers::where('delivery_number', $deliveryNumber)->get();
+
+        if ($transfers->isEmpty() || $transfers->contains(fn($t) => $t->status != 0)) {
+            return redirect()->back()->with('error', 'This transfer is not awaiting first approval');
+        }
+
+        Transfers::where('delivery_number', $deliveryNumber)->update(['status' => 1]);
+
+        Approval::create([
+            'approval_id' => (new CustomIds())->generateId(),
+            'job_id' => $deliveryNumber,
+            'user_id' => auth()->user()->user_id,
+            'approval_date' => time(),
+            'order' => 1,
+        ]);
+
+        $this->logger->create();
+
+        return redirect()->back()->with('success', 'Success! Transfer approved — awaiting release');
+    }
+
+    public function serviceRequest($id)
+    {
+        if (!auth()->user()->hasPermission('transfer.internal.release')) {
+            return redirect()->back()->with('error', 'You do not have permission to release this transfer');
+        }
+
+        $deliveryNumber = base64_decode($id);
+        $transfers = Transfers::where('delivery_number', $deliveryNumber)
+            ->get();
+
+        if ($transfers->contains(fn($t) => $t->status != 1)) {
+            return redirect()->back()->with('error', 'This transfer has not received first approval yet');
+        }
+
+        Transfers::where('delivery_number', $deliveryNumber)->update(['status' => 2]);
+        $this->logger->create();
+
+        return redirect()->back()->with('success', 'Success! Transfer released — awaiting receipt');
+    }
+
+    public function receiveInterTransferRequest(Request $request, $id)
+    {
+        $request->validate([
+            'idNumber' => 'required',
+            'driverName' => 'required',
+            'driverPhone' => 'required',
+        ]);
+
+        $transfers = json_decode($request->allDeliveries, TRUE);
+        $transferIds = array_column($transfers['deliveries'], 'deliveryId');
+
+        $existing = Transfers::whereIn('transfer_id', $transferIds)->get();
+
+        if ($existing->isEmpty()) {
+            return redirect()->back()->with('error', 'Transfer not found');
+        }
+
+        $destinationId = $existing->first()->destination;
+
+        if (!auth()->user()->hasPermission('transfer.internal.receive')) {
+            return redirect()->back()->with('error', 'You do not have permission to receive this transfer');
+        }
+
+        if ($existing->contains(fn($t) => $t->status != 2)) {
+            return redirect()->back()->with('error', 'This transfer has not been released yet');
+        }
+
+        DB::beginTransaction();
+        try {
+            foreach ($transfers['deliveries'] as $transferItem) {
+                $transfer = Transfers::where('transfer_id', $transferItem['deliveryId'])->first();
+
+                // Get or create driver
+                $driver = Driver::where('id_number', $request->idNumber)->first();
+
+                if (!$driver) {
+                    $driverId = (new CustomIds())->generateId();
+                    $driver = Driver::create([
+                        'driver_id' => $driverId,
+                        'id_number' => $request->idNumber,
+                        'driver_name' => strtoupper($request->driverName),
+                        'phone' => $request->driverPhone
+                    ]);
+                } else {
+                    $driverId = $driver->driver_id;
+                }
+
+                // Common transfer update data
+                $transferUpdateData = [
+                    'status' => 3, // received — awaiting final approval, not yet completed
+                    'driver_id' => $driverId,
+                    'registration' => $request->registration,
+                    'transporter_id' => $request->transporter,
+                    'requested_palettes' => $transferItem['palette'],
+                    'requested_weight' => $transferItem['weight'],
+                ];
+
+                if ($transferItem['transferType'] == 1) {
+                    // Handle stock transfer
+                    $stockId = (new CustomIds())->generateId();
+                    $stock = [
+                        'stock_id' => $stockId,
+                        'delivery_id' => $transfer->delivery_id,
+                        'station_id' => $transfer->destination,
+                        'date_received' => time(),
+                        'delivery_number' => $transfer->delivery_number,
+                        'delivery_type' => 2,
+                        'warehouse_bay' => $request->bayId,
+                        'total_weight' => $transferItem['weight'],
+                        'total_pallets' => $transferItem['palette'],
+                        'pallet_weight' => 0,
+                        'package_tare' => 0,
+                        'net_weight' => $transferItem['weight'],
+                        'user_id' => auth()->user()->user_id,
+                        'registration' => $request->registration,
+                        'driver_id' => $driverId,
+                        'transporter_id' => $request->transporter,
+                    ];
+                    StockIn::create($stock);
+                } else {
+                    // Handle blend balance transfer
+                    $bb = BlendBalance::where('blend_balance_id', $transfer->stock_id)->first();
+                    $station = WarehouseBay::where('bay_id', $request->bayId)->first();
+
+                    $balance = [
+                        'blend_balance_id' => (new CustomIds())->generateId(),
+                        'blend_id' => $transfer->delivery_id,
+                        'ex_packages' => $transferItem['palette'],
+                        'unit_weight' => (int)($transferItem['weight'] / $transferItem['palette']),
+                        'net_weight' => $transferItem['weight'],
+                        'gross_weight' => $transferItem['weight'],
+                        'station_id' => $station->station_id,
+                        'type' => $bb->type,
+                    ];
+                    BlendBalance::create($balance);
+                }
+
+                // Update transfer record
+                $transfer->update($transferUpdateData);
+            }
+            $this->logger->create();
+            DB::commit();
+            return redirect()->route('clerk.viewInternalTransfers')->with('success', 'Success! Transfer request received successfully — awaiting final approval');
+        } catch (Exception $e) {
+            DB::rollback();
+            return redirect()->back()->with('error', 'Oops! An error occurred please try again');
+        }
+    }
+
+    public function approveTransferFinal($id)
+    {
+        if (!auth()->user()->hasPermission('transfer.internal.approve.final')) {
+            return redirect()->back()->with('error', 'You do not have permission to give final approval on this transfer');
+        }
+
+        $deliveryNumber = base64_decode($id);
+        $transfers = Transfers::where('delivery_number', $deliveryNumber)->get();
+
+        if ($transfers->isEmpty() || $transfers->contains(fn($t) => $t->status != 3)) {
+            return redirect()->back()->with('error', 'This transfer has not been received yet');
+        }
+
+        Transfers::where('delivery_number', $deliveryNumber)->update(['status' => 4]);
+
+        Approval::create([
+            'approval_id' => (new CustomIds())->generateId(),
+            'job_id' => $deliveryNumber,
+            'user_id' => auth()->user()->user_id,
+            'approval_date' => time(),
+            'order' => 2,
+        ]);
+
+        $this->logger->create();
+
+        return redirect()->back()->with('success', 'Success! Transfer fully approved and completed');
     }
 
     public function releaseTransfer(Request $request)
@@ -1062,11 +1461,7 @@ public function viewExternalTransfers(Request $request)
             ]);
 
             if (Auction::where(['stock_id' => $transfer->stock_id])->exists()) {
-                Auction::where(['stock_id' => $transfer->stock_id])
-                    ->update([
-                        'release_date' => now()->format('Y-m-d'),
-                        'warehouse_id' => $transfer->warehouse_id,
-                    ]);
+                Auction::where(['stock_id' => $transfer->stock_id])->update(['release_date' => now()->format('Y-m-d')]);
             }
 
             return response()->json([
@@ -1120,105 +1515,6 @@ public function viewExternalTransfers(Request $request)
         }
     }
 
-    public function serviceRequest($id)
-    {
-        Transfers::where('delivery_number', base64_decode($id))->update([
-            'status' => 3
-        ]);
-        $this->logger->create();
-        return redirect()->back()->with('success', 'Success! Transfer request serviced and stock updated successfully');
-    }
-    public function receiveInterTransferRequest(Request $request, $id)
-    {
-       $request->validate([
-            'idNumber' => 'required',
-            'driverName' => 'required',
-            'driverPhone' => 'required',
-        ]);
-        $transfers = json_decode($request->allDeliveries, TRUE);
-        DB::beginTransaction();
-        try {
-            foreach ($transfers['deliveries'] as $transferItem) {
-                $transfer = Transfers::where('transfer_id', $transferItem['deliveryId'])->first();
-
-                // Get or create driver
-                $driver = Driver::where('id_number', $request->idNumber)->first();
-
-                if (!$driver) {
-                    $driverId = (new CustomIds())->generateId();
-                    $driver = Driver::create([
-                        'driver_id' => $driverId,
-                        'id_number' => $request->idNumber,
-                        'driver_name' => strtoupper($request->driverName),
-                        'phone' => $request->driverPhone
-                    ]);
-                } else {
-                    $driverId = $driver->driver_id;
-                }
-
-                // Common transfer update data
-                $transferUpdateData = [
-                    'status' => 4,
-                    'driver_id' => $driverId,
-                    'registration' => $request->registration,
-                    'transporter_id' => $request->transporter,
-                    'requested_palettes' => $transferItem['palette'],
-                    'requested_weight' => $transferItem['weight'],
-                ];
-
-                if ($transferItem['transferType'] == 1) {
-                    // Handle stock transfer
-                    $stockId = (new CustomIds())->generateId();
-                    $stock = [
-                        'stock_id' => $stockId,
-                        'delivery_id' => $transfer->delivery_id,
-                        'station_id' => $transfer->destination,
-                        'date_received' => time(),
-                        'delivery_number' => $transfer->delivery_number,
-                        'delivery_type' => 2,
-                        'warehouse_bay' => $request->bayId,
-                        'total_weight' => $transferItem['weight'],
-                        'total_pallets' => $transferItem['palette'],
-                        'pallet_weight' => 0,
-                        'package_tare' => 0,
-                        'net_weight' => $transferItem['weight'],
-                        'user_id' => auth()->user()->user_id,
-                        'registration' => $request->registration,
-                        'driver_id' => $driverId,
-                        'transporter_id' => $request->transporter,
-                    ];
-                    StockIn::create($stock);
-                } else {
-                    // Handle blend balance transfer
-                    $bb = BlendBalance::where('blend_balance_id', $transfer->stock_id)->first();
-                    $station = WarehouseBay::where('bay_id', $request->bayId)->first();
-
-                    $balance = [
-                        'blend_balance_id' => (new CustomIds())->generateId(),
-                        'blend_id' => $transfer->delivery_id,
-                        'ex_packages' => $transferItem['palette'],
-                        'unit_weight' => (int) ($transferItem['weight'] / $transferItem['palette']),
-                        'net_weight' => $transferItem['weight'],
-                        'gross_weight' => $transferItem['weight'],
-                        'station_id' => $station->station_id,
-                        'type' => $bb->type,
-                    ];
-                    BlendBalance::create($balance);
-                }
-
-                // Update transfer record
-                 $transfer->update($transferUpdateData);
-            }
-            $this->logger->create();
-            DB::commit();
-            return redirect()->route('clerk.viewInternalTransfers')->with('success', 'Success! Transfer request received successfully');
-        } catch (Exception $e) {
-            // Rollback the transaction if an exception occurs
-            DB::rollback();
-            // Handle or log the exception
-            return redirect()->back()->with('error', 'Oops! An error occurred please try again');
-        }
-    }
     public function updateInterTransferRequest(Request $request, $id)
     {
         $request->validate([
@@ -1226,9 +1522,9 @@ public function viewExternalTransfers(Request $request)
             'weight' => 'required|numeric',
         ]);
         DB::beginTransaction();
-        try{
+        try {
             $driver = Driver::where('id_number', $request->idNumber)->first();
-            if ($driver){
+            if ($driver) {
                 Transfers::where('transfer_id', $id)->update([
                     'requested_palettes' => $request->pallets,
                     'requested_weight' => $request->weight,
@@ -1236,7 +1532,7 @@ public function viewExternalTransfers(Request $request)
                     'registration' => $request->registration,
                     'transporter_id' => $request->transporter,
                 ]);
-            }else{
+            } else {
                 $customId = new CustomIds();
                 $driverId = $customId->generateId();
 
@@ -1263,7 +1559,8 @@ public function viewExternalTransfers(Request $request)
             return redirect()->back()->with('error', 'Oops! An error occurred please try again');
         }
     }
-    public function updateExternalTransferRequest (Request $request, $id)
+
+    public function updateExternalTransferRequest(Request $request, $id)
     {
         $request->validate([
             "pallets" => 'required',
@@ -1278,17 +1575,17 @@ public function viewExternalTransfers(Request $request)
         DB::beginTransaction();
         try {
             $driver = Driver::where('id_number', $request->idNumber)->first();
-            if ($driver){
-                ExternalTransfer::where('ex_transfer_id', $id)->update([ 'warehouse_id' => $request->warehouse, 'registration' => $request->registration, 'transporter_id' => $request->transporter, 'transferred_palettes' => $request->pallets, 'transferred_weight' => $request->weight
+            if ($driver) {
+                ExternalTransfer::where('ex_transfer_id', $id)->update(['warehouse_id' => $request->warehouse, 'registration' => $request->registration, 'transporter_id' => $request->transporter, 'transferred_palettes' => $request->pallets, 'transferred_weight' => $request->weight
                 ]);
-            }else{
+            } else {
                 $customId = new CustomIds();
                 $driverId = $customId->generateId();
                 $driver = [
                     'driver_id' => $driverId, 'id_number' => $request->idNumber, 'driver_name' => $request->driverName, 'phone' => $request->driverPhone
                 ];
                 Driver::create($driver);
-                ExternalTransfer::where('ex_transfer_id', $id)->update([ 'driver_id' => $driverId, 'warehouse_id' => $request->warehouse, 'registration' => $request->registration, 'transporter_id' => $request->transporter, 'transferred_palettes' => $request->pallets, 'transferred_weight' => $request->weight
+                ExternalTransfer::where('ex_transfer_id', $id)->update(['driver_id' => $driverId, 'warehouse_id' => $request->warehouse, 'registration' => $request->registration, 'transporter_id' => $request->transporter, 'transferred_palettes' => $request->pallets, 'transferred_weight' => $request->weight
                 ]);
             }
             $this->logger->create();
@@ -1301,18 +1598,21 @@ public function viewExternalTransfers(Request $request)
             return redirect()->back()->with('error', 'Oops! An error occurred please try again');
         }
     }
+
     public function cancelInterTransferRequest($id)
     {
         Transfers::where('transfer_id', $id)->delete();
         $this->logger->create();
         return redirect()->back()->with('success', 'Success! Transfer request canceled successfully');
     }
+
     public function cancelExternalTransferRequest($id)
     {
         ExternalTransfer::where('ex_transfer_id', $id)->delete();
         $this->logger->create();
         return redirect()->back()->with('success', 'Success! Transfer request canceled successfully');
     }
+
     public function viewDeliveryOrders()
     {
         $currentMonth = Carbon::now()->month;
@@ -2549,13 +2849,16 @@ public function viewExternalTransfers(Request $request)
         $data = WarehouseBay::where('station_id', $request->selectedStation)->orderBy('bay_name', 'asc')->get();
         return response()->json($data);
     }
+
     public function viewShippingInstructions()
     {
         $shipping = ShippingInstruction::join('clients', 'clients.client_id', '=', 'shipping_instructions.client_id')
             ->join('destinations', 'destinations.destination_id', '=', 'shipping_instructions.destination_id')
             ->join('stations', 'stations.station_id', '=', 'shipping_instructions.station_id')
-            ->select('shipping_id', 'client_name', 'shipping_instructions.created_at', 'shipping_instructions.status', 'station_name', 'shipping_number', 'vessel_name', 'port_name', 'load_type', 'location_id', 'shipping_instructions.si_number')
+            ->leftJoin('drivers', 'drivers.driver_id', '=', 'shipping_instructions.driver_id')
+            ->select('shipping_id', 'client_name', 'shipping_instructions.created_at', 'shipping_instructions.status', 'station_name', 'shipping_number', 'vessel_name', 'port_name', 'load_type', 'location_id', 'shipping_instructions.si_number', 'container_number', 'container_tare', 'drivers.id_number', 'driver_name', 'registration', 'seal_number', 'drivers.phone', 'transporter_id', 'escort', 'clearing_agent')
             ->latest('shipping_instructions.created_at')
+            ->whereNull('clients.deleted_at')
             ->get();
         $registrations = ShippingInstruction::pluck('registration')->toArray();
         $users = Driver::all();
@@ -2563,6 +2866,7 @@ public function viewExternalTransfers(Request $request)
         $transporters = Transporter::all();
         return view('clerk::shipping.SIs')->with(['shipping' => $shipping, 'registrations' => $registrations, 'users' => $users, 'agents' => $agents, 'transporters' => $transporters]);
     }
+
     public function createSI()
     {
         $stations = Station::where('status', 1)->get();
@@ -2574,6 +2878,7 @@ public function viewExternalTransfers(Request $request)
             ->get();
         return view('clerk::shipping.createSI')->with(['ports' => $ports, 'stations' => $stations, 'clients' => $clients]);
     }
+
     public function editSI($id)
     {
         $si = ShippingInstruction::find($id);
@@ -2587,6 +2892,7 @@ public function viewExternalTransfers(Request $request)
             ->get();
         return view('clerk::shipping.editSI')->with(['ports' => $ports, 'stations' => $stations, 'clients' => $clients, 'si' => $si, 'siTeas' => $siTeas]);
     }
+
     public function addShippingInstruction(Request $request)
     {
         $request->validate([
@@ -2628,13 +2934,14 @@ public function viewExternalTransfers(Request $request)
         $this->logger->create();
         return redirect()->route('clerk.addShipmentTeas', $siId)->with('success', 'Success! Shipping instruction created successfully');
     }
+
     public function updateSI(Request $request, $id)
     {
         $request->validate([
             'client_hidden' => 'string|required',
             'station_hidden' => 'string|required',
             'vessel' => 'string|required',
-            'shipmentNumber' => 'required|string|unique:shipping_instructions,shipping_number,'.$id.',shipping_id',
+            'shipmentNumber' => 'required|string|unique:shipping_instructions,shipping_number,' . $id . ',shipping_id',
             'destination' => 'required|string',
             'package' => 'required|string',
             'containerSize' => 'required|string',
@@ -2662,46 +2969,49 @@ public function viewExternalTransfers(Request $request)
             ],
             'booking_number' => $request->bookingNumber,
             'si_number' => $request->shippingNumber,
+            'invoice_number' => $request->invoiceNumber
         ];
 
         ShippingInstruction::where('shipping_id', $id)->update($si);
         $this->logger->create();
         return redirect()->route('clerk.addShipmentTeas', $id)->with('success', 'Success! Shipping instruction created successfully');
     }
+
     public function addShipmentTeas($id)
     {
-       $si = ShippingInstruction::join('stations', 'stations.station_id', '=', 'shipping_instructions.station_id')
+        $si = ShippingInstruction::join('stations', 'stations.station_id', '=', 'shipping_instructions.station_id')
             ->join('clients', 'clients.client_id', '=', 'shipping_instructions.client_id')
             ->join('destinations', 'destinations.destination_id', '=', 'shipping_instructions.destination_id')
             ->leftJoin('transporters', 'transporters.transporter_id', '=', 'shipping_instructions.transporter_id')
             ->leftJoin('drivers', 'drivers.driver_id', 'shipping_instructions.driver_id')
             ->leftJoin('clearing_agents', 'clearing_agents.agent_id', 'shipping_instructions.clearing_agent')
-            ->select('shipping_instructions.*', 'location_id', 'client_name', 'clients.phone as client_phone', 'clients.email', 'clients.address', 'port_name', 'transporter_name', 'driver_name', 'drivers.phone', 'agent_name')
-           ->find($id);
+            ->select('shipping_instructions.*', 'shipping_instructions.address as c_address', 'location_id', 'client_name', 'clients.phone as client_phone', 'clients.email', 'clients.address', 'port_name', 'transporter_name', 'driver_name', 'drivers.phone', 'agent_name')
+            ->find($id);
         $teas = Shipment::join('stock_ins', 'stock_ins.stock_id', '=', 'shipments.stock_id')
             ->join('delivery_orders', 'delivery_orders.delivery_id', '=', 'stock_ins.delivery_id')
             ->join('gardens', 'gardens.garden_id', '=', 'delivery_orders.garden_id')
             ->join('grades', 'grades.grade_id', '=', 'delivery_orders.grade_id')
-            ->select('shipment_id', 'shipments.shipped_packages', 'shipments.shipped_weight', 'shipments.status', 'garden_name', 'grade_name', 'invoice_number', 'stock_ins.package_tare', 'stock_ins.pallet_weight', 'delivery_orders.height')
+            ->select('shipment_id', 'shipments.shipped_packages', 'shipments.shipped_weight', 'shipments.status', 'garden_name', 'grade_name', 'invoice_number', 'stock_ins.package_tare', 'stock_ins.pallet_weight', 'delivery_orders.height', 'shipments.package_tare', 'shipments.pallet_weight', 'shipments.pallet_height')
             ->where('shipping_id', $id)
             ->orderBy('shipments.created_at', 'desc')
             ->get();
         $clientTeas = DB::table('currentstock')
             ->where('current_stock', '>', 0)
             ->where('current_weight', '>', 0)
-            ->where(['client_id' => $si->client_id, 'station_id' =>  $si->station_id])
+            ->where(['client_id' => $si->client_id, 'station_id' => $si->station_id])
             ->orderBy('sortOrder', 'desc')
             ->get();
         return view('clerk::shipping.addTeasToSI')->with(['teas' => $teas, 'clientTeas' => $clientTeas, 'si' => $si]);
     }
+
     public function storeShippingInstruction(Request $request, $id)
     {
         $data = json_decode($request->form_data);
-        foreach ($data as $tea){
+        foreach ($data as $tea) {
             $stock = StockIn::where('stock_id', $tea->stock_id)->first();
-            $customId =  new CustomIds();
+            $customId = new CustomIds();
             $shipment = [
-                'shipment_id' =>  $customId->generateId(),
+                'shipment_id' => $customId->generateId(),
                 'shipping_id' => $id,
                 'stock_id' => $tea->stock_id,
                 'delivery_id' => $stock->delivery_id,
@@ -2717,22 +3027,19 @@ public function viewExternalTransfers(Request $request)
         $this->logger->create();
         return redirect()->back()->with('success', 'Successful! Teas added to shipping instruction');
     }
-    public function initateSI($id){
-        ShippingInstruction::where('shipping_id', $id)->update(['status' => 1]);
-        $this->logger->create();
-        return redirect()->route('clerk.viewShippingInstructions')->with('success', 'Success! Shipping instructions updated successfully');
-    }
+
     public function updateShippingInstruction($id)
     {
-        if (auth()->user()->role_id == 2 || auth()->user()->hasPermission('straightline.approve')){
+        if (auth()->user()->role_id == 2 || auth()->user()->hasPermission('straightline.approve')) {
             ShippingInstruction::where('shipping_id', $id)->update(['status' => 4]);
             $this->logger->create();
-        }else{
+        } else {
             ShippingInstruction::where('shipping_id', $id)->update(['status' => 3]);
             $this->logger->create();
         }
         return redirect()->route('clerk.viewShippingInstructions')->with('success', 'Success! Shipping instructions updated successfully');
     }
+
     public function markAsShipped($id)
     {
         ShippingInstruction::where('shipping_id', $id)->update(['ship_date' => time(), 'status' => 4]);
@@ -2740,59 +3047,7 @@ public function viewExternalTransfers(Request $request)
         $this->logger->create();
         return redirect()->back()->with('success', 'Success! Shipment details updated successfully');
     }
-    public function updateShippingInstructionDetails(Request $request, $id)
-    {
-        DB::beginTransaction();
-        try {
-            $driver = Driver::where('id_number', $request->idNumber)->first();
-            if ($driver){
-                $shipment = [
-                    'container_number' => $request->containerNumber,
-                    'container_tare' => $request->tare,
-                    'clearing_agent' => $request->agent,
-                    'seal_number' => $request->seal,
-                    'transporter_id' => $request->transporter,
-                    'driver_id' => $driver->driver_id,
-                    'registration' => $request->registration,
-                    'ship_date' => time(),
-                    'escort' => $request->escort,
-                    'status' => 2
-                ];
-            }else{
-                $customId = new CustomIds();
-                $driverId = $customId->generateId();
-                $newDriver = [
-                    'driver_id' => $driverId,
-                    'id_number' => $request->idNumber,
-                    'driver_name' => strtoupper($request->driverName),
-                    'phone' => $request->driverPhone
-                ];
-                Driver::create($newDriver);
-                $shipment = [
-                    'container_number' => $request->containerNumber,
-                    'container_tare' => $request->tare,
-                    'clearing_agent' => $request->agent,
-                    'seal_number' => $request->seal,
-                    'transporter_id' => $request->transporter,
-                    'driver_id' => $driverId,
-                    'registration' => $request->registration,
-                    'ship_date' => time(),
-                    'escort' => $request->escort,
-                    'status' => 2
-                ];
-            }
-            ShippingInstruction::where('shipping_id', $id)->update($shipment);
-            $this->logger->create();
-            // Commit the transaction
-            DB::commit();
-        } catch (Exception $e) {
-            // Rollback the transaction if an exception occurs
-            DB::rollback();
-            // Handle or log the exception
-            return redirect()->back()->with('error', 'Oops! An error occurred please try again');
-        }
-        return redirect()->back()->with('success', 'Successful!, Shipping Instructions updated successfully');
-    }
+
     public function downloadSIDocument($id)
     {
         return $this->AppClass->downloadStraightLine($id);
@@ -2802,26 +3057,78 @@ public function viewExternalTransfers(Request $request)
     {
         return $this->AppClass->downloadSIPackingList($id);
     }
+
     public function downloadSIContinuedPackingList($id)
     {
         return $this->AppClass->downloadSIContinuedPackingList($id);
     }
+
+    public function downloadSIPackingListExcel($id)
+    {
+        return $this->AppClass->downloadSIPackingListExcel($id);
+    }
+
+    public function downloadSIContinuedPackingListExcel($id)
+    {
+        return $this->AppClass->downloadSIContinuedPackingListExcel($id);
+    }
+
     public function downloadDriverClearance($id)
     {
         return $this->AppClass->downloadStraightLineClearance($id);
     }
+
     public function viewBlendProcessing()
     {
-        $sheets = DB::table('blend_sheets')
+        $data = DB::table('blend_sheets')
             ->join('clients', 'clients.client_id', '=', 'blend_sheets.client_id')
             ->join('destinations', 'destinations.destination_id', '=', 'blend_sheets.destination_id')
             ->join('stations', 'stations.station_id', '=', 'blend_sheets.station_id')
-            ->select('blend_sheets.blend_id', 'blend_sheets.created_at', 'station_name', 'client_name', 'clients.client_id', 'blend_number', 'vessel_name', 'port_name', 'blend_sheets.status', 'output_packages', 'output_weight', 'location_id', 'stations.station_id', 'package_type', 'si_number')
+            ->leftJoin('shipment_containers', 'shipment_containers.blend_id', '=', 'blend_sheets.blend_id')
+            ->select('blend_sheets.blend_id', 'blend_sheets.created_at', 'station_name', 'client_name', 'clients.client_id', 'blend_number', 'vessel_name', 'port_name', 'blend_sheets.status', 'output_packages', 'output_weight', 'location_id', 'stations.station_id', 'package_type', 'si_number', 'blend_shipped')
+            ->selectRaw("CASE WHEN blend_sheets.packet_tare IS NOT NULL
+        AND blend_sheets.container_tare IS NOT NULL
+        AND blend_sheets.agent_id IS NOT NULL
+        AND blend_sheets.seal_number IS NOT NULL
+        AND blend_sheets.escort IS NOT NULL
+        AND blend_sheets.blend_date IS NOT NULL
+        AND blend_sheets.transporter_id IS NOT NULL
+        AND blend_sheets.registration IS NOT NULL
+        AND blend_sheets.driver_id IS NOT NULL
+        AND EXISTS (SELECT 1 FROM shipment_containers WHERE shipment_containers.blend_id = blend_sheets.blend_id)
+        THEN 1 ELSE 0 END as logistics_complete")
+            ->selectRaw("SUM(CASE WHEN shipment_containers.status = 'approved' THEN shipment_containers.packages ELSE 0 END) as total_packages")
+            ->selectRaw("SUM(CASE WHEN shipment_containers.status = 'approved' THEN shipment_containers.weight ELSE 0 END) as total_weight")
+            ->selectRaw("CASE WHEN
+            (blend_sheets.output_packages <= SUM(CASE WHEN shipment_containers.status = 'approved' THEN shipment_containers.packages ELSE 0 END)
+             OR blend_sheets.output_weight <= SUM(CASE WHEN shipment_containers.status = 'approved' THEN shipment_containers.weight ELSE 0 END))
+            AND blend_sheets.blend_shipped IS NULL
+        THEN 1 ELSE 0 END as release_status")
             ->whereNull('blend_sheets.deleted_at')
-            ->latest('blend_sheets.created_at')
-            ->get();
-        return view('clerk::shipping.blendSheets')->with(['sheets' => $sheets]);
+            ->where('blend_sheets.type', 'blend')
+            ->whereNull('clients.deleted_at')
+            ->groupBy(
+                'blend_sheets.blend_id', 'blend_sheets.created_at', 'station_name', 'client_name', 'clients.client_id',
+                'blend_number', 'vessel_name', 'port_name', 'blend_sheets.status', 'output_packages', 'output_weight',
+                'location_id', 'stations.station_id', 'package_type', 'si_number', 'blend_sheets.blend_shipped'
+            )
+            ->latest('blend_sheets.created_at');
+
+        $sheets = $data->whereNull('blend_sheets.deleted_at')->get();
+        $clients = $data->get()->groupBy('client_name');
+        $stations = $data->get()->groupBy('station_name');
+        $agents = ClearingAgent::all();
+        $transporters = Transporter::all();
+        $registrations = BlendSheet::pluck('registration')->toArray();
+        $users = Driver::all();
+
+        return view('clerk::shipping.blendSheets')->with([
+            'sheets' => $sheets, 'clients' => $clients, 'stations' => $stations,
+            'agents' => $agents, 'transporters' => $transporters,
+            'registrations' => $registrations, 'users' => $users,
+        ]);
     }
+
     public function createBlendSheet()
     {
         $stations = Station::where('status', 1)->get();
@@ -2833,15 +3140,16 @@ public function viewExternalTransfers(Request $request)
             ->get();
         return view('clerk::shipping.createBlend')->with(['ports' => $ports, 'stations' => $stations, 'clients' => $clients]);
     }
+
     public function addBlendSheet(Request $request)
     {
         $request->validate([
             'client' => 'required|string',
             'station' => 'required|string',
-            'shipmentNumber' =>'required|string',
+            'shipmentNumber' => 'required|string',
             'contract' => 'required|string',
             'destination' => 'required|string',
-            'packagingType' =>'required|string',
+            'packagingType' => 'required|string',
             'containerSize' => 'required|string',
             'consignee' => 'required|string',
             'mark' => 'required|string',
@@ -2878,6 +3186,7 @@ public function viewExternalTransfers(Request $request)
         $this->logger->create();
         return redirect()->route('clerk.addBlendTeas', $sheet['blend_id'])->with('success', 'Success! Blend sheet created successfully');
     }
+
     public function addBlendTeas($id)
     {
         $bs = BlendSheet::join('clients', 'clients.client_id', '=', 'blend_sheets.client_id')
@@ -2910,7 +3219,8 @@ public function viewExternalTransfers(Request $request)
                 'blend_sheets.station_id',
                 'drivers.driver_name',
                 'drivers.phone',
-                'clearing_agents.agent_name'
+                'clearing_agents.agent_name',
+                'blend_sheets.address as c_address', 'package_type',
             )
             ->selectRaw('SUM(blend_shipments.blended_packages) as outputPackages')
             ->selectRaw('SUM(blend_shipments.net_weight) as outputWeight')
@@ -2938,17 +3248,18 @@ public function viewExternalTransfers(Request $request)
                 'drivers.driver_name',
                 'drivers.phone',
                 'clearing_agents.agent_name',
-                'blend_sheets.station_id'
+                'blend_sheets.station_id',
+                'blend_sheets.address', 'package_type',
             )
             ->first(); // Fetch the first record that matches the conditions
         $teas = BlendTea::leftJoin('delivery_orders', 'delivery_orders.delivery_id', '=', 'blend_teas.delivery_id')
             ->leftJoin('gardens', 'gardens.garden_id', '=', 'delivery_orders.garden_id')
-            ->leftJoin('grades','grades.grade_id','=','delivery_orders.grade_id')
-            ->leftJoin('loading_instructions', function($join) {
-                $join->on('loading_instructions.delivery_id','=','delivery_orders.delivery_id')
+            ->leftJoin('grades', 'grades.grade_id', '=', 'delivery_orders.grade_id')
+            ->leftJoin('loading_instructions', function ($join) {
+                $join->on('loading_instructions.delivery_id', '=', 'delivery_orders.delivery_id')
                     ->whereNull('loading_instructions.deleted_at');
             })
-            ->leftJoin('blendBalances', function ($join){
+            ->leftJoin('blendBalances', function ($join) {
                 $join->on('blendBalances.blend_balance_id', '=', 'blend_teas.stock_id')
                     ->on('blendBalances.blend_id', '=', 'blend_teas.delivery_id');
             })
@@ -2965,14 +3276,15 @@ public function viewExternalTransfers(Request $request)
         $blendBalances = DB::table('blendBalances')->where(['client_id' => $bs->client_id, 'status' => 0])->where('current_weight', '>', 0)->get();
         return view('clerk::shipping.addTeasToBlend')->with(['teas' => $teas, 'clientTeas' => $clientTeas, 'bs' => $bs, 'blendBalances' => $blendBalances]);
     }
+
     public function storeBlendTeas(Request $request, $id)
     {
         $data = json_decode($request->form_data);
-        foreach ($data as $tea){
+        foreach ($data as $tea) {
             $stock = StockIn::where('stock_id', $tea->stock_id)->first();
-            $customId =  new CustomIds();
+            $customId = new CustomIds();
             $sheet = [
-                'blended_id' =>  $customId->generateId(),
+                'blended_id' => $customId->generateId(),
                 'blend_id' => $id,
                 'stock_id' => $tea->stock_id,
                 'delivery_id' => $stock->delivery_id,
@@ -2984,6 +3296,7 @@ public function viewExternalTransfers(Request $request)
         $this->logger->create();
         return redirect()->back()->with('success', 'Successful! Teas added to blend sheet');
     }
+
     public function addBlendBalanceTeas(Request $request, $id)
     {
         $filteredBlends = array_filter($request->blends, function ($record) {
@@ -2996,11 +3309,11 @@ public function viewExternalTransfers(Request $request)
         });
         DB::beginTransaction();
         try {
-            foreach ($filteredBlends as $blendID => $stock){
+            foreach ($filteredBlends as $blendID => $stock) {
                 $blendB = BlendBalance::find($blendID);
-                $customId =  new CustomIds();
+                $customId = new CustomIds();
                 $sheet = [
-                    'blended_id' =>  $customId->generateId(),
+                    'blended_id' => $customId->generateId(),
                     'blend_id' => $id,
                     'stock_id' => $blendB->blend_balance_id,
                     'delivery_id' => $blendB->blend_id,
@@ -3019,19 +3332,290 @@ public function viewExternalTransfers(Request $request)
             return redirect()->back()->with('error', 'Oops! An error occurred please try again');
         }
     }
+
+    public function initiateBlendSheet($id)
+    {
+        $blend = BlendSheet::find($id);
+
+        if (!$blend) {
+            return redirect()->back()->with('error', 'Blend sheet not found');
+        }
+
+        if ($blend->status != 0) {
+            return redirect()->back()->with('error', 'This blend has already been initiated');
+        }
+
+        $blend->update(['status' => 1]);
+        $this->logger->create();
+
+        return redirect()->route('clerk.viewBlendProcessing')->with('success', 'Success! Blend initiated successfully');
+    }
+
+    public function approveBlendFirst($id)
+    {
+        if (auth()->user()->role_id != 2 && !auth()->user()->hasPermission('blend.approve')) {
+            return redirect()->back()->with('error', 'You do not have permission to approve this blend');
+        }
+
+        $blend = BlendSheet::find($id);
+
+        if (!$blend || $blend->status != 1) {
+            return redirect()->back()->with('error', 'This blend is not awaiting first approval');
+        }
+
+        $blend->update(['status' => 2]);
+
+        Approval::create([
+            'approval_id' => (new CustomIds())->generateId(),
+            'job_id' => $blend->blend_id,
+            'user_id' => auth()->user()->user_id,
+            'approval_date' => time(),
+            'order' => 1,
+        ]);
+
+        $this->logger->create();
+
+        return redirect()->route('clerk.viewBlendProcessing')->with('success', 'Success! Blend approved — complete the outturn report next');
+    }
+
+    public function approveBlendFinal($id)
+    {
+        if (auth()->user()->role_id != 2 && !auth()->user()->hasPermission('blend.approve')) {
+            return redirect()->back()->with('error', 'You do not have permission to approve this blend');
+        }
+
+        $blend = BlendSheet::find($id);
+
+        if (!$blend || $blend->status != 3) {
+            return redirect()->back()->with('error', 'This blend has not completed the outturn report yet');
+        }
+
+        $blend->update(['status' => 4]);
+
+        Approval::create([
+            'approval_id' => (new CustomIds())->generateId(),
+            'job_id' => $blend->blend_id,
+            'user_id' => auth()->user()->user_id,
+            'approval_date' => time(),
+            'order' => 2,
+        ]);
+
+        $this->logger->create();
+
+        return redirect()->route('clerk.viewBlendProcessing')->with('success', 'Success! Blend fully approved and marked as shipped');
+    }
+
+    public function markBlendShipped($id)
+    {
+        if (auth()->user()->role_id != 2 && !auth()->user()->hasPermission('blend.markasshipped')) {
+            return redirect()->back()->with('error', 'You do not have permission to approve this blend');
+        }
+        $blend = BlendSheet::find($id);
+        if (!$blend || $blend->status != 4) {
+            return redirect()->back()->with('error', 'This blend has not completed the outturn report yet');
+        }
+        $blend->update(['blend_shipped' => time()]);
+        $this->logger->create();
+        return redirect()->route('clerk.viewBlendProcessing')->with('success', 'Success! Blend fully approved and marked as shipped');
+    }
+
+    public function markRebagShipped($id)
+    {
+        if (auth()->user()->role_id != 2 && !auth()->user()->hasPermission('rebag.markasshipped')) {
+            return redirect()->back()->with('error', 'You do not have permission to approve this blend');
+        }
+        $blend = BlendSheet::find($id);
+        if (!$blend || $blend->status != 4) {
+            return redirect()->back()->with('error', 'This blend has not completed the outturn report yet');
+        }
+        $blend->update(['blend_shipped' => time()]);
+        $this->logger->create();
+        return redirect()->route('clerk.rebagJobs')->with('success', 'Success! Blend fully approved and marked as shipped');
+    }
+
+    public function initiateRebagSheet($id)
+    {
+        $blend = BlendSheet::find($id);
+
+        if (!$blend) {
+            return redirect()->back()->with('error', 'Blend sheet not found');
+        }
+
+        if ($blend->status != 0) {
+            return redirect()->back()->with('error', 'This blend has already been initiated');
+        }
+
+        $blend->update(['status' => 1]);
+        $this->logger->create();
+
+        return redirect()->route('clerk.rebagJobs')->with('success', 'Success! Blend initiated successfully');
+    }
+
+    public function approveRebagFirst($id)
+    {
+        if (auth()->user()->role_id != 2 && !auth()->user()->hasPermission('blend.approve')) {
+            return redirect()->back()->with('error', 'You do not have permission to approve this blend');
+        }
+
+        $blend = BlendSheet::find($id);
+
+        if (!$blend || $blend->status != 1) {
+            return redirect()->back()->with('error', 'This blend is not awaiting first approval');
+        }
+
+        $blend->update(['status' => 2]);
+
+        Approval::create([
+            'approval_id' => (new CustomIds())->generateId(),
+            'job_id' => $blend->blend_id,
+            'user_id' => auth()->user()->user_id,
+            'approval_date' => time(),
+            'order' => 1,
+        ]);
+
+        $this->logger->create();
+
+        return redirect()->route('clerk.rebagJobs')->with('success', 'Success! Blend approved — complete the outturn report next');
+    }
+
+    public function approveRebagFinal($id)
+    {
+        if (auth()->user()->role_id != 2 && !auth()->user()->hasPermission('rebag.approve')) {
+            return redirect()->back()->with('error', 'You do not have permission to approve this blend');
+        }
+
+        $blend = BlendSheet::find($id);
+
+        if (!$blend || $blend->status != 3) {
+            return redirect()->back()->with('error', 'This blend has not completed the outturn report yet');
+        }
+
+        $blend->update(['status' => 4]);
+
+        Approval::create([
+            'approval_id' => (new CustomIds())->generateId(),
+            'job_id' => $blend->blend_id,
+            'user_id' => auth()->user()->user_id,
+            'approval_date' => time(),
+            'order' => 2,
+        ]);
+
+        $this->logger->create();
+
+        return redirect()->route('clerk.rebagJobs')->with('success', 'Success! Blend fully approved and marked as shipped');
+    }
+
+    public function getRebagLogistics($id)
+    {
+        $bs = BlendSheet::find($id);
+        $driver = Driver::where('driver_id', $bs->driver_id)->first();
+
+        $containers = ShipmentContainer::leftJoin('drivers', 'drivers.driver_id', '=', 'shipment_containers.driver_id')
+            ->leftJoin('clearing_agents as ca', 'ca.agent_id', '=', 'shipment_containers.agent_id')
+            ->leftJoin('transporters', 'transporters.transporter_id', '=', 'shipment_containers.transporter_id')
+            ->select('shipment_containers.*', 'driver_name', 'phone', 'id_number', 'transporter_name', 'agent_name')
+            ->where('blend_id', $id)
+            ->orderBy('shipment_containers.created_at')
+            ->get();
+
+        return response()->json([
+            'packageTare' => $bs->packet_tare,
+            'container_tare' => $bs->container_tare,
+            'agent_id' => $bs->agent_id,
+            'seal_number' => $bs->seal_number,
+            'escort' => $bs->escort,
+            'blend_date' => $bs->blend_date,
+            'transporter_id' => $bs->transporter_id,
+            'registration' => $bs->registration,
+            'id_number' => $driver?->id_number,
+            'driver_name' => $driver?->driver_name,
+            'phone' => $driver?->phone,
+            'canApproveContainer' => (bool) canuser('rebag.container.approve'),
+            'containers' => $containers,
+        ]);
+    }
+
+    public function updateRebagLogistics(Request $request, $id)
+    {
+        DB::beginTransaction();
+        try {
+            $blendSheet = BlendSheet::find($id);
+            $customIds = new CustomIds();
+            $driverID = null;
+
+            if ($request->idNumber) {
+                $existingDriver = Driver::where('id_number', $request->idNumber)->first();
+                if (!$existingDriver) {
+                    $driverID = $customIds->generateId();
+                    Driver::create([
+                        'driver_id' => $driverID,
+                        'id_number' => $request->idNumber,
+                        'driver_name' => strtoupper($request->driverName),
+                        'phone' => $request->driverPhone,
+                    ]);
+                } else {
+                    $driverID = $existingDriver->driver_id;
+                }
+            }
+
+            $blendSheet->update([
+                'driver_id' => $driverID,
+                'agent_id' => $request->agentId,
+                'transporter_id' => $request->transporter,
+                'registration' => $request->registration,
+                'seal_number' => $request->seal,
+                'escort' => $request->escortId,
+                'container_tare' => $request->tare,
+            ]);
+
+            if ($request->containers) {
+                $submitted = [];
+                foreach ($request->containers as $contain) {
+                    $number = $contain['containerNumber'];
+                    $existing = ShipmentContainer::where('blend_id', $id)->where('container_number', $number)->first();
+                    if ($existing) {
+                        $existing->update([
+                            'seal_number' => $contain['sealNumber'],
+                            'tare_weight' => $contain['containerTareWeight'] ?: null,
+                            'pallet_weight' => $contain['palletWeight'] ?: null,
+                        ]);
+                    } else {
+                        ShipmentContainer::create([
+                            'container_id' => $customIds->generateId(),
+                            'container_number' => $number,
+                            'seal_number' => $contain['sealNumber'],
+                            'tare_weight' => $contain['containerTareWeight'] ?: null,
+                            'pallet_weight' => $contain['palletWeight'] ?: null,
+                            'blend_id' => $id,
+                        ]);
+                    }
+                    $submitted[] = $number;
+                }
+                ShipmentContainer::where('blend_id', $id)->whereNotIn('container_number', $submitted)->delete();
+            }
+
+            DB::commit();
+            return redirect()->route('clerk.rebagJobs')->with('success', 'Logistics details saved successfully');
+        } catch (Exception $exception) {
+            DB::rollback();
+            return redirect()->back()->with('error', 'Oops! An error occurred: ' . $exception->getMessage());
+        }
+    }
+
     public function updateBlendSheet($id)
     {
-        if (auth()->user()->role_id == 2 || auth()->user()->hasPermission('blend.approve')){
+        if (auth()->user()->role_id == 2 || auth()->user()->hasPermission('blend.approve')) {
             $blend = BlendSheet::where('blend_id', $id)->first();
             $status = $blend->status !== 3 ? ($blend->status + 1) : 4;
             $blend->update(['status' => $status, 'blend_shipped' => time()]);
             $this->logger->create();
-        }else{
+        } else {
             BlendSheet::where('blend_id', $id)->update(['status' => 1]);
             $this->logger->create();
         }
         return redirect()->route('clerk.viewBlendProcessing')->with('success', 'Success! Blend sheet updated successfully');
     }
+
     public function deleteBlendTea($id)
     {
         $bt = BlendTea::find($id);
@@ -3040,6 +3624,7 @@ public function viewExternalTransfers(Request $request)
         $this->logger->create();
         return redirect()->back()->with('success', 'Successful! Teas removed from blend sheet successfully');
     }
+
     public function deleteSITea($id)
     {
         $bt = Shipment::find($id);
@@ -3048,15 +3633,17 @@ public function viewExternalTransfers(Request $request)
         $this->logger->create();
         return redirect()->back()->with('success', 'Successful! Teas removed from SI successfully');
     }
-    public function updateOutTurnReport ($id)
+
+    public function updateOutTurnReport($id)
     {
-       $bs = BlendSheet::join('blend_teas', 'blend_teas.blend_id', '=', 'blend_sheets.blend_id')
+        $bs = BlendSheet::join('blend_teas', 'blend_teas.blend_id', '=', 'blend_sheets.blend_id')
             ->join('clients', 'clients.client_id', 'blend_sheets.client_id')
             ->leftJoin('clearing_agents', 'clearing_agents.agent_id', '=', 'blend_sheets.agent_id')
             ->select('blend_sheets.blend_id', 'client_name', 'blend_number', 'b_dust', 'c_dust', 'sweepings', 'fibre', 'packet_tare', 'blend_sheets.agent_id', 'container_tare', 'seal_number', 'escort', 'blend_date', 'transporter_id', 'registration', 'driver_id') // Specify necessary columns
             ->selectRaw('SUM(blend_teas.blended_packages) as input_packages')
             ->selectRaw('SUM(blend_teas.blended_weight) as input_weight')
             ->where('blend_sheets.blend_id', $id) // Assuming $id is for blend_sheets.blend_id
+            ->whereNull('blend_teas.deleted_at') // Ensure you are not including deleted records
             ->groupBy('blend_id', 'blend_number', 'client_name', 'b_dust', 'c_dust', 'sweepings', 'fibre', 'packet_tare', 'agent_id', 'container_tare', 'seal_number', 'escort', 'blend_date', 'transporter_id', 'registration', 'driver_id') // Group by specific columns
             ->first();
         $agents = ClearingAgent::all();
@@ -3100,7 +3687,7 @@ public function viewExternalTransfers(Request $request)
             'seal_number' => $bs->seal_number,
             'registration' => $bs->registration,
             'id_number' => $driver == null ? null : $driver->id_number,
-            'driver_name'=> $driver == null ? null : $driver->driver_name,
+            'driver_name' => $driver == null ? null : $driver->driver_name,
             'phone' => $driver == null ? null : $driver->phone,
             'mOperator' => $mOperator,
             'bSupervisor' => $bSupervisor,
@@ -3121,11 +3708,7 @@ public function viewExternalTransfers(Request $request)
         ];
         return view('clerk::shipping.updateOutTurnReport')->with(['bs' => $bs, 'agents' => $agents, 'transporters' => $transporters, 'registrations' => $registrations, 'users' => $users, 'outTurnReport' => $outTurnReport, 'containerNumbers' => $containerNumbers]);
     }
-    public function amendOutTurnReport ($id)
-    {
-        return $blend = BlendSheet::where('blend_id', $id)->first();
 
-    }
     public function updateBlendSheetDetails(Request $request, $id)
     {
         DB::beginTransaction();
@@ -3168,15 +3751,15 @@ public function viewExternalTransfers(Request $request)
                     ];
                     Driver::create($newDriver);
                     $driverID = $newDriver['driver_id'];
-                }else{
+                } else {
                     $driverID = $drivers->driver_id;
                 }
             }
 
             $outputPacks = 0;
             $outputWeight = 0;
-            if ($request->blend !== null){
-                foreach ($request->blend as $shipping){
+            if ($request->blend !== null) {
+                foreach ($request->blend as $shipping) {
                     $blendShipment = $customIds->generateId();
                     $shipment = [
                         'blend_shipment_id' => $blendShipment,
@@ -3188,8 +3771,8 @@ public function viewExternalTransfers(Request $request)
                         'package_tare' => $request->packageTare,
                         'gross_weight' => floatval($shipping['packages']) * floatval($shipping['weight']) + (floatval($shipping['packages']) * floatval($request->packageTare)) + floatval($shipping['packages']) * floatval($request->tareVariance)
                     ];
-                    $outputPacks += floatval( $shipping['packages']);
-                    $outputWeight += floatval( $shipping['weight']) * floatval( $shipping['packages']);
+                    $outputPacks += floatval($shipping['packages']);
+                    $outputWeight += floatval($shipping['weight']) * floatval($shipping['packages']);
                     BlendShipment::create($shipment);
                 }
             }
@@ -3212,8 +3795,8 @@ public function viewExternalTransfers(Request $request)
                 'sweepings' => $request->sweepings,
             ]);
 
-            if($request->balances !== null){
-                foreach ($request->balances as $blendBal){
+            if ($request->balances !== null) {
+                foreach ($request->balances as $blendBal) {
                     $blendBalance = $customIds->generateId();
                     $balance = [
                         'blend_balance_id' => $blendBalance,
@@ -3284,7 +3867,7 @@ public function viewExternalTransfers(Request $request)
             }
 
             $customId = new CustomIds();
-            foreach ($request->supervisor as $key => $user){
+            foreach ($request->supervisor as $key => $user) {
                 $supervisor = [
                     'supervision_id' => $customId->generateId(),
                     'blend_id' => $id,
@@ -3294,7 +3877,7 @@ public function viewExternalTransfers(Request $request)
                 ];
                 BlendSupervision::create($supervisor);
             }
-            foreach ($request->new as $key => $new){
+            foreach ($request->new as $key => $new) {
                 $newMaterial = [
                     'material_id' => $customId->generateId(),
                     'blend_id' => $id,
@@ -3304,7 +3887,7 @@ public function viewExternalTransfers(Request $request)
                 ];
                 BlendMaterial::create($newMaterial);
             }
-            foreach ($request->inUse as $key => $used){
+            foreach ($request->inUse as $key => $used) {
                 $usedMaterial = [
                     'material_id' => $customId->generateId(),
                     'blend_id' => $id,
@@ -3314,7 +3897,7 @@ public function viewExternalTransfers(Request $request)
                 ];
                 BlendMaterial::create($usedMaterial);
             }
-            foreach ($request->damaged as $key => $used){
+            foreach ($request->damaged as $key => $used) {
                 $usedMaterial = [
                     'material_id' => $customId->generateId(),
                     'blend_id' => $id,
@@ -3324,12 +3907,12 @@ public function viewExternalTransfers(Request $request)
                 ];
                 BlendMaterial::create($usedMaterial);
             }
-            if ($blendSheet->status == 4){
+            if ($blendSheet->status == 4) {
                 BlendSheet::where('blend_id', $id)->update(['status' => 4]);
-            }elseif($blendSheet->status == 3) {
+            } elseif ($blendSheet->status == 3) {
                 BlendSheet::where('blend_id', $id)->update(['status' => 3]);
-            }else{
-                BlendSheet::where('blend_id', $id)->update(['status' => 2]);
+            } else {
+                BlendSheet::where('blend_id', $id)->update(['status' => 3]);
             }
             BlendTea::where('blend_id', $id)->update(['status' => 1]);
             $this->logger->create();
@@ -3337,9 +3920,10 @@ public function viewExternalTransfers(Request $request)
             return redirect()->route('clerk.viewBlendProcessing')->with('success', 'Success! Blend sheet updated successfully');
         } catch (Exception $exception) {
             DB::rollback();
-            return redirect()->back()->with('error', 'Oops! An error occurred please try again '.$exception->getMessage());
+            return redirect()->back()->with('error', 'Oops! An error occurred please try again ' . $exception->getMessage());
         }
     }
+
     public function markBlendTeaAsShipped($id)
     {
         DB::beginTransaction();
@@ -3356,9 +3940,10 @@ public function viewExternalTransfers(Request $request)
             return redirect()->back()->with('error', 'Oops! An error occurred please try again');
         }
     }
+
     public function editBlendSheet($id)
     {
-       $sheet = BlendSheet::find($id);
+        $sheet = BlendSheet::find($id);
         $blendTeas = BlendTea::where('blend_id', $id)->count();
         $stations = Station::where('status', 1)->get();
         $ports = Destination::all();
@@ -3369,15 +3954,16 @@ public function viewExternalTransfers(Request $request)
             ->get();
         return view('clerk::shipping.editBlend')->with(['ports' => $ports, 'stations' => $stations, 'clients' => $clients, 'sheet' => $sheet, 'blendTeas' => $blendTeas]);
     }
+
     public function updateBlend(Request $request, $id)
     {
         $request->validate([
             'client' => 'required|string',
             'station' => 'required|string',
-            'shipmentNumber' =>'required|string|unique:blend_sheets,blend_number,'.$id.',blend_id',
+            'shipmentNumber' => 'required|string|unique:blend_sheets,blend_number,' . $id . ',blend_id',
             'contract' => 'required|string',
             'destination' => 'required|string',
-            'packagingType' =>'required|string',
+            'packagingType' => 'required|string',
             'containerSize' => 'required|string',
             'consignee' => 'required|string',
             'mark' => 'required|string',
@@ -3410,62 +3996,1325 @@ public function viewExternalTransfers(Request $request)
         $this->logger->create();
         return redirect()->route('clerk.addBlendTeas', $id)->with('success', 'Success! Blend sheet updated successfully');
     }
+
     public function viewBlendBalances()
     {
         $balances = DB::table('blendBalances')->where('current_weight', '>', 0)->orderBy('blend_number', 'asc')->get();
         return view('clerk::stock.blendBalances')->with(['balances' => $balances]);
     }
+
     public function downloadBlendSheet($id)
     {
         return $this->AppClass->downloadBlendJob($id);
     }
+
     public function downloadBlendPackingList($id)
     {
         return $this->AppClass->downloadBlendPackingList($id);
     }
+
     public function downloadBlendPackingListCont($id)
     {
         return $this->AppClass->downloadBlendPackingListCont($id);
     }
+
     public function downloadBlendDriverClearance($id)
     {
         return $this->AppClass->driverClearanceBlends($id);
     }
-    /*public function viewDirectDeliveries()
-    {
-       $orders = DeliveryOrder::join('clients', 'clients.client_id', '=', 'delivery_orders.client_id')
-            ->join('stock_ins', 'stock_ins.delivery_id', '=', 'delivery_orders.delivery_id')
-            ->leftJoin('stations', 'stations.station_id', '=', 'stock_ins.station_id')
-            ->leftJoin('warehouses', 'warehouses.warehouse_id', '=', 'delivery_orders.warehouse_id')
-            ->leftJoin('transporters', 'transporters.transporter_id', '=', 'stock_ins.transporter_id')
-            ->leftJoin('drivers', 'drivers.driver_id', '=', 'stock_ins.driver_id')
-            ->leftJoin('delivery_notes', function ($join) {
-                $join->on('delivery_notes.delivery_number', 'stock_ins.delivery_number');
-            })
-            ->select(
-                'client_name',
-                'tea_id',
-                'warehouse_name',
-                'station_name',
-                'delivery_orders.status as order_status',
-                'stock_ins.delivery_number',
-                'delivery_orders.created_at',
-                'drivers.driver_id', 'transporters.transporter_id', 'registration', 'id_number', 'drivers.phone', 'driver_name', 'path'
-            )
-            ->selectRaw('SUM(total_pallets) AS total_packages')
-            ->selectRaw('SUM(net_weight) AS total_net_weight')
-            ->where('delivery_orders.delivery_type', 2)
-            ->groupBy('delivery_number', 'client_name')
-            ->orderBy('delivery_orders.created_at', 'desc')
-            ->get();
-        $stations = Station::where('status', 1)->get();
-        $clients = Client::all();
 
+    public function downloadBlendPackingListExcel($id)
+    {
+        return $this->AppClass->downloadBlendPackingListExcel($id);
+    }
+
+    public function downloadBlendPackingListContExcel($id)
+    {
+        return $this->AppClass->downloadBlendPackingListContExcel($id);
+    }
+
+    /*  Rebagging Job Functionalities */
+
+    public function viewRebagJobs()
+    {
+        $data = DB::table('blend_sheets')
+            ->join('clients', 'clients.client_id', '=', 'blend_sheets.client_id')
+            ->join('destinations', 'destinations.destination_id', '=', 'blend_sheets.destination_id')
+            ->join('stations', 'stations.station_id', '=', 'blend_sheets.station_id')
+            ->leftJoin('shipment_containers', 'shipment_containers.blend_id', '=', 'blend_sheets.blend_id')
+            ->select('blend_sheets.blend_id', 'blend_sheets.created_at', 'station_name', 'client_name', 'clients.client_id', 'blend_number', 'vessel_name', 'port_name', 'blend_sheets.status', 'output_packages', 'output_weight', 'location_id', 'stations.station_id', 'package_type', 'si_number', 'blend_shipped')
+            ->selectRaw("CASE WHEN blend_sheets.packet_tare IS NOT NULL
+        AND blend_sheets.container_tare IS NOT NULL
+        AND blend_sheets.agent_id IS NOT NULL
+        AND blend_sheets.seal_number IS NOT NULL
+        AND blend_sheets.escort IS NOT NULL
+        AND blend_sheets.blend_date IS NOT NULL
+        AND blend_sheets.transporter_id IS NOT NULL
+        AND blend_sheets.registration IS NOT NULL
+        AND blend_sheets.driver_id IS NOT NULL
+        AND EXISTS (SELECT 1 FROM shipment_containers WHERE shipment_containers.blend_id = blend_sheets.blend_id)
+        THEN 1 ELSE 0 END as logistics_complete")
+            ->selectRaw("SUM(CASE WHEN shipment_containers.status = 'approved' THEN shipment_containers.packages ELSE 0 END) as total_packages")
+            ->selectRaw("SUM(CASE WHEN shipment_containers.status = 'approved' THEN shipment_containers.weight ELSE 0 END) as total_weight")
+            ->selectRaw("CASE WHEN
+            (blend_sheets.output_packages <= SUM(CASE WHEN shipment_containers.status = 'approved' THEN shipment_containers.packages ELSE 0 END)
+             OR blend_sheets.output_weight <= SUM(CASE WHEN shipment_containers.status = 'approved' THEN shipment_containers.weight ELSE 0 END))
+            AND blend_sheets.blend_shipped IS NULL
+        THEN 1 ELSE 0 END as release_status")
+            ->whereNull('blend_sheets.deleted_at')
+            ->where('blend_sheets.type', 'rebag')
+            ->whereNull('clients.deleted_at')
+            ->groupBy(
+                'blend_sheets.blend_id', 'blend_sheets.created_at', 'station_name', 'client_name', 'clients.client_id',
+                'blend_number', 'vessel_name', 'port_name', 'blend_sheets.status', 'output_packages', 'output_weight',
+                'location_id', 'stations.station_id', 'package_type', 'si_number', 'blend_sheets.blend_shipped'
+            )
+            ->latest('blend_sheets.created_at');
+
+        $sheets = $data->whereNull('blend_sheets.deleted_at')->get();
+        $clients = $data->get()->groupBy('client_name');
+        $stations = $data->get()->groupBy('station_name');
+        $agents = ClearingAgent::all();
         $transporters = Transporter::all();
+        $registrations = BlendSheet::pluck('registration')->toArray();
         $users = Driver::all();
 
-        return view('clerk::DOS.directDelivery')->with(['orders' => $orders, 'stations' => $stations, 'clients' => $clients, 'transporters' => $transporters, 'users' => $users]);
-    }*/
+        return view('clerk::shipping.rebag.index')->with([
+            'sheets' => $sheets, 'clients' => $clients, 'stations' => $stations,
+            'agents' => $agents, 'transporters' => $transporters,
+            'registrations' => $registrations, 'users' => $users,]);
+    }
+
+    public function createRebagJob()
+    {
+        $stations = Station::where('status', 1)->get();
+        $ports = Destination::all();
+        $clients = DB::table('currentstock')
+            ->whereIn('station_id', $stations->pluck('station_id')->toArray())
+            ->groupBy('client_id', 'client_name')
+            ->select('client_id', 'client_name')
+            ->get();
+        return view('clerk::shipping.rebag.create')->with(['ports' => $ports, 'stations' => $stations, 'clients' => $clients]);
+    }
+
+    public function addRebagJob(Request $request)
+    {
+        $request->validate([
+            'client' => 'required|string',
+            'station' => 'required|string',
+            'shipmentNumber' => 'required|string',
+            'contract' => 'required|string',
+            'destination' => 'required|string',
+            'packagingType' => 'required|string',
+            'containerSize' => 'required|string',
+            'consignee' => 'required|string',
+            'mark' => 'required|string',
+        ]);
+
+        $customId = new CustomIds();
+        $sheet = [
+            'blend_id' => $customId->generateId(),
+            'client_id' => $request->client,
+            'vessel_name' => $request->vessel,
+            'blend_number' => $request->shipmentNumber,
+            'contract' => $request->contract,
+            'destination_id' => $request->destination,
+            'garden' => $request->gardenName,
+            'grade' => $request->blendGrade,
+            'blend_date' => $request->blendDate,
+            'package_type' => $request->packagingType,
+            'container_size' => $request->containerSize,
+            'consignee' => $request->consignee,
+            'shipping_mark' => $request->mark,
+            'standard_details' => $request->shippingInstruction,
+            'station_id' => $request->station,
+            'user_id' => auth()->user()->user_id,
+            'type' => 'rebag',
+            'address' => [
+                'address' => $request->address,
+                'mobile' => $request->mobile,
+                'box' => $request->box,
+                'state' => $request->state
+            ],
+            'booking_number' => $request->bookingNumber,
+            'si_number' => $request->shippingNumber,
+        ];
+        BlendSheet::create($sheet);
+        $this->logger->create();
+        return redirect()->route('clerk.rebagJobs', $sheet['blend_id'])->with('success', 'Success! Blend sheet created successfully');
+    }
+
+    public function addRebagJobTeas($id)
+    {
+        $bs = BlendSheet::join('clients', 'clients.client_id', '=', 'blend_sheets.client_id')
+            ->join('destinations', 'destinations.destination_id', '=', 'blend_sheets.destination_id')
+            ->join('stations', 'stations.station_id', '=', 'blend_sheets.station_id')
+            ->leftJoin('transporters', 'transporters.transporter_id', '=', 'blend_sheets.transporter_id')
+            ->leftJoin('drivers', 'drivers.driver_id', '=', 'blend_sheets.driver_id')
+            ->leftJoin('clearing_agents', 'clearing_agents.agent_id', '=', 'blend_sheets.agent_id')
+            ->leftJoin('blend_shipments', 'blend_shipments.blend_id', '=', 'blend_sheets.blend_id')
+            ->select(
+                'clients.client_id',
+                'blend_sheets.blend_id',
+                'blend_sheets.blend_number',
+                'blend_sheets.status',
+                'blend_sheets.consignee',
+                'blend_sheets.vessel_name',
+                'blend_sheets.shipping_mark',
+                'blend_sheets.standard_details',
+                'blend_sheets.registration',
+                'blend_sheets.escort',
+                'blend_sheets.container_tare',
+                'blend_sheets.seal_number',
+                'clients.client_name',
+                'clients.phone as client_phone',
+                'clients.email',
+                'clients.address',
+                'destinations.port_name',
+                'transporters.transporter_name',
+                'location_id',
+                'blend_sheets.station_id',
+                'drivers.driver_name',
+                'drivers.phone',
+                'clearing_agents.agent_name',
+                'blend_sheets.address as c_address'
+            )
+            ->selectRaw('SUM(blend_shipments.blended_packages) as outputPackages')
+            ->selectRaw('SUM(blend_shipments.net_weight) as outputWeight')
+            ->where('blend_sheets.blend_id', $id) // Use where instead of find
+            ->groupBy(
+                'client_id',
+                'blend_sheets.blend_id',
+                'blend_sheets.blend_number',
+                'blend_sheets.status',
+                'blend_sheets.consignee',
+                'blend_sheets.vessel_name',
+                'blend_sheets.shipping_mark',
+                'blend_sheets.standard_details',
+                'blend_sheets.registration',
+                'blend_sheets.escort',
+                'blend_sheets.container_tare',
+                'blend_sheets.seal_number',
+                'clients.client_name',
+                'clients.phone',
+                'clients.email',
+                'clients.address',
+                'destinations.port_name',
+                'transporters.transporter_name',
+                'location_id',
+                'drivers.driver_name',
+                'drivers.phone',
+                'clearing_agents.agent_name',
+                'blend_sheets.station_id',
+                'blend_sheets.address'
+            )
+            ->first(); // Fetch the first record that matches the conditions
+        $teas = BlendTea::leftJoin('delivery_orders', 'delivery_orders.delivery_id', '=', 'blend_teas.delivery_id')
+            ->leftJoin('gardens', 'gardens.garden_id', '=', 'delivery_orders.garden_id')
+            ->leftJoin('grades', 'grades.grade_id', '=', 'delivery_orders.grade_id')
+            ->leftJoin('loading_instructions', function ($join) {
+                $join->on('loading_instructions.delivery_id', '=', 'delivery_orders.delivery_id')
+                    ->whereNull('loading_instructions.deleted_at');
+            })
+            ->leftJoin('blendBalances', function ($join) {
+                $join->on('blendBalances.blend_balance_id', '=', 'blend_teas.stock_id')
+                    ->on('blendBalances.blend_id', '=', 'blend_teas.delivery_id');
+            })
+            ->select('blended_id', 'blend_teas.blended_packages', 'blend_teas.blended_weight', 'blend_teas.status', 'garden_name', 'grade_name', 'grade', 'garden', 'loading_number', 'sale_number', 'prompt_date', 'invoice_number', 'blend_number', 'blend_date')
+            ->where('blend_teas.blend_id', $id)
+            ->orderBy('blend_teas.created_at', 'desc')
+            ->get();
+        $clientTeas = DB::table('currentstock')
+            ->where('current_stock', '>', 0)
+            ->where('current_weight', '>', 0)
+            ->where(['client_id' => $bs->client_id, 'station_id' => $bs->station_id])
+            ->orderBy('sortOrder', 'desc')
+            ->get();
+        $blendBalances = DB::table('blendBalances')->where(['client_id' => $bs->client_id, 'status' => 0])->where('current_weight', '>', 0)->get();
+        return view('clerk::shipping.rebag.addTeas')->with(['teas' => $teas, 'clientTeas' => $clientTeas, 'bs' => $bs, 'blendBalances' => $blendBalances]);
+    }
+
+    public function storeRebagJobTeas(Request $request, $id)
+    {
+        $data = json_decode($request->form_data);
+        foreach ($data as $tea) {
+            $stock = StockIn::where('stock_id', $tea->stock_id)->first();
+            $customId = new CustomIds();
+            $sheet = [
+                'blended_id' => $customId->generateId(),
+                'blend_id' => $id,
+                'stock_id' => $tea->stock_id,
+                'delivery_id' => $stock->delivery_id,
+                'blended_packages' => $tea->stock,
+                'blended_weight' => round($tea->weight, 2),
+            ];
+            BlendTea::create($sheet);
+        }
+        $this->logger->create();
+        return redirect()->back()->with('success', 'Successful! Teas added to blend sheet');
+    }
+
+    public function addRebagJobBlendBalanceTeas(Request $request, $id)
+    {
+        $filteredBlends = array_filter($request->blends, function ($record) {
+            // Check if all required keys exist in the delivery array
+            return array_key_exists('packages', $record)
+                && array_key_exists('weights', $record)
+                // Check if any of the values are null
+                && $record['packages'] !== null
+                && $record['weights'] !== null;
+        });
+        DB::beginTransaction();
+        try {
+            foreach ($filteredBlends as $blendID => $stock) {
+                $blendB = BlendBalance::find($blendID);
+                $customId = new CustomIds();
+                $sheet = [
+                    'blended_id' => $customId->generateId(),
+                    'blend_id' => $id,
+                    'stock_id' => $blendB->blend_balance_id,
+                    'delivery_id' => $blendB->blend_id,
+                    'blended_packages' => $stock['packages'],
+                    'blended_weight' => $stock['weights'],
+                ];
+                BlendTea::create($sheet);
+            }
+            $this->logger->create();
+            DB::commit();
+            return redirect()->back()->with('success', 'Successful! Teas added to blend sheet');
+        } catch (Exception $e) {
+            // Rollback the transaction if an exception occurs
+            DB::rollback();
+            // Handle or log the exception
+            return redirect()->back()->with('error', 'Oops! An error occurred please try again');
+        }
+    }
+
+    public function updateRebagJob($id)
+    {
+        if (auth()->user()->role_id == 2 || auth()->user()->hasPermission('blend.approve')) {
+            $blend = BlendSheet::where('blend_id', $id)->first();
+            $status = $blend->status !== 3 ? ($blend->status + 1) : 4;
+            $blend->update(['status' => $status, 'blend_shipped' => time()]);
+            $this->logger->create();
+        } else {
+            BlendSheet::where('blend_id', $id)->update(['status' => 1]);
+            $this->logger->create();
+        }
+        return redirect()->route('clerk.rebagJobs')->with('success', 'Success! Blend sheet updated successfully');
+    }
+
+    public function deleteRebagJobTea($id)
+    {
+        $bt = BlendTea::find($id);
+//        BlendBalance::where('blend_balance_id', $bt->stock_id)->update(['status' => 0]);
+        $bt->delete();
+        $this->logger->create();
+        return redirect()->back()->with('success', 'Successful! Teas removed from blend sheet successfully');
+    }
+
+    public function updateRebagJobOutTurnReport($id)
+    {
+        $bs = BlendSheet::join('blend_teas', 'blend_teas.blend_id', '=', 'blend_sheets.blend_id')
+            ->join('clients', 'clients.client_id', 'blend_sheets.client_id')
+            ->leftJoin('clearing_agents', 'clearing_agents.agent_id', '=', 'blend_sheets.agent_id')
+            ->select('blend_sheets.blend_id', 'client_name', 'blend_number', 'b_dust', 'c_dust', 'sweepings', 'fibre', 'packet_tare', 'blend_sheets.agent_id', 'container_tare', 'seal_number', 'escort', 'blend_date', 'transporter_id', 'registration', 'driver_id') // Specify necessary columns
+            ->selectRaw('SUM(blend_teas.blended_packages) as input_packages')
+            ->selectRaw('SUM(blend_teas.blended_weight) as input_weight')
+            ->where('blend_sheets.blend_id', $id) // Assuming $id is for blend_sheets.blend_id
+            ->whereNull('blend_teas.deleted_at') // Ensure you are not including deleted records
+            ->groupBy('blend_id', 'blend_number', 'client_name', 'b_dust', 'c_dust', 'sweepings', 'fibre', 'packet_tare', 'agent_id', 'container_tare', 'seal_number', 'escort', 'blend_date', 'transporter_id', 'registration', 'driver_id') // Group by specific columns
+            ->first();
+        $agents = ClearingAgent::all();
+        $transporters = Transporter::all();
+        $registrations = BlendSheet::pluck('registration')->toArray();
+        $users = Driver::all();
+        $shipment = BlendShipment::where('blend_id', $id)->first();
+        $driver = Driver::where('driver_id', $bs->driver_id)->first();
+        $supervisors = BlendSupervision::where('blend_id', $id)->get();
+        $mOperator = $supervisors->firstWhere('supervisor_type', 1)?->supervisor_name ?? null;
+        $bSupervisor = $supervisors->firstWhere('supervisor_type', 2)?->supervisor_name ?? null;
+        $tParty = $supervisors->firstWhere('supervisor_type', 3)?->supervisor_name ?? null;
+        $materials = BlendMaterial::where('blend_id', $id)->get();
+        $newPaperSack = $materials->first(fn($m) => $m->material_type == 1 && $m->condition == 1)?->total;
+        $inUsePaperSack = $materials->first(fn($m) => $m->material_type == 1 && $m->condition == 2)?->total;
+        $damagedPaperSack = $materials->first(fn($m) => $m->material_type == 1 && $m->condition == 3)?->total;
+        $newPoly = $materials->first(fn($m) => $m->material_type == 2 && $m->condition == 1)?->total;
+        $inUsePoly = $materials->first(fn($m) => $m->material_type == 2 && $m->condition == 2)?->total;
+        $damagedPoly = $materials->first(fn($m) => $m->material_type == 2 && $m->condition == 3)?->total;
+        $newPouch = $materials->first(fn($m) => $m->material_type == 3 && $m->condition == 1)?->total;
+        $newPallet = $materials->first(fn($m) => $m->material_type == 4 && $m->condition == 1)?->total;
+        $inUsePallet = $materials->first(fn($m) => $m->material_type == 3 && $m->condition == 2)?->total;
+        $damagedPallet = $materials->first(fn($m) => $m->material_type == 3 && $m->condition == 3)?->total;
+        $newGummy = $materials->first(fn($m) => $m->material_type == 5 && $m->condition == 1)?->total;
+        $inUseGummy = $materials->first(fn($m) => $m->material_type == 4 && $m->condition == 2)?->total;
+        $damagedGummy = $materials->first(fn($m) => $m->material_type == 4 && $m->condition == 3)?->total;
+        $containerNumbers = ShipmentContainer::where('blend_id', $id)->get();
+
+        $outTurnReport = [
+            'packageTare' => $bs->packet_tare,
+            'sweepings' => $bs->sweepings,
+            'b_dust' => $bs->b_dust,
+            'fibre' => $bs->fibre,
+            'c_dust' => $bs->c_dust,
+            'variance' => $shipment == null ? 0 : $shipment->weight_variance,
+            'container_tare' => $bs->container_tare,
+            'agent_id' => $bs->agent_id,
+            'transporter_id' => $bs->transporter_id,
+            'blend_date' => $bs->blend_date,
+            'escort' => $bs->escort,
+            'seal_number' => $bs->seal_number,
+            'registration' => $bs->registration,
+            'id_number' => $driver == null ? null : $driver->id_number,
+            'driver_name' => $driver == null ? null : $driver->driver_name,
+            'phone' => $driver == null ? null : $driver->phone,
+            'mOperator' => $mOperator,
+            'bSupervisor' => $bSupervisor,
+            'tParty' => $tParty,
+            'newPaper' => $newPaperSack,
+            'inUsePaper' => $inUsePaperSack,
+            'damagedPaper' => $damagedPaperSack,
+            'newPoly' => $newPoly,
+            'inUsePoly' => $inUsePoly,
+            'damagedPoly' => $damagedPoly,
+            'newPallet' => $newPallet,
+            'inUsePallet' => $inUsePallet,
+            'damagedPallet' => $damagedPallet,
+            'newPouch' => $newPouch,
+            'newGummy' => $newGummy,
+            'inUseGummy' => $inUseGummy,
+            'damagedGummy' => $damagedGummy,
+        ];
+        return view('clerk::shipping.rebag.outTurnReport')->with(['bs' => $bs, 'agents' => $agents, 'transporters' => $transporters, 'registrations' => $registrations, 'users' => $users, 'outTurnReport' => $outTurnReport, 'containerNumbers' => $containerNumbers]);
+    }
+
+    public function updateRebagJobDetails(Request $request, $id)
+    {
+        DB::beginTransaction();
+        try {
+            $blendSheet = BlendSheet::find($id);
+            $customIds = new CustomIds();
+            $driverID = null;
+            BlendShipment::where('blend_id', $id)->delete();
+            BlendBalance::where('blend_id', $id)->delete();
+            ShipmentContainer::where('blend_id', $id)->delete();
+            BlendSupervision::where('blend_id', $id)->delete();
+            BlendMaterial::where('blend_id', $id)->delete();
+            $blendSheet->update([
+                'driver_id' => null,
+                'agent_id' => null,
+                'transporter_id' => null,
+                'registration' => null,
+                'seal_number' => null,
+                'escort' => null,
+                'blend_date' => null,
+                'container_tare' => null,
+                'output_packages' => null,
+                'output_weight' => null,
+                'packet_tare' => null,
+                'b_dust' => null,
+                'c_dust' => null,
+                'fibre' => null,
+                'sweepings' => null,
+            ]);
+
+            if ($request->idNumber) {
+                $drivers = Driver::where('id_number', $request->idNumber)->first();
+                if (!$drivers) {
+                    $driverId = $customIds->generateId();
+                    $newDriver = [
+                        'driver_id' => $driverId,
+                        'id_number' => $request->idNumber,
+                        'driver_name' => strtoupper($request->driverName),
+                        'phone' => $request->driverPhone
+                    ];
+                    Driver::create($newDriver);
+                    $driverID = $newDriver['driver_id'];
+                } else {
+                    $driverID = $drivers->driver_id;
+                }
+            }
+
+            $outputPacks = 0;
+            $outputWeight = 0;
+            if ($request->blend !== null) {
+                foreach ($request->blend as $shipping) {
+                    $blendShipment = $customIds->generateId();
+                    $shipment = [
+                        'blend_shipment_id' => $blendShipment,
+                        'blend_id' => $blendSheet->blend_id,
+                        'blended_packages' => $shipping['packages'],
+                        'unit_weight' => $shipping['weight'],
+                        'weight_variance' => $request->tareVariance,
+                        'net_weight' => floatval($shipping['packages']) * floatval($shipping['weight']),
+                        'package_tare' => $request->packageTare,
+                        'gross_weight' => floatval($shipping['packages']) * floatval($shipping['weight']) + (floatval($shipping['packages']) * floatval($request->packageTare)) + floatval($shipping['packages']) * floatval($request->tareVariance)
+                    ];
+                    $outputPacks += floatval($shipping['packages']);
+                    $outputWeight += floatval($shipping['weight']) * floatval($shipping['packages']);
+                    BlendShipment::create($shipment);
+                }
+            }
+
+            $blendSheet->update([
+                'driver_id' => $driverID ?? null,
+                'agent_id' => $request->agentId ?? null,
+                'transporter_id' => $request->transporter ?? null,
+                'registration' => $request->registration ?? null,
+                'seal_number' => $request->seal ?? null,
+                'escort' => $request->escortId ?? null,
+                'blend_date' => $request->blendDate,
+                'container_tare' => $request->tare,
+                'output_packages' => $outputPacks,
+                'output_weight' => $outputWeight,
+                'packet_tare' => $request->packageTare,
+                'b_dust' => $request->bDust,
+                'c_dust' => $request->cDust,
+                'fibre' => $request->fibre,
+                'sweepings' => $request->sweepings,
+            ]);
+
+            if ($request->balances !== null) {
+                foreach ($request->balances as $blendBal) {
+                    $blendBalance = $customIds->generateId();
+                    $balance = [
+                        'blend_balance_id' => $blendBalance,
+                        'blend_id' => $blendSheet->blend_id,
+                        'ex_packages' => $blendBal['packages'],
+                        'unit_weight' => floatval($blendBal['weight']),
+                        'net_weight' => floatval($blendBal['weight']) * floatval($blendBal['packages']),
+                        'station_id' => $blendSheet->station_id,
+                        'gross_weight' => floatval($blendBal['weight']) * floatval($blendBal['packages']),
+                        'type' => 1,
+                    ];
+                    BlendBalance::create($balance);
+                }
+            }
+
+            BlendBalance::create([
+                'blend_balance_id' => (new CustomIds())->generateId(),
+                'blend_id' => $blendSheet->blend_id,
+                'ex_packages' => 1,
+                'unit_weight' => $request->bDust,
+                'net_weight' => $request->bDust,
+                'station_id' => $blendSheet->station_id,
+                'gross_weight' => $request->bDust,
+                'type' => 2
+            ]);
+
+            if ($request->containers !== null) {
+                // Get all submitted container numbers
+                $submittedContainerNumbers = [];
+
+                foreach ($request->containers as $contain) {
+                    $containerNumber = $contain['containerNumber'];
+
+                    // Check if this container already exists for this blend
+                    $existingContainer = ShipmentContainer::where('blend_id', $blendSheet->blend_id)
+                        ->where('container_number', $containerNumber)
+                        ->first();
+
+                    if ($existingContainer) {
+                        // UPDATE existing container
+                        $existingContainer->update([
+                            'seal_number' => $contain['sealNumber'],
+                            'tare_weight' => $contain['containerTareWeight'] ?? null,
+                            'pallet_weight' => $contain['palletWeight'] ?? null,
+                        ]);
+
+                        $submittedContainerNumbers[] = $containerNumber;
+                    } else {
+                        // CREATE new container
+                        $container = [
+                            'container_id' => $customIds->generateId(),
+                            'container_number' => $containerNumber,
+                            'seal_number' => $contain['sealNumber'],
+                            'tare_weight' => $contain['containerTareWeight'] ?? null,
+                            'pallet_weight' => $contain['palletWeight'] ?? null,
+                            'blend_id' => $blendSheet->blend_id
+                        ];
+
+                        ShipmentContainer::create($container);
+                        $submittedContainerNumbers[] = $containerNumber;
+                    }
+                }
+
+                // DELETE containers that were removed (exist in DB but not in submitted data)
+                ShipmentContainer::where('blend_id', $blendSheet->blend_id)
+                    ->whereNotIn('container_number', $submittedContainerNumbers)
+                    ->delete();
+            }
+
+            $customId = new CustomIds();
+            foreach ($request->supervisor as $key => $user) {
+                $supervisor = [
+                    'supervision_id' => $customId->generateId(),
+                    'blend_id' => $id,
+                    'supervisor_type' => $key,
+                    'supervisor_name' => $user['name'],
+                    'compiled_by' => auth()->user()->user_id
+                ];
+                BlendSupervision::create($supervisor);
+            }
+            foreach ($request->new as $key => $new) {
+                $newMaterial = [
+                    'material_id' => $customId->generateId(),
+                    'blend_id' => $id,
+                    'material_type' => $key,
+                    'total' => $new['name'],
+                    'condition' => 1
+                ];
+                BlendMaterial::create($newMaterial);
+            }
+            foreach ($request->inUse as $key => $used) {
+                $usedMaterial = [
+                    'material_id' => $customId->generateId(),
+                    'blend_id' => $id,
+                    'material_type' => $key,
+                    'total' => $used['name'],
+                    'condition' => 2
+                ];
+                BlendMaterial::create($usedMaterial);
+            }
+            foreach ($request->damaged as $key => $used) {
+                $usedMaterial = [
+                    'material_id' => $customId->generateId(),
+                    'blend_id' => $id,
+                    'material_type' => $key,
+                    'total' => $used['name'],
+                    'condition' => 3
+                ];
+                BlendMaterial::create($usedMaterial);
+            }
+            if ($blendSheet->status == 4) {
+                BlendSheet::where('blend_id', $id)->update(['status' => 4]);
+            } elseif ($blendSheet->status == 3) {
+                BlendSheet::where('blend_id', $id)->update(['status' => 3]);
+            } else {
+                BlendSheet::where('blend_id', $id)->update(['status' => 3]);
+            }
+            BlendTea::where('blend_id', $id)->update(['status' => 1]);
+            $this->logger->create();
+            DB::commit();
+            return redirect()->route('clerk.rebagJobs')->with('success', 'Success! Blend sheet updated successfully');
+        } catch (Exception $exception) {
+            DB::rollback();
+            return redirect()->back()->with('error', 'Oops! An error occurred please try again ' . $exception->getMessage());
+        }
+    }
+
+    public function markRebagJobAsShipped($id)
+    {
+        DB::beginTransaction();
+        try {
+            BlendSheet::where('blend_id', $id)->update(['status' => 3]);
+            BlendTea::where('blend_id', $id)->update(['status' => 1]);
+            $this->logger->create();
+            DB::commit();
+            return redirect()->back()->with('success', 'Success! Blend sheet details updated successfully');
+        } catch (Exception $e) {
+            // Rollback the transaction if an exception occurs
+            DB::rollback();
+            // Handle or log the exception
+            return redirect()->back()->with('error', 'Oops! An error occurred please try again');
+        }
+    }
+
+    public function editRebagJob($id)
+    {
+        $sheet = BlendSheet::find($id);
+        $blendTeas = BlendTea::where('blend_id', $id)->count();
+        $stations = Station::where('status', 1)->get();
+        $ports = Destination::all();
+        $clients = DB::table('currentstock')
+            ->whereIn('station_id', $stations->pluck('station_id')->toArray())
+            ->groupBy('client_id', 'client_name')
+            ->select('client_id', 'client_name')
+            ->get();
+        return view('clerk::shipping.rebag.edit')->with(['ports' => $ports, 'stations' => $stations, 'clients' => $clients, 'sheet' => $sheet, 'blendTeas' => $blendTeas]);
+    }
+
+    public function updateRebag(Request $request, $id)
+    {
+        $request->validate([
+            'client' => 'required|string',
+            'station' => 'required|string',
+            'shipmentNumber' => 'required|string|unique:blend_sheets,blend_number,' . $id . ',blend_id',
+            'contract' => 'required|string',
+            'destination' => 'required|string',
+            'packagingType' => 'required|string',
+            'containerSize' => 'required|string',
+            'consignee' => 'required|string',
+            'mark' => 'required|string',
+        ]);
+
+        $sheet = [
+            'client_id' => $request->client,
+            'vessel_name' => $request->vessel,
+            'blend_number' => $request->shipmentNumber,
+            'contract' => $request->contract,
+            'destination_id' => $request->destination,
+            'garden' => $request->gardenName,
+            'grade' => $request->blendGrade,
+            'package_type' => $request->packagingType,
+            'container_size' => $request->containerSize,
+            'consignee' => $request->consignee,
+            'shipping_mark' => $request->mark,
+            'standard_details' => $request->shippingInstruction,
+            'station_id' => $request->station,
+            'address' => [
+                'address' => $request->address,
+                'mobile' => $request->mobile,
+                'box' => $request->box,
+                'state' => $request->state
+            ],
+            'booking_number' => $request->bookingNumber,
+            'si_number' => $request->shippingNumber,
+        ];
+        BlendSheet::where('blend_id', $id)->update($sheet);
+        $this->logger->create();
+        return redirect()->route('clerk.addRebagJobTeas', $id)->with('success', 'Success! Blend sheet updated successfully');
+    }
+
+    public function downloadRebagJob($id)
+    {
+        return $this->AppClass->downloadBlendJob($id);
+    }
+
+    public function downloadRebagJobPackingList($id)
+    {
+        return $this->AppClass->downloadBlendPackingList($id);
+    }
+
+    public function downloadRebagJobPackingListCont($id)
+    {
+        return $this->AppClass->downloadBlendPackingListCont($id);
+    }
+
+    public function downloadRebagJobDriverClearance($id)
+    {
+        return $this->AppClass->driverClearanceBlends($id);
+    }
+
+    public function downloadRebagJobPackingListExcel($id)
+    {
+        return $this->AppClass->downloadBlendPackingListExcel($id);
+    }
+
+    public function downloadRebagPackingListContExcel($id)
+    {
+        return $this->AppClass->downloadBlendPackingListContExcel($id);
+    }
+
+    public function updateBlendLogistics(Request $request, $id)
+    {
+        DB::beginTransaction();
+        try {
+            $blendSheet = BlendSheet::find($id);
+            $customIds = new CustomIds();
+            $driverID = null;
+
+            if ($request->idNumber) {
+                $existingDriver = Driver::where('id_number', $request->idNumber)->first();
+                if (!$existingDriver) {
+                    $driverID = $customIds->generateId();
+                    Driver::create([
+                        'driver_id' => $driverID,
+                        'id_number' => $request->idNumber,
+                        'driver_name' => strtoupper($request->driverName),
+                        'phone' => $request->driverPhone,
+                    ]);
+                } else {
+                    $driverID = $existingDriver->driver_id;
+                }
+            }
+
+            $blendSheet->update([
+                'driver_id' => $driverID,
+                'agent_id' => $request->agentId,
+                'transporter_id' => $request->transporter,
+                'registration' => $request->registration,
+                'seal_number' => $request->seal,
+                'escort' => $request->escortId,
+                'container_tare' => $request->tare,
+            ]);
+
+            if ($request->containers) {
+                $submitted = [];
+                foreach ($request->containers as $contain) {
+                    $number = $contain['containerNumber'];
+                    $existing = ShipmentContainer::where('blend_id', $id)->where('container_number', $number)->first();
+                    if ($existing) {
+                        $existing->update([
+                            'seal_number' => $contain['sealNumber'],
+                            'tare_weight' => $contain['containerTareWeight'] ?: null,
+                            'pallet_weight' => $contain['palletWeight'] ?: null,
+                        ]);
+                    } else {
+                        ShipmentContainer::create([
+                            'container_id' => $customIds->generateId(),
+                            'container_number' => $number,
+                            'seal_number' => $contain['sealNumber'],
+                            'tare_weight' => $contain['containerTareWeight'] ?: null,
+                            'pallet_weight' => $contain['palletWeight'] ?: null,
+                            'blend_id' => $id,
+                        ]);
+                    }
+                    $submitted[] = $number;
+                }
+                ShipmentContainer::where('blend_id', $id)->whereNotIn('container_number', $submitted)->delete();
+            }
+
+            DB::commit();
+            return redirect()->route('clerk.viewBlendProcessing')->with('success', 'Logistics details saved successfully');
+        } catch (Exception $exception) {
+            DB::rollback();
+            return redirect()->back()->with('error', 'Oops! An error occurred: ' . $exception->getMessage());
+        }
+    }
+
+    public function initateSI($id)
+    {
+        $si = ShippingInstruction::find($id);
+
+        if (!$si) {
+            return redirect()->back()->with('error', 'SI not found');
+        }
+
+        if ($si->status != 0) {
+            return redirect()->back()->with('error', 'This SI has already been initiated');
+        }
+
+        $si->update(['status' => 1]);
+        $this->logger->create();
+
+        return redirect()->back()->with('success', 'Success! SI initiated successfully');
+    }
+
+    public function approveSIFirst($id)
+    {
+        $si = ShippingInstruction::find($id);
+
+        if (!auth()->user()->hasPermission('straightline.approve') && auth()->user()->role_id != 2) {
+            return redirect()->back()->with('error', 'You do not have permission to approve this SI');
+        }
+
+        if (!$si || $si->status != 1) {
+            return redirect()->back()->with('error', 'This SI is not awaiting first approval');
+        }
+
+        $si->update(['status' => 2]);
+
+        Approval::create([
+            'approval_id' => (new CustomIds())->generateId(),
+            'job_id' => $si->shipping_id,
+            'user_id' => auth()->user()->user_id,
+            'approval_date' => time(),
+            'order' => 1,
+        ]);
+
+        $this->logger->create();
+
+        return redirect()->back()->with('success', 'Success! SI approved — update transport details next');
+    }
+
+    public function updateShippingInstructionDetails(Request $request, $id)
+    {
+        $si = ShippingInstruction::find($id);
+
+        if (!$si || $si->status != 2) {
+            return redirect()->back()->with('error', 'This SI is not ready for transport details');
+        }
+
+        $driver = Driver::where('id_number', $request->idNumber)->first();
+
+        if (!$driver) {
+            $driverId = (new CustomIds())->generateId();
+            Driver::create([
+                'driver_id' => $driverId,
+                'id_number' => $request->idNumber,
+                'driver_name' => strtoupper($request->driverName),
+                'phone' => $request->driverPhone,
+            ]);
+        } else {
+            $driverId = $driver->driver_id;
+        }
+
+        $si->update([
+            'container_number' => $request->containerNumber,
+            'container_tare' => $request->tare,
+            'clearing_agent' => $request->agent,
+            'seal_number' => $request->seal,
+            'escort' => $request->escort,
+            'transporter_id' => $request->transporter,
+            'registration' => $request->registration,
+            'driver_id' => $driverId,
+            'status' => $si->status <= 3 ? 3 : 4,
+        ]);
+
+        $this->logger->create();
+
+        return redirect()->back()->with('success', 'Success! Transport details saved and SI sent for final approval');
+    }
+
+    public function approveSIFinal($id)
+    {
+        $si = ShippingInstruction::find($id);
+
+        if (!auth()->user()->hasPermission('straightline.approve') && auth()->user()->role_id != 2) {
+            return redirect()->back()->with('error', 'You do not have permission to give final approval on this SI');
+        }
+
+        if (!$si || $si->status != 3) {
+            return redirect()->back()->with('error', 'This SI has not been submitted for approval yet');
+        }
+
+        if (is_null($si->transporter_id)) {
+            return redirect()->back()->with('error', 'Cannot approve — transporter details are missing');
+        }
+
+        $si->update(['status' => 4, 'ship_date' => time()]);
+
+        Approval::create([
+            'approval_id' => (new CustomIds())->generateId(),
+            'job_id' => $si->shipping_id,
+            'user_id' => auth()->user()->user_id,
+            'approval_date' => time(),
+            'order' => 2,
+        ]);
+
+        $this->logger->create();
+
+        return redirect()->back()->with('success', 'Success! SI approved and marked as shipped');
+    }
+
+    public function getBlendLogistics($id)
+    {
+        $bs = BlendSheet::find($id);
+        $driver = Driver::where('driver_id', $bs->driver_id)->first();
+
+        $containers = ShipmentContainer::leftJoin('drivers', 'drivers.driver_id', '=', 'shipment_containers.driver_id')
+            ->leftJoin('clearing_agents as ca', 'ca.agent_id', '=', 'shipment_containers.agent_id')
+            ->leftJoin('transporters', 'transporters.transporter_id', '=', 'shipment_containers.transporter_id')
+            ->select('shipment_containers.*', 'driver_name', 'phone', 'id_number', 'transporter_name', 'agent_name')
+            ->where('blend_id', $id)
+            ->orderBy('shipment_containers.created_at')
+            ->get();
+
+        return response()->json([
+            'packageTare' => $bs->packet_tare,
+            'container_tare' => $bs->container_tare,
+            'agent_id' => $bs->agent_id,
+            'seal_number' => $bs->seal_number,
+            'escort' => $bs->escort,
+            'blend_date' => $bs->blend_date,
+            'transporter_id' => $bs->transporter_id,
+            'registration' => $bs->registration,
+            'id_number' => $driver?->id_number,
+            'driver_name' => $driver?->driver_name,
+            'phone' => $driver?->phone,
+            'canApproveContainer' => (bool) canuser('blend.container.approve'),
+            'containers' => $containers,
+        ]);
+    }
+
+    public function manageContainers($id)
+    {
+        $blend = BlendSheet::findOrFail($id);
+        $containers = ShipmentContainer::leftJoin('drivers', 'drivers.driver_id', '=', 'shipment_containers.driver_id')
+            ->leftJoin('clearing_agents as ca', 'ca.agent_id', '=', 'shipment_containers.agent_id')
+            ->leftJoin('transporters', 'transporters.transporter_id', '=', 'shipment_containers.transporter_id')
+            ->select('shipment_containers.*', 'driver_name', 'phone', 'id_number', 'transporter_name', 'agent_name')
+            ->where('blend_id', $id)
+            ->orderBy('shipment_containers.created_at')
+            ->get();
+        $agents = ClearingAgent::orderBy('agent_name')->get();
+        $transporters = Transporter::orderBy('transporter_name')->get();
+        $registrations = BlendSheet::pluck('registration')->toArray();
+        $users = Driver::orderBy('driver_name')->get();
+        return view('clerk::shipping.containers.index', compact('blend', 'containers', 'agents', 'transporters', 'registrations', 'users'));
+    }
+
+    public function storeContainer(Request $request, $id)
+    {
+        $data = $request->validate([
+            'containerNumber' => 'required|string|max:20',
+            'seal' => 'required|string|max:50',
+            'tare' => 'nullable|numeric',
+            'palletWeight' => 'nullable|numeric',
+            'packages' => 'nullable|numeric',
+            'weight' => 'nullable|numeric',
+            'agentId' => 'required|exists:clearing_agents,agent_id',
+            'escortId' => 'required|in:yes,no',
+            'transporter' => 'required|exists:transporters,transporter_id',
+            'registration' => 'required|string|max:20',
+            'idNumber' => 'required|string|max:20',
+            'driverName' => 'required|string|max:100',
+            'driverPhone' => 'required|string|max:20',
+        ]);
+
+        $driver = Driver::where('id_number', $data['idNumber'])->first();
+
+        if ($driver){
+            $driverId = $driver->driver_id;
+        }else{
+            $newDriver = Driver::create([
+                'driver_id' => (new CustomIds())->generateId(),
+                'id_number' => $data['idNumber'],
+                'driver_name' => $data['driverName'],
+                'phone' => $data['driverPhone']
+            ]);
+
+            $driverId = $newDriver['driver_id'];
+        }
+
+        ShipmentContainer::create([
+            'container_id' => (new CustomIds())->generateId(),
+            'blend_id' => $id,
+            'container_number' => $data['containerNumber'],
+            'seal_number' => $data['seal'],
+            'tare_weight' => $data['tare'] ?? null,
+            'pallet_weight' => $data['palletWeight'] ?? null,
+            'packages' => $data['packages'] ?? null,
+            'weight' => $data['weight'] ?? null,
+            'agent_id' => $data['agentId'],
+            'escort' => $data['escortId'],
+            'transporter_id' => $data['transporter'],
+            'registration' => $data['registration'],
+            'driver_id' => $driverId,
+            'status' => 'pending',
+        ]);
+
+        return redirect()->back()->with('success', 'Container added successfully.');
+    }
+
+    public function updateContainer(Request $request, $containerId)
+    {
+        $container = ShipmentContainer::findOrFail($containerId);
+
+        $data = $request->validate([
+            'containerNumber' => 'required|string|max:20',
+            'seal' => 'required|string|max:50',
+            'tare' => 'nullable|numeric',
+            'palletWeight' => 'nullable|numeric',
+            'packages' => 'nullable|numeric',
+            'weight' => 'nullable|numeric',
+            'agentId' => 'required|exists:clearing_agents,agent_id',
+            'escortId' => 'required|in:yes,no',
+            'transporter' => 'required|exists:transporters,transporter_id',
+            'registration' => 'required|string|max:20',
+            'idNumber' => 'required|string|max:20',
+            'driverName' => 'required|string|max:100',
+            'driverPhone' => 'required|string|max:20',
+        ]);
+
+        $driver = Driver::where('id_number', $data['idNumber'])->first();
+
+        if ($driver){
+            $driverId = $driver->driver_id;
+        }else{
+            $newDriver = Driver::create([
+                'driver_id' => (new CustomIds())->generateId(),
+                'id_number' => $data['idNumber'],
+                'driver_name' => $data['driverName'],
+                'phone' => $data['driverPhone']
+            ]);
+
+            $driverId = $newDriver['driver_id'];
+        }
+
+        $container->update([
+            'container_number' => $data['containerNumber'],
+            'seal_number' => $data['seal'],
+            'tare_weight' => $data['tare'] ?? null,
+            'pallet_weight' => $data['palletWeight'] ?? null,
+            'packages' => $data['packages'] ?? null,
+            'weight' => $data['weight'] ?? null,
+            'agent_id' => $data['agentId'],
+            'escort' => $data['escortId'],
+            'transporter_id' => $data['transporter'],
+            'registration' => $data['registration'],
+            'driver_id' => $driverId,
+        ]);
+
+        return redirect()->back()->with('success', 'Container updated successfully.');
+    }
+
+    public function destroyContainer($containerId)
+    {
+        ShipmentContainer::findOrFail($containerId)->delete();
+
+        return redirect()->back()->with('success', 'Container deleted successfully.');
+    }
+
+    public function updateContainerStatus(Request $request, $containerId)
+    {
+        $request->validate(['action' => 'required|in:approve,decline']);
+
+        $container = ShipmentContainer::findOrFail($containerId);
+        $container->status = $request->action === 'approve' ? 'approved' : 'declined';
+        $container->save();
+        return response()->json([
+            'success' => true,
+            'status' => $container->status,
+        ]);
+
+    }
+
+    public function downloadContainerClearance($id)
+    {
+        $shipment = ShipmentContainer::where('container_id', $id)
+            ->join('blend_sheets', 'blend_sheets.blend_id', '=', 'shipment_containers.blend_id')
+            ->join('destinations', 'destinations.destination_id', '=', 'blend_sheets.destination_id')
+            ->join('stations', 'stations.station_id', '=', 'blend_sheets.station_id')
+            ->leftJoin('drivers', 'drivers.driver_id', '=', 'shipment_containers.driver_id')
+            ->leftJoin('clearing_agents as ca', 'ca.agent_id', '=', 'shipment_containers.agent_id')
+            ->leftJoin('transporters', 'transporters.transporter_id', '=', 'shipment_containers.transporter_id')
+            ->select('shipment_containers.*', 'driver_name', 'phone', 'id_number', 'transporter_name', 'agent_name', 'blend_number', 'port_name', 'vessel_name', 'contract', 'station_name', 'packages as output_packages', 'weight as output_weight', 'container_size', 'package_type')
+            ->first();
+
+        $staffName = auth()->user()->user->surname.' '.auth()->user()->user->first_name;
+        $date = Carbon::now()->format('D, d-m-Y H:i:s');
+
+        // Render Blade view
+        $html = View::make('clerk::downloads.blend_clearance', compact('shipment','staffName', 'date'))->render();
+
+        // Initialize mPDF with settings
+        $mpdf = new Mpdf([
+            'tempDir' => storage_path('app/mpdf_temp'),
+            'mode'        => 'utf-8',
+            'format'      => 'A4-P', // Landscape
+            'orientation' => 'P',
+            'margin_top'    => 2,
+            'margin_bottom' => 7,
+            'margin_left'   => 5,
+            'margin_right'  => 5,
+            'setAutoBottomMargin' => 'stretch'
+        ]);
+
+        // Set footer for all pages
+        $mpdf->SetHTMLFooter('
+            <table width="100%">
+                <tr>
+                    <td align="center">Page {PAGENO} of {nbpg}</td>
+                </tr>
+            </table>
+        ');
+
+        // Write HTML content
+        $mpdf->WriteHTML($html);
+
+        // Generate PDF filename
+        $pdfFileName = str_replace('/', '', $shipment->blend_number).' CLEARANCE.pdf';
+
+        // Output PDF as downloadable file
+        return Response::make($mpdf->Output($pdfFileName, PdfDestination::INLINE), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="' . $pdfFileName . '"',
+        ]);
+    }
+
+    public function downloadContainerPackingListPdf($id)
+    {
+        $shipment = ShipmentContainer::where('container_id', $id)
+            ->join('blend_sheets', 'blend_sheets.blend_id', '=', 'shipment_containers.blend_id')
+            ->join('clients', 'clients.client_id', '=', 'blend_sheets.client_id')
+            ->join('destinations', 'destinations.destination_id', '=', 'blend_sheets.destination_id')
+            ->select('client_name', 'clients.address', 'blend_number', 'consignee', 'blend_sheets.address as consignee_address', 'blend_shipped', 'port_name', 'booking_number', 'shipping_mark', 'vessel_name', 'package_type', 'garden', 'grade', 'packages', 'weight', 'tare_weight', 'pallet_weight')
+            ->first();
+
+        $printed = auth()->user();
+        $staffName = $printed ? ($printed->first_name.' '.$printed->surname) : auth()->user()->username;
+
+        $html = View::make('clerk::downloads.blend_packing_list_pdf', compact('shipment', 'staffName'))->render();
+
+        // Initialize mPDF with settings
+        $mpdf = new Mpdf([
+            'tempDir' => storage_path('app/mpdf_temp'),
+            'mode'        => 'utf-8',
+            'format'      => 'A4-L', // Landscape
+            'orientation' => 'P',
+            'margin_top'    => 7,
+            'margin_bottom' => 7,
+            'margin_left'   => 7,
+            'margin_right'  => 7,
+            'setAutoBottomMargin' => 'stretch'
+        ]);
+
+        // Set footer for all pages
+        $mpdf->SetHTMLFooter('
+            <table width="100%">
+                <tr>
+                    <td align="center">Page {PAGENO} of {nbpg}</td>
+                </tr>
+            </table>
+        ');
+
+        // Write HTML content
+        $mpdf->WriteHTML($html);
+
+        // Generate PDF filename
+        $pdfFileName = str_replace('/', '', $shipment->blend_number).'.pdf';
+
+        // Output PDF as downloadable file
+        return Response::make($mpdf->Output($pdfFileName, PdfDestination::INLINE), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="' . $pdfFileName . '"',
+        ]);
+    }
+
+    public function downloadContainerPackingListExcel($id)
+    {
+        $shipment = ShipmentContainer::where('container_id', $id)
+            ->join('blend_sheets', 'blend_sheets.blend_id', '=', 'shipment_containers.blend_id')
+            ->join('clients', 'clients.client_id', '=', 'blend_sheets.client_id')
+            ->join('destinations', 'destinations.destination_id', '=', 'blend_sheets.destination_id')
+            ->select('client_name', 'clients.address', 'blend_number', 'consignee', 'blend_sheets.address as consignee_address', 'blend_shipped', 'port_name', 'booking_number', 'shipping_mark', 'vessel_name', 'package_type', 'garden', 'grade', 'packages', 'weight', 'tare_weight', 'pallet_weight')
+            ->firstOrFail();
+
+        $consigneeAddr = json_decode($shipment->consignee_address, true) ?? [];
+        $showPalletWeight = isset($shipment->package_type) && ((int) $shipment->package_type !== 4);
+        $grossPerContainer = $showPalletWeight
+            ? $shipment->weight + $shipment->tare_weight + $shipment->pallet_weight
+            : $shipment->weight + $shipment->tare_weight;
+
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Packing List');
+
+        $lastCol = $showPalletWeight ? 'I' : 'H'; // 9 cols with pallet weight, 8 without
+
+        // ---- Company header ----
+        $sheet->mergeCells("A1:{$lastCol}1");
+        $sheet->setCellValue('A1', 'PACKMAC HOLDINGS LIMITED');
+        $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14)->getColor()->setRGB('008000');
+        $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+        $sheet->mergeCells("A2:{$lastCol}2");
+        $sheet->setCellValue('A2', 'Chai Street Shimanzi High Level, Mombasa P.O BOX 41328-80100, Mombasa, Kenya (TMSA 186)');
+        $sheet->getStyle('A2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+        $sheet->mergeCells("A3:{$lastCol}3");
+        $sheet->setCellValue('A3', 'PACKING LIST');
+        $sheet->getStyle('A3')->getFont()->setBold(true)->setSize(13);
+        $sheet->getStyle('A3')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+        // ---- Info block (label / value / label / value across 4 columns, like the PDF) ----
+        $infoRows = [
+            ['SHIPPER', $shipment->client_name, '', ''],
+            ['', $shipment->address, '', ''],
+            ['SI NUMBER', $shipment->blend_number, 'PORT OF LOADING', 'MOMBASA, KENYA'],
+            ['PO/INV NUMBER', '', 'DESTINATION PORT', $shipment->port_name],
+            ['CONSIGNEE', $shipment->consignee, 'BOOKING NUMBER', $shipment->booking_number],
+            ['PO. BOX', $consigneeAddr['box'] ?? '', 'DATE SHIPPED', $shipment->blend_shipped
+                ? \Carbon\Carbon::createFromTimestamp($shipment->blend_shipped, config('app.timezone'))->format('d/m/Y')
+                : ''],
+            ['ADDRESS', $consigneeAddr['address'] ?? '', 'SHIPPING MARKS', $shipment->shipping_mark],
+            ['STATE/COUNTRY', $consigneeAddr['state'] ?? '', 'OCEAN VESSEL', $shipment->vessel_name],
+            ['PHONE NUMBER', $consigneeAddr['mobile'] ?? '', '', ''],
+        ];
+
+        $row = 5;
+        foreach ($infoRows as [$label1, $value1, $label2, $value2]) {
+            $sheet->setCellValue("A{$row}", $label1);
+            $sheet->getStyle("A{$row}")->getFont()->setBold(true);
+            $sheet->setCellValue("B{$row}", $value1);
+            if ($label2 !== '') {
+                $sheet->setCellValue("C{$row}", $label2);
+                $sheet->getStyle("C{$row}")->getFont()->setBold(true);
+                $sheet->setCellValue("D{$row}", $value2);
+            }
+            $row++;
+        }
+
+        $row += 1; // blank spacer row
+
+        // ---- Packing list table header ----
+        $tableHeaderRow = $row;
+        $headers = ['Garden', 'Invoice No', 'Grade', 'Qty', 'Nett Kgs', 'Tare'];
+        if ($showPalletWeight) {
+            $headers[] = 'Plt Wtt';
+        }
+        $headers[] = 'Gross Kgs';
+        $headers[] = 'REMARKS';
+
+        $col = 'A';
+        foreach ($headers as $header) {
+            $sheet->setCellValue("{$col}{$tableHeaderRow}", $header);
+            $col++;
+        }
+        $sheet->getStyle("A{$tableHeaderRow}:{$lastCol}{$tableHeaderRow}")->getFont()->setBold(true);
+        $sheet->getStyle("A{$tableHeaderRow}:{$lastCol}{$tableHeaderRow}")->getFill()
+            ->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('F0F0F0');
+
+        // ---- Data row ----
+        $dataRow = $tableHeaderRow + 1;
+        $values = [
+            $shipment->garden,
+            $shipment->blend_number,
+            $shipment->grade,
+            $shipment->packages,
+            number_format($shipment->weight, 2),
+            number_format($shipment->tare_weight, 2),
+        ];
+        if ($showPalletWeight) {
+            $values[] = number_format($shipment->pallet_weight, 2);
+        }
+        $values[] = number_format($grossPerContainer, 2);
+        $values[] = '';
+
+        $col = 'A';
+        foreach ($values as $value) {
+            $sheet->setCellValue("{$col}{$dataRow}", $value);
+            $col++;
+        }
+
+        // ---- Totals row ----
+        $totalsRow = $dataRow + 1;
+        $sheet->setCellValue("C{$totalsRow}", 'TOTALS');
+        $sheet->setCellValue("D{$totalsRow}", $shipment->packages);
+        $sheet->setCellValue("E{$totalsRow}", number_format($shipment->weight, 2));
+        $sheet->setCellValue("F{$totalsRow}", number_format($shipment->tare_weight, 2));
+        if ($showPalletWeight) {
+            $sheet->setCellValue("G{$totalsRow}", number_format($shipment->pallet_weight, 2));
+            $sheet->setCellValue("H{$totalsRow}", number_format($grossPerContainer, 2));
+        } else {
+            $sheet->setCellValue("G{$totalsRow}", number_format($grossPerContainer, 2));
+        }
+        $sheet->getStyle("A{$totalsRow}:{$lastCol}{$totalsRow}")->getFont()->setBold(true);
+        $sheet->getStyle("A{$totalsRow}:{$lastCol}{$totalsRow}")->getFill()
+            ->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('E8E8E8');
+
+        // ---- Borders around the table ----
+        $sheet->getStyle("A{$tableHeaderRow}:{$lastCol}{$totalsRow}")
+            ->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
+
+        // ---- Signature + printed-on footer ----
+        $sigRow = $totalsRow + 3;
+        $sheet->setCellValue("A{$sigRow}", 'Prepared By');
+        $sheet->setCellValue("D{$sigRow}", 'Checked By');
+        $sheet->getStyle("B{$sigRow}")->getBorders()->getBottom()->setBorderStyle(Border::BORDER_THIN);
+        $sheet->getStyle("E{$sigRow}")->getBorders()->getBottom()->setBorderStyle(Border::BORDER_THIN);
+
+        $printedRow = $sigRow + 2;
+        $sheet->setCellValue("A{$printedRow}", 'Printed On: ' . now()->format('d/m/Y H:i:s'));
+        $sheet->getStyle("A{$printedRow}")->getFont()->setItalic(true);
+
+        // ---- Column widths ----
+        foreach (range('A', $lastCol) as $c) {
+            $sheet->getColumnDimension($c)->setWidth(18);
+        }
+
+        $fileName = str_replace('/', '', $shipment->blend_number) . '.xlsx';
+
+        $writer = new Xlsx($spreadsheet);
+        $tempFile = tempnam(sys_get_temp_dir(), 'packing_list');
+        $writer->save($tempFile);
+
+        return Response::download($tempFile, $fileName, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ])->deleteFileAfterSend(true);
+    }
 
     public function viewDirectDeliveries(Request $request)
     {
@@ -5635,22 +7484,5 @@ public function viewExternalTransfers(Request $request)
         $users = Driver::all();
 
         return view('clerk::transfers.release-form', compact('transfer', 'warehouses', 'transporters', 'users'));
-    }
-
-    public function downloadBlendPackingListExcel($id)
-    {
-        return $this->AppClass->downloadBlendPackingListExcel($id);
-    }
-    public function downloadBlendPackingListContExcel($id)
-    {
-        return $this->AppClass->downloadBlendPackingListContExcel($id);
-    }
-    public function downloadSIPackingListExcel($id)
-    {
-        return $this->AppClass->downloadSIPackingListExcel($id);
-    }
-    public function downloadSIContinuedPackingListExcel($id)
-    {
-        return $this->AppClass->downloadSIContinuedPackingListExcel($id);
     }
 }

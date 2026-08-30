@@ -89,7 +89,7 @@
 
                             <div class="mb-0">
                                 <label class="my-1 fs-xs fw-bold" style="font-size: 85% !important;">TRANSPORTER</label>
-                                <select name="transporter" id="transporterSelect2" class="form-select js-choice" required onchange="toggleOtherInput(this, 'otherTransporterInput2')">
+                                <select name="transporter" id="transporterSelect2" class="form-select js-choice" onchange="toggleOtherInput(this, 'otherTransporterInput2')">
                                     <option selected disabled value="">-- select transporter --</option>
                                     @foreach($transporters as $transporter)
                                         <option value="{{ $transporter->transporter_id }}">{{ $transporter->transporter_name }}</option>
@@ -101,7 +101,7 @@
 
                             <div class="mb-0">
                                 <label class="my-1 fs-xs fw-bold" style="font-size: 85% !important;">VEHICLE REGISTRATION</label><br>
-                                <input class="form-control" name="registration" id="editableSelect" type="text" list="optionsList" placeholder="-- plate number --" required style="height: 47% !important;">
+                                <input class="form-control" name="registration" id="editableSelect" type="text" list="optionsList" placeholder="-- plate number --" style="height: 47% !important;">
                                 <datalist id="optionsList">
                                     @foreach($registrations as $registration => $transporter)
                                         <option value="{{ $registration }}">{{ $registration }} </option>
@@ -111,7 +111,7 @@
 
                             <div class="mb-2">
                                 <label class="my-1 fs-xs fw-bold" style="font-size: 85% !important;">DRIVER'S ID NUMBER</label> <br>
-                                <input id="idSelect" type="text" list="idList" name="idNumber" class="form-control idSelect" placeholder="-- driver's ID Number --" required style="height: 72% !important;">
+                                <input id="idSelect" type="text" list="idList" name="idNumber" class="form-control idSelect" placeholder="-- driver's ID Number --" style="height: 72% !important;">
                                 <datalist id="idList">
                                     @foreach($users as $user)
                                         <option value="{{ $user->id_number }}">{{ $user->id_number }}</option>
@@ -121,12 +121,12 @@
 
                             <div class="mb-0">
                                 <label class="my-1 fs-xs fw-bold" style="font-size: 85% !important;">DRIVER'S NAME</label>
-                                <input type="text" name="driverName" id="driverName" class="form-control driverName" required style="height: 67% !important;">
+                                <input type="text" name="driverName" id="driverName" class="form-control driverName"  style="height: 67% !important;">
                             </div>
 
                             <div class="mb-0">
                                 <label class="my-1 fs-xs fw-bold" style="font-size: 85% !important;">DRIVER'S PHONE NUMBER</label>
-                                <input type="text" name="driverPhone" id="driverPhone" class="form-control driverPhone" required style="height: 67% !important;">
+                                <input type="text" name="driverPhone" id="driverPhone" class="form-control driverPhone" style="height: 67% !important;">
                             </div>
                             <div class="mb-5">
                                 <label class="my-1 fs-xs fw-bold" style="font-size: 85% !important;">LOADING NUMBER</label>

@@ -73,9 +73,9 @@
 </head>
 <body>
 <div class="company-info">
-    {{-- <span><img class="logo" src="{{ 'assets/img/favicons/icon.png' }}"></span> --}}
+    <img class="logo" src="data:image/png;base64,{{ base64_encode(file_get_contents(public_path('assets/img/favicons/icon.png'))) }}" alt="Logo">
     <span>
-    <img class="logo" src="{{ asset('assets/img/favicons/icon.png') }}" alt="Logo">
+
 </span>
     <h1 class="heading">PACKMAC HOLDINGS LIMITED</h1>
     <p>Chai Street Shimanzi High Level, Mombasa P.O BOX 41328-80100, Mombasa, Kenya (TMSA 186)</p>
@@ -122,7 +122,7 @@
         <td style="width: 15% !important;"> SEAL NUMBER </td>
         <td style="width: 35% !important;"> :  {{ $sheet->seal_number }} </td>
         <td style="width: 20% !important;"> STATUS </td>
-        <td style="width: 30% !important;"> : {{ $sheet->ship_date == null ? 'Being Processed' : 'Shipped On :'. Carbon\Carbon::createFromTimestamp($sheet->ship_date, config('app.timezone'))->toDateString() }}  </td>
+        <td style="width: 30% !important;"> : {{ $sheet->ship_date == null ? 'Being Processed' : 'Shipped On :'. Carbon\Carbon::createFromTimestamp($sheet->ship_date, config('app.timezone'))->format('D, d-m-Y') }}  </td>
     </tr>
 </table>
 <br>
@@ -165,7 +165,7 @@
             <td>{{ number_format(str_replace([',', '.00'], '', $order->shipped_weight), 2) }}</td>
             <td>{{ $order->production_date }}</td>
             <td>{{ $order->expiry_date }}</td>
-            <td>{{ $order->height ?? 0 }} FT</td>
+            <td>{{ $order->pallet_height ?? 0 }} FT</td>
             <td>
                 {{
                         app('\App\Services\AppClass')->getAgingDays(

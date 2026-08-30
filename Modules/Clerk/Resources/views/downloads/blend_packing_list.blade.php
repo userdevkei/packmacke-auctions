@@ -68,7 +68,8 @@
 <body>
 <?php
 // Calculate per container values
-$containerCount = count($containers);
+$containerCounts = count($containers) ;
+$containerCount = $containerCounts == 0 ? 1 : $containerCounts;
 $packagesPerContainer = floor($sheet->output_packages / $containerCount);
 $weightPerContainer = $sheet->output_weight / $containerCount;
 
@@ -90,46 +91,62 @@ $grandTotalGross = 0;
 ?>
 
 <div class="company-info">
-    <h1 class="heading">{{ $sheet->client_name }}</h1>
-    <p>{{ $sheet->address }}</p>
+    <span>
+        <img class="logo" src="data:image/png;base64,{{ base64_encode(file_get_contents(public_path('assets/img/favicons/icon.png'))) }}" alt="Logo">
+    </span>
+    <h1 class="heading">PACKMAC HOLDINGS LIMITED</h1>
+    <p>Chai Street Shimanzi High Level, Mombasa P.O BOX 41328-80100, Mombasa, Kenya (TMSA 186)</p>
 </div>
+
 <div class="header">PACKING LIST<hr></div>
 <table>
     <tr>
-        <td style="width: 15% !important; font-weight: bold !important;"> INVOICE NUMBER </td>
+        <td style="width: 15% !important; font-weight: bold !important;"> SHIPPER </td>
+        <td style="width: 85% !important;">
+            <h4> : {{ $sheet->client_name }}</h4>
+            <p>: {{ $sheet->address }}</p>
+        </td>
+    </tr>
+    <tr>
+        <td style="width: 15% !important; font-weight: bold !important;"> SI NUMBER </td>
         <td style="width: 40% !important;"> : {{ $sheet->blend_number }} </td>
         <td style="width: 20%!important;"> PORT OF LOADING </td>
         <td style="width: 25% !important;"> : MOMBASA, KENYA </td>
     </tr>
     <tr>
-        <td style="width: 15%!important;"> CONSIGNEE </td>
-        <td style="width: 40% !important;"> : {{ $sheet->consignee }} </td>
+        <td style="width: 15%!important;"> PO/INV NUMBER </td>
+        <td style="width: 40% !important;"> : </td>
+
         <td style="width: 20% !important;"> DESTINATION PORT </td>
         <td style="width: 25% !important;"> : {{ $sheet->port_name }}</td>
     </tr>
     <tr>
-        <td style="width: 15% !important;">  </td>
-        <td style="width: 40% !important;"> : {{ $consigneeAddr['box'] ?? '' }} </td>
+        <td style="width: 15%!important;"> CONSIGNEE </td>
+        <td style="width: 40% !important;"> : {{ $sheet->consignee }} </td>
         <td style="width: 20% !important;"> BOOKING NUMBER</td>
         <td style="width: 25% !important;"> : {{ $sheet->booking_number }} </td>
     </tr>
     <tr>
-        <td style="width: 15% !important;">  </td>
-        <td style="width: 40% !important;"> : {{ $consigneeAddr['address'] ?? '' }} </td>
+        <td style="width: 15% !important;"> CONSIGNEE PO BOX </td>
+        <td style="width: 40% !important;"> : {{ $consigneeAddr['box'] ?? '' }} </td>
         <td style="width: 20% !important;"> DATE </td>
         <td style="width: 25% !important;"> : {{ \Carbon\Carbon::parse($sheet->blend_date)->format('d/m/Y') }} </td>
     </tr>
     <tr>
-        <td style="width: 15% !important;"> </td>
-        <td style="width: 40% !important;"> : {{ $consigneeAddr['state'] ?? '' }} </td>
+        <td style="width: 15% !important;"> CONSIGNEE ADDRESS </td>
+        <td style="width: 40% !important;"> : {{ $consigneeAddr['address'] ?? '' }} </td>
         <td style="width: 20% !important;"> SHIPPING MARKS </td>
         <td style="width: 25% !important;"> : {{ $sheet->shipping_mark }} </td>
     </tr>
     <tr>
-        <td style="width: 15% !important;"> </td>
-        <td style="width: 40% !important;"> : {{ $consigneeAddr['mobile'] ?? '' }} </td>
+        <td style="width: 15% !important;"> STATE/COUNTRY </td>
+        <td style="width: 40% !important;"> : {{ $consigneeAddr['state'] ?? '' }} </td>
         <td style="width: 20% !important;"> OCEAN VESSEL </td>
         <td style="width: 25% !important;"> : {{ $sheet->vessel_name }} </td>
+    </tr>
+    <tr>
+        <td style="width: 15% !important;"> PHONE NUMBER</td>
+        <td style="width: 40% !important;"> : {{ $consigneeAddr['mobile'] ?? '' }} </td>
     </tr>
 </table>
 

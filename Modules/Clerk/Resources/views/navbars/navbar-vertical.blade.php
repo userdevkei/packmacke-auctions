@@ -141,7 +141,7 @@
                         <div class="d-flex align-items-center"><span class="nav-link-icon"><span class="fa fa-cogs" aria-hidden="true"></span></span><span class="nav-link-text ps-1">Blended Process </span>
                         </div>
                     </a>
-                    <!-- parent pages--><a class="nav-link" href="{{ route('clerk.viewRebagging') }}" role="button" data-bs-toggle="" aria-expanded="false">
+                    <!-- parent pages--><a class="nav-link" href="{{ route('clerk.rebagJobs') }}" role="button" data-bs-toggle="" aria-expanded="false">
                         <div class="d-flex align-items-center"><span class="nav-link-icon"><span class="fa fa-box-open" aria-hidden="true"></span></span><span class="nav-link-text ps-1">Rebagging Process </span>
                         </div>
                     </a>

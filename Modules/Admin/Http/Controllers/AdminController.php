@@ -236,64 +236,71 @@ class AdminController extends Controller
     }
     public function index()
     {
+        $clients = Client::all();
+        return view('admin::welcome')->with(['clients' => $clients]);
+    }
+
+    public function dashboardStats()
+    {
         $orders = DeliveryOrder::leftJoin('loading_instructions', 'loading_instructions.delivery_id', '=', 'delivery_orders.delivery_id')
-            ->select('loading_instructions.status as load_status', 'loading_instructions.deleted_at', 'delivery_orders.created_at as date_received', 'loading_number')
             ->whereNull('delivery_orders.deleted_at');
 
-//// Clone the query builder instance for each variable
-        $uncollected = clone $orders;
-        $late = clone $orders;
-        $noTCI = clone $orders;
-        $overstayed = clone $orders;
-//
-        $uncollected = $uncollected->where('loading_instructions.status', 1)->where('loading_instructions.deleted_at', '=', null)->get();
-        $threshold = Carbon::now();
-        $late = $late->whereRaw("DATE_ADD(loading_instructions.created_at, INTERVAL 2 DAY) <= '$threshold'")->where('loading_instructions.deleted_at', '=', null)->where('loading_instructions.status', 1)->get();
-        $noTCI = $noTCI->where('delivery_orders.delivery_type', 1)
-                ->where(function ($noTCI) {
-                    $noTCI->where('delivery_orders.status', 0)
-                        ->orWhereNull('delivery_orders.status'); // Fixed: checks for null status
-                })
-                ->where(function ($noTCI) {
-                    $noTCI->whereNull('loading_instructions.delivery_id')  // No matching loading instruction
-                        ->orWhereNotNull('loading_instructions.deleted_at');  // Exists but only where deleted_at is not null
-                })
-                ->get();
-        $now = \Carbon\Carbon::now();
-        $overstayed = $overstayed->whereRaw("DATE_ADD(delivery_orders.prompt_date, INTERVAL 7 DAY) <= '$now'")
+        $uncollected = (clone $orders)
             ->where('loading_instructions.status', 1)
-            ->where('loading_instructions.deleted_at', '=', null)
-            ->get();
-//
-        $internal = Transfers::where('transfers.status', '<', 3)
-            ->orWhere('transfers.status', null)
+            ->whereNull('loading_instructions.deleted_at')
+            ->count();
+
+        $threshold = Carbon::now();
+        $late = (clone $orders)
+            ->whereRaw("DATE_ADD(loading_instructions.created_at, INTERVAL 2 DAY) <= ?", [$threshold])
+            ->whereNull('loading_instructions.deleted_at')
+            ->where('loading_instructions.status', 1)
+            ->count();
+
+        $noTCI = (clone $orders)
+            ->where('delivery_orders.delivery_type', 1)
+            ->where(function ($q) {
+                $q->where('delivery_orders.status', 0)->orWhereNull('delivery_orders.status');
+            })
+            ->where(function ($q) {
+                $q->whereNull('loading_instructions.delivery_id')
+                    ->orWhereNotNull('loading_instructions.deleted_at');
+            })
+            ->count();
+
+        $now = Carbon::now();
+        $overstayed = (clone $orders)
+            ->whereRaw("DATE_ADD(delivery_orders.prompt_date, INTERVAL 7 DAY) <= ?", [$now])
+            ->where('loading_instructions.status', 1)
+            ->whereNull('loading_instructions.deleted_at')
+            ->count();
+
+        $internal = Transfers::where(function ($q) {
+            $q->where('transfers.status', '<', 3)->orWhereNull('transfers.status');
+        })
             ->whereNull('transfers.deleted_at')
-            ->latest('transfers.created_at')
-            ->get()
-            ->groupBy('delivery_number');
-//
-        $external = ExternalTransfer::latest('external_transfers.created_at')
-            ->where('external_transfers.status', '<', 3)
-            ->orWhere('external_transfers.status', null)
+            ->distinct()
+            ->count('delivery_number');
+
+        $external = ExternalTransfer::where(function ($q) {
+            $q->where('external_transfers.status', '<', 3)->orWhereNull('external_transfers.status');
+        })
             ->whereNull('external_transfers.deleted_at')
-            ->orderBy('delivery_number', 'desc')
-            ->get()
-            ->groupBy('delivery_number');
-//
-        $si = ShippingInstruction::latest('shipping_instructions.created_at')
-            ->where('shipping_instructions.status', '<', 4)
-            ->orWhere('shipping_instructions.status', null)
+            ->distinct()
+            ->count('delivery_number');
+
+        $si = ShippingInstruction::where(function ($q) {
+            $q->where('shipping_instructions.status', '<', 4)->orWhereNull('shipping_instructions.status');
+        })
             ->whereNull('shipping_instructions.deleted_at')
-            ->get();
+            ->count();
 
         $blend = DB::table('blend_sheets')
-            ->where(function ($query) {
-                $query->where('blend_sheets.status', '<', 4)
-                    ->orWhereNull('blend_sheets.status');
+            ->where(function ($q) {
+                $q->where('blend_sheets.status', '<', 4)->orWhereNull('blend_sheets.status');
             })
             ->whereNull('blend_sheets.deleted_at')
-            ->latest('blend_sheets.created_at')
-            ->get();
+            ->count();
 
         $stocks = DB::table('currentstock')
             ->select('client_name')
@@ -303,10 +310,21 @@ class AdminController extends Controller
             ->where('current_stock', '>', 0)
             ->get();
 
-        $tcis = LoadingInstruction::whereIn('status',[null, 0, 1])->whereNull('deleted_at')->select('loading_number')->get()->groupBy('loading_number')->count();
-        $clients = Client::all();
-//
-        return view('admin::welcome')->with(['blend' => $blend, 'si' => $si, 'internal' => $internal, 'external' => $external, 'uncollected' => $uncollected, 'late' => $late, 'noTCI' => $noTCI, 'overstayed' => $overstayed, 'tcis' => $tcis, 'clients' => $clients, 'stocks' => $stocks]);
+        $clientsCount = Client::count();
+
+        return response()->json([
+            'uncollected' => $uncollected,
+            'late'        => $late,
+            'noTCI'       => $noTCI,
+            'overstayed'  => $overstayed,
+            'internal'    => $internal,
+            'external'    => $external,
+            'si'          => $si,
+            'blend'       => $blend,
+            'clientsCount'=> $clientsCount,
+            'stockedCount'=> $stocks->count(),
+            'topClients'  => $stocks->take(6)->values(),
+        ]);
     }
     public function dashboardReport($id)
     {
@@ -2464,37 +2482,6 @@ class AdminController extends Controller
         $drivers = Driver::all();
         return view('admin::transfers.prepareInternalTransfer')->with(['transfers' => $transfers, 'client' => $client, 'station' => $station, 'destination' => $destination, 'transporters' => $transporters, 'registrations' => $registrations, 'users' => $drivers]);
     }
-    public function prepareToReceiveTransfer($id)
-    {
-        $transfers = Transfers::leftJoin('blendBalances', function ($join) {
-            $join->on('blendBalances.blend_balance_id', '=', 'transfers.stock_id')
-                ->on('blendBalances.blend_id', '=', 'transfers.delivery_id');
-        })
-            ->leftJoin('delivery_orders', function ($join) {
-                $join->on('delivery_orders.delivery_id', '=', 'transfers.delivery_id');
-            })
-            ->leftJoin('stations', 'stations.station_id', '=', 'transfers.station_id')
-            ->leftJoin('grades', 'grades.grade_id', '=', 'delivery_orders.grade_id')
-            ->leftJoin('gardens', 'gardens.garden_id', '=', 'delivery_orders.garden_id')
-            ->leftJoin('clients', 'clients.client_id', '=', 'delivery_orders.client_id')
-            ->leftJoin('stations as destination_station', 'destination_station.station_id', '=', 'transfers.destination')
-            ->leftJoin('warehouse_locations', 'warehouse_locations.location_id', '=', 'destination_station.location_id')
-            ->leftJoin('transporters', 'transporters.transporter_id', '=', 'transfers.transporter_id')
-            ->leftJoin('drivers', 'drivers.driver_id', '=', 'transfers.driver_id')
-            ->orderBy('transfers.created_at', 'desc')
-            ->select('stations.station_name', 'stations.station_id', 'clients.client_name', 'destination_station.station_name as destination_name', 'destination_station.station_id as destination', 'transfers.status', 'transfers.delivery_number', 'transfers.created_at', 'warehouse_locations.location_id', 'stations.location_id as origin', 'transfers.requested_palettes', 'transfers.requested_weight', 'garden_name', 'grade_name', 'invoice_number', 'lot_number', 'stock_id', 'registration', 'driver_name', 'id_number', 'drivers.phone', 'transporters.transporter_id', 'transporter_name', 'transfer_id', 'garden', 'grade', 'blend_number', DB::raw("CASE WHEN blendBalances.blend_balance_id IS NOT NULL THEN 2 WHEN delivery_orders.delivery_id IS NOT NULL THEN 1 ELSE NULL END AS transfer_type"))
-            ->where(['delivery_number' => base64_decode($id)])
-            ->whereIn('transfers.status', [1, 2, 3])
-            ->get();
-
-            return $transfers->first();
-
-        $transporters = Transporter::all();
-        $registrations = Transfers::pluck('registration')->toArray();
-        $drivers = Driver::all();
-        $stations = WarehouseBay::where('station_id', $transfers[0]->destination)->get();
-        return view('admin::transfers.prepareToReceiveTransfer')->with(['transfers' => $transfers, 'transporters' => $transporters, 'registrations' => $registrations, 'users' => $drivers, 'stations' => $stations]);
-    }
     public function viewExternalTransferDetails($id)
     {
         $transfers = ExternalTransfer::leftJoin('blendBalances', function ($join) {
@@ -2564,13 +2551,6 @@ class AdminController extends Controller
             'to' => $to,
         ]);
     }
-
-    /**
-     * Shared query builder for both the grouped (list view) and ungrouped (export) datasets.
-     * All WHERE filters run BEFORE grouping/aggregation wherever the column allows it (indexed,
-     * non-aggregated columns on external_transfers), which lets MySQL use indexes and avoid
-     * scanning + joining rows it would just discard after grouping anyway.
-     */
 
     private function externalTransfersBaseQuery(Request $request, bool $forCount = false)
     {
@@ -2677,17 +2657,16 @@ class AdminController extends Controller
         return $query;
     }
 
-
-public function externalTransfersData(Request $request)
+    public function externalTransfersData(Request $request)
 {
     $groupBy = ['external_transfers.delivery_number', 'external_transfers.lot'];
 
     $saleTypeCase = "CASE
-        WHEN MIN(auctions.delivery_id) IS NULL THEN 'Other'
-        WHEN MIN(auctions.type) = 'auction' THEN 'Auction'
-        WHEN MIN(auctions.type) = 'private' THEN 'Private'
-        ELSE 'Other'
-    END";
+            WHEN MIN(auctions.delivery_id) IS NULL THEN 'Other'
+            WHEN MIN(auctions.type) = 'auction' THEN 'Auction'
+            WHEN MIN(auctions.type) = 'private' THEN 'Private'
+            ELSE 'Other'
+        END";
 
     // Search and sort are handled client-side by DataTables now, so this
     // endpoint just returns every row matching the panel filters — no
@@ -2734,9 +2713,9 @@ public function externalTransfersData(Request $request)
 
     $statusBadges = [
         0 => '<span class="badge bg-warning">Created</span>',
-        1 => '<span class="badge bg-danger">Pending Approval</span>',
-        2 => '<span class="badge bg-info">Approved (Ops)</span>',
-        3 => '<span class="badge bg-dark">Approved (Fin)</span>',
+        1 => '<span class="badge bg-dark">Initiated</span>',
+        2 => '<span class="badge bg-info">1st Approved</span>',
+        3 => '<span class="badge bg-secondary">Released</span>',
     ];
 
     $data = [];
@@ -2761,162 +2740,162 @@ public function externalTransfersData(Request $request)
     return response()->json(['data' => $data]);
 }
 
-public function externalTransfersExport(Request $request)
-{
-    $hasDateRange = $request->filled('date_from') || $request->filled('date_to');
-    $hasOtherFilter = $request->filled('client_id') || $request->filled('delivery_number')
-        || $request->filled('status') || $request->filled('destination')
-        || $request->filled('source') || $request->filled('sale_type');
+    public function externalTransfersExport(Request $request)
+    {
+        $hasDateRange = $request->filled('date_from') || $request->filled('date_to');
+        $hasOtherFilter = $request->filled('client_id') || $request->filled('delivery_number')
+            || $request->filled('status') || $request->filled('destination')
+            || $request->filled('source') || $request->filled('sale_type');
 
-    // if (!$hasDateRange && !$hasOtherFilter && !$request->boolean('confirm_full')) {
-    //     return response()->json([
-    //         'error' => 'no_filters',
-    //         'message' => 'Exporting the full table can be slow and heavy. Please pick a date range (or another filter) before exporting, or confirm you want everything.',
-    //     ], 422);
-    // }
+        // if (!$hasDateRange && !$hasOtherFilter && !$request->boolean('confirm_full')) {
+        //     return response()->json([
+        //         'error' => 'no_filters',
+        //         'message' => 'Exporting the full table can be slow and heavy. Please pick a date range (or another filter) before exporting, or confirm you want everything.',
+        //     ], 422);
+        // }
 
-    $format = $request->get('format', 'csv');
+        $format = $request->get('format', 'csv');
 
-    $baseRows = $this->externalTransfersBaseQuery($request)
-        ->select([
-            'external_transfers.delivery_id',
-            'external_transfers.delivery_number',
-            'external_transfers.lot',
-            'external_transfers.status',
-            'external_transfers.created_at',
-            'external_transfers.release_date',
-            'external_transfers.transferred_palettes',
-            'external_transfers.transferred_weight',
-            'external_transfers.stock_id',
-            'delivery_orders.invoice_number',
-            'gardens.garden_name',
-            'grades.grade_name',
-            DB::raw("COALESCE(clients.client_name, blendBalances.client_name, '') as client_name"),
-            DB::raw("COALESCE(warehouses.warehouse_name, other_destinations.warehouse_name, '') as warehouse_name"),
-            DB::raw("COALESCE(stations.station_name, blendBalances.station_name, '') as station_name"),
+        $baseRows = $this->externalTransfersBaseQuery($request)
+            ->select([
+                'external_transfers.delivery_id',
+                'external_transfers.delivery_number',
+                'external_transfers.lot',
+                'external_transfers.status',
+                'external_transfers.created_at',
+                'external_transfers.release_date',
+                'external_transfers.transferred_palettes',
+                'external_transfers.transferred_weight',
+                'external_transfers.stock_id',
+                'delivery_orders.invoice_number',
+                'gardens.garden_name',
+                'grades.grade_name',
+                DB::raw("COALESCE(clients.client_name, blendBalances.client_name, '') as client_name"),
+                DB::raw("COALESCE(warehouses.warehouse_name, other_destinations.warehouse_name, '') as warehouse_name"),
+                DB::raw("COALESCE(stations.station_name, blendBalances.station_name, '') as station_name"),
 
-            DB::raw("CASE
+                DB::raw("CASE
+                    WHEN auctions.delivery_id IS NULL THEN 'Other'
+                    WHEN auctions.type = 'auction' THEN 'Auction'
+                    WHEN auctions.type = 'private' THEN 'Private'
+                    ELSE 'Other'
+                END as sale_type"),
+            ])
+            ->orderBy('external_transfers.stock_id'); // chunkById needs a stable, indexed order
+
+        if ($request->filled('sale_type')) {
+            $saleType = ucfirst(strtolower($request->sale_type));
+            $baseRows->havingRaw("CASE
                 WHEN auctions.delivery_id IS NULL THEN 'Other'
                 WHEN auctions.type = 'auction' THEN 'Auction'
                 WHEN auctions.type = 'private' THEN 'Private'
                 ELSE 'Other'
-            END as sale_type"),
-        ])
-        ->orderBy('external_transfers.stock_id'); // chunkById needs a stable, indexed order
+            END = ?", [$saleType]);
+        }
 
-    if ($request->filled('sale_type')) {
-        $saleType = ucfirst(strtolower($request->sale_type));
-        $baseRows->havingRaw("CASE
-            WHEN auctions.delivery_id IS NULL THEN 'Other'
-            WHEN auctions.type = 'auction' THEN 'Auction'
-            WHEN auctions.type = 'private' THEN 'Private'
-            ELSE 'Other'
-        END = ?", [$saleType]);
+        $statusLabels = [
+            0 => 'Created',
+            1 => 'Initiated',
+            2 => '1st Approved',
+            3 => 'Released',
+        ];
+
+        // Resolve once and reuse across every row/chunk rather than re-resolving
+        // the service from the container on every iteration.
+        $agingService = app(\App\Services\AppClass::class);
+
+        // If release_date is null the transfer hasn't been released yet, so aging
+        // is measured against "today" instead — same rule as your existing page.
+        $agingDaysFor = function ($row) use ($agingService) {
+            $timestamp = $row->release_date ? strtotime($row->release_date) : strtotime(now());
+            return $agingService->getAgingDays($row->delivery_id, $timestamp);
+        };
+
+        if ($format === 'pdf') {
+            // Raised for safety; each chunk's HTML is small (500 rows), so this is now a
+            // last-resort ceiling rather than something we actually expect to hit.
+            ini_set('pcre.backtrack_limit', '10000000');
+            ini_set('memory_limit', '512M');
+
+            $mpdf = new Mpdf([
+                'format' => 'A4-L',
+                'orientation' => 'L',
+                'margin_left' => 10,
+                'margin_right' => 10,
+                'margin_top' => 10,
+                'margin_bottom' => 10,
+                'tempDir' => base_path('Files/mpdf'),
+            ]);
+
+            // Opening HTML: styles + table header, written once
+            $mpdf->WriteHTML(
+                view('admin::transfers.partials.export-pdf-header')->render()
+            );
+
+            $rowNumber = 0;
+            $CHUNK_SIZE = 500;
+
+            $baseRows->chunkById($CHUNK_SIZE, function ($chunk) use ($mpdf, $statusLabels, $agingDaysFor, &$rowNumber) {
+                $html = view('admin::transfers.partials.export-pdf-rows', [
+                    'rows' => $chunk,
+                    'statusLabels' => $statusLabels,
+                    'startIndex' => $rowNumber,
+                    'agingDaysFor' => $agingDaysFor,
+                ])->render();
+
+                $mpdf->WriteHTML($html);
+                $rowNumber += $chunk->count();
+            }, 'external_transfers.stock_id', 'stock_id');
+
+            // Closing HTML: </table> + totals footer, written once
+            $mpdf->WriteHTML(
+                view('admin::transfers.partials.export-pdf-footer', ['rowCount' => $rowNumber])->render()
+            );
+
+            return response($mpdf->Output(
+                'external-transfers-' . now()->format('Y-m-d') . '.pdf',
+                \Mpdf\Output\Destination::STRING_RETURN
+            ))->header('Content-Type', 'application/pdf');
+        }
+
+        // CSV stays row-by-row streamed — already had no meaningful cap concern
+        $filename = 'external-transfers-' . now()->format('Y-m-d') . '.csv';
+        $headers = [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+        ];
+        $columns = ['#', 'Date Initiated', 'Delivery Number', 'Invoice Number', 'Garden', 'Grade', 'Client Name', 'Packages', 'Net Weight', 'Transfer From', 'Destination', 'Sale Type', 'Status', 'Aging Days'];
+
+        $callback = function () use ($baseRows, $columns, $statusLabels, $agingDaysFor) {
+            $file = fopen('php://output', 'w');
+            fputcsv($file, $columns);
+            $i = 0;
+            $baseRows->chunkById(1000, function ($chunk) use ($file, $statusLabels, $agingDaysFor, &$i) {
+                foreach ($chunk as $row) {
+                    $i++;
+                    fputcsv($file, [
+                        $i,
+                        Carbon::parse($row->created_at)->format('d/m/y'),
+                        $row->delivery_number . $row->lot,
+                        $row->invoice_number,
+                        $row->garden_name,
+                        $row->grade_name,
+                        $row->client_name,
+                        number_format($row->transferred_palettes, 0),
+                        number_format($row->transferred_weight, 2),
+                        $row->station_name,
+                        $row->warehouse_name,
+                        $row->sale_type,
+                        $statusLabels[$row->status] ?? 'Released',
+                        $agingDaysFor($row) . ' days',
+                    ]);
+                }
+            }, 'external_transfers.stock_id', 'stock_id');
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
     }
-
-    $statusLabels = [
-        0 => 'Created',
-        1 => 'Pending Approval',
-        2 => 'Approved (Ops)',
-        3 => 'Approved (Fin)',
-    ];
-
-    // Resolve once and reuse across every row/chunk rather than re-resolving
-    // the service from the container on every iteration.
-    $agingService = app(\App\Services\AppClass::class);
-
-    // If release_date is null the transfer hasn't been released yet, so aging
-    // is measured against "today" instead — same rule as your existing page.
-    $agingDaysFor = function ($row) use ($agingService) {
-        $timestamp = $row->release_date ? strtotime($row->release_date) : strtotime(now());
-        return $agingService->getAgingDays($row->delivery_id, $timestamp);
-    };
-
-    if ($format === 'pdf') {
-        // Raised for safety; each chunk's HTML is small (500 rows), so this is now a
-        // last-resort ceiling rather than something we actually expect to hit.
-        ini_set('pcre.backtrack_limit', '10000000');
-        ini_set('memory_limit', '512M');
-
-        $mpdf = new Mpdf([
-            'format' => 'A4-L',
-            'orientation' => 'L',
-            'margin_left' => 10,
-            'margin_right' => 10,
-            'margin_top' => 10,
-            'margin_bottom' => 10,
-            'tempDir' => base_path('Files/mpdf'),
-        ]);
-
-        // Opening HTML: styles + table header, written once
-        $mpdf->WriteHTML(
-            view('admin::transfers.partials.export-pdf-header')->render()
-        );
-
-        $rowNumber = 0;
-        $CHUNK_SIZE = 500;
-
-        $baseRows->chunkById($CHUNK_SIZE, function ($chunk) use ($mpdf, $statusLabels, $agingDaysFor, &$rowNumber) {
-            $html = view('admin::transfers.partials.export-pdf-rows', [
-                'rows' => $chunk,
-                'statusLabels' => $statusLabels,
-                'startIndex' => $rowNumber,
-                'agingDaysFor' => $agingDaysFor,
-            ])->render();
-
-            $mpdf->WriteHTML($html);
-            $rowNumber += $chunk->count();
-        }, 'external_transfers.stock_id', 'stock_id');
-
-        // Closing HTML: </table> + totals footer, written once
-        $mpdf->WriteHTML(
-            view('admin::transfers.partials.export-pdf-footer', ['rowCount' => $rowNumber])->render()
-        );
-
-        return response($mpdf->Output(
-            'external-transfers-' . now()->format('Y-m-d') . '.pdf',
-            \Mpdf\Output\Destination::STRING_RETURN
-        ))->header('Content-Type', 'application/pdf');
-    }
-
-    // CSV stays row-by-row streamed — already had no meaningful cap concern
-    $filename = 'external-transfers-' . now()->format('Y-m-d') . '.csv';
-    $headers = [
-        'Content-Type' => 'text/csv',
-        'Content-Disposition' => "attachment; filename=\"{$filename}\"",
-    ];
-    $columns = ['#', 'Date Initiated', 'Delivery Number', 'Invoice Number', 'Garden', 'Grade', 'Client Name', 'Packages', 'Net Weight', 'Transfer From', 'Destination', 'Sale Type', 'Status', 'Aging Days'];
-
-    $callback = function () use ($baseRows, $columns, $statusLabels, $agingDaysFor) {
-        $file = fopen('php://output', 'w');
-        fputcsv($file, $columns);
-        $i = 0;
-        $baseRows->chunkById(1000, function ($chunk) use ($file, $statusLabels, $agingDaysFor, &$i) {
-            foreach ($chunk as $row) {
-                $i++;
-                fputcsv($file, [
-                    $i,
-                    Carbon::parse($row->created_at)->format('d/m/y'),
-                    $row->delivery_number . $row->lot,
-                    $row->invoice_number,
-                    $row->garden_name,
-                    $row->grade_name,
-                    $row->client_name,
-                    number_format($row->transferred_palettes, 0),
-                    number_format($row->transferred_weight, 2),
-                    $row->station_name,
-                    $row->warehouse_name,
-                    $row->sale_type,
-                    $statusLabels[$row->status] ?? 'Released',
-                    $agingDaysFor($row) . ' days',
-                ]);
-            }
-        }, 'external_transfers.stock_id', 'stock_id');
-        fclose($file);
-    };
-
-    return response()->stream($callback, 200, $headers);
-}
 
     public function prepareExternalTransfer(Request $request)
     {
@@ -3307,73 +3286,6 @@ public function externalTransfersExport(Request $request)
 
         $this->logger->create();
         return redirect()->back()->with('success', 'Success! Transfer request initiated successfully');
-    }
-
-    public function releaseTransfer(Request $request)
-    {
-        $transfer = ExternalTransfer::where('ex_transfer_id', $request->releaseId)->first();
-
-        if (!$transfer) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Transfer not found'
-            ], 404);
-        }
-
-        if ($request->status === 'true') {
-            $releaseDate = now();
-            $today = $releaseDate->toDateString();
-
-            // Check if there are already releases today
-            $existingReleaseToday = ExternalTransfer::whereDate('release_date', $today)
-                ->where('delivery_number', $transfer->delivery_number)
-                ->whereNotNull('lot')
-                ->first();
-
-            $delNumber = $transfer->delivery_number;
-
-            if ($existingReleaseToday) {
-                // Use the same lot number as existing releases today
-                $lotNumber = $existingReleaseToday->lot;
-            } else {
-                // This is the first release today, get the next lot number
-                $lotNumber = $this->getNextLotNumber($today, $delNumber);
-            }
-
-            $transfer->update([
-                'release_date' => $releaseDate,
-                'lot' => $lotNumber
-            ]);
-
-            if (Auction::where(['stock_id' => $transfer->stock_id])->exists()) {
-                Auction::where(['stock_id' => $transfer->stock_id])->update([
-                    'release_date' => now()->format('Y-m-d'),
-                    'warehouse_id' => $transfer->warehouse_id
-                    ]);
-            }
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Transfer released successfully with Lot ' . $lotNumber,
-                'lot_number' => $lotNumber,
-                'release_date' => $releaseDate->format('Y-m-d')
-            ]);
-        } else {
-            $transfer->update([
-                'release_date' => null,
-                'lot' => null
-            ]);
-
-            if (Auction::where(['stock_id' => $transfer->stock_id])->exists()) {
-                Auction::where(['stock_id' => $transfer->stock_id])->update(['release_date' => null]);
-            }
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Transfer release cancelled successfully',
-                'release_date' => ''
-            ]);
-        }
     }
 
     private function getNextLotNumber($date, $delNumber)
@@ -4126,67 +4038,88 @@ public function externalTransfersExport(Request $request)
         $this->logger->create();
         return redirect()->back()->with('success', 'Success! Shipment details updated successfully');
     }
+    public function approveSIFirst($id)
+    {
+        $si = ShippingInstruction::find($id);
+
+        if (!$si || $si->status != 1) {
+            return redirect()->back()->with('error', 'This SI is not awaiting first approval');
+        }
+
+        $si->update(['status' => 2]);
+        Approval::create([
+            'approval_id' => (new CustomIds())->generateId(),
+            'job_id' => $si->shipping_id,
+            'user_id' => auth()->user()->user_id,
+            'approval_date' => time(),
+            'order' => 1,
+        ]);
+        $this->logger->create();
+        return redirect()->back()->with('success', 'Success! SI approved — update transport details next');
+    }
+
     public function updateShippingInstructionDetails(Request $request, $id)
     {
-        DB::beginTransaction();
-        try {
-            $driver = Driver::where('id_number', $request->idNumber)->first();
+        $si = ShippingInstruction::find($id);
 
-            if ($driver){
-                $shipment = [
-                    'container_number' => $request->containerNumber,
-                    'container_tare' => $request->tare,
-                    'clearing_agent' => $request->agent,
-                    'seal_number' => $request->seal,
-                    'transporter_id' => $request->transporter,
-                    'driver_id' => $driver->driver_id,
-                    'registration' => $request->registration,
-                    'ship_date' => time(),
-                    'escort' => $request->escort,
-                    'status' => 2
-                ];
-            }else{
-
-                $customId = new CustomIds();
-                $driverId = $customId->generateId();
-
-                $newDriver = [
-                    'driver_id' => $driverId,
-                    'id_number' => $request->idNumber,
-                    'driver_name' => strtoupper($request->driverName),
-                    'phone' => $request->driverPhone
-                ];
-
-                Driver::create($newDriver);
-
-                $shipment = [
-                    'container_number' => $request->containerNumber,
-                    'container_tare' => $request->tare,
-                    'clearing_agent' => $request->agent,
-                    'seal_number' => $request->seal,
-                    'transporter_id' => $request->transporter,
-                    'driver_id' => $driverId,
-                    'registration' => $request->registration,
-                    'ship_date' => time(),
-                    'escort' => $request->escort,
-                    'status' => 2
-                ];
-
-            }
-
-            ShippingInstruction::where('shipping_id', $id)->update($shipment);
-            $this->logger->create();
-
-            // Commit the transaction
-            DB::commit();
-
-        } catch (\Exception $e) {
-            // Rollback the transaction if an exception occurs
-            DB::rollback();
-            // Handle or log the exception
-            return redirect()->back()->with('error', 'Oops! An error occurred please try again');
+        if (!$si || $si->status != 2) {
+            return redirect()->back()->with('error', 'This SI is not ready for transport details');
         }
-        return redirect()->back()->with('success', 'Successful!, Shipping Instructions updated successfully');
+
+        $driver = Driver::where('id_number', $request->idNumber)->first();
+
+        if (!$driver) {
+            $driverId = (new CustomIds())->generateId();
+            Driver::create([
+                'driver_id' => $driverId,
+                'id_number' => $request->idNumber,
+                'driver_name' => strtoupper($request->driverName),
+                'phone' => $request->driverPhone,
+            ]);
+        } else {
+            $driverId = $driver->driver_id;
+        }
+
+        $si->update([
+            'container_number' => $request->containerNumber,
+            'container_tare' => $request->tare,
+            'clearing_agent' => $request->agent,
+            'seal_number' => $request->seal,
+            'escort' => $request->escort,
+            'transporter_id' => $request->transporter,
+            'registration' => $request->registration,
+            'driver_id' => $driverId,
+            'status' => $si->status <= 3 ? 3 : 4,
+        ]);
+
+        $this->logger->create();
+
+        return redirect()->back()->with('success', 'Success! Transport details saved and SI sent for final approval');
+    }
+    public function approveSIFinal($id)
+    {
+        $si = ShippingInstruction::find($id);
+
+        if (!$si || $si->status != 3) {
+            return redirect()->back()->with('error', 'This SI has not been submitted for approval yet');
+        }
+
+        if (is_null($si->transporter_id)) {
+            return redirect()->back()->with('error', 'Cannot approve — transporter details are missing');
+        }
+
+        $si->update(['status' => 4, 'ship_date' => time()]);
+
+        Approval::create([
+            'approval_id' => (new CustomIds())->generateId(),
+            'job_id' => $si->shipping_id,
+            'user_id' => auth()->user()->user_id,
+            'approval_date' => time(),
+            'order' => 2,
+        ]);
+
+        $this->logger->create();
+        return redirect()->back()->with('success', 'Success! SI approved and marked as shipped');
     }
     public function deleteShippingInstructionTea($id)
     {
@@ -7859,6 +7792,7 @@ $clients = Client::join('delivery_orders', 'delivery_orders.client_id', '=', 'cl
             ],
             'booking_number' => $request->bookingNumber,
             'si_number' => $request->shippingNumber,
+            'invoice_number' => $request->invoiceNumber,
         ];
 
         ShippingInstruction::where('shipping_id', $id)->update($si);
@@ -8125,5 +8059,146 @@ $clients = Client::join('delivery_orders', 'delivery_orders.client_id', '=', 'cl
     public function downloadSIContinuedPackingListExcel($id)
     {
         return $this->AppClass->downloadSIContinuedPackingListExcel($id);
+    }
+
+    public function approveTransferFirst($id)
+    {
+        $deliveryNumber = base64_decode($id);
+        $transfers = Transfers::where('delivery_number', $deliveryNumber)->get();
+
+        if ($transfers->isEmpty() || $transfers->contains(fn($t) => $t->status != 0)) {
+            return redirect()->back()->with('error', 'This transfer is not awaiting first approval');
+        }
+
+        Transfers::where('delivery_number', $deliveryNumber)->update(['status' => 1]);
+
+        Approval::create([
+            'approval_id' => (new CustomIds())->generateId(),
+            'job_id' => $deliveryNumber,
+            'user_id' => auth()->user()->user_id,
+            'approval_date' => time(),
+            'order' => 1,
+        ]);
+
+        $this->logger->create();
+
+        return redirect()->back()->with('success', 'Success! Transfer approved — awaiting release');
+    }
+
+    public function approveTransferFinal($id)
+    {
+        $deliveryNumber = base64_decode($id);
+        $transfers = Transfers::where('delivery_number', $deliveryNumber)->get();
+
+        if ($transfers->isEmpty() || $transfers->contains(fn($t) => $t->status != 3)) {
+            return redirect()->back()->with('error', 'This transfer has not been received yet');
+        }
+
+        Transfers::where('delivery_number', $deliveryNumber)->update(['status' => 4]);
+
+        Approval::create([
+            'approval_id' => (new CustomIds())->generateId(),
+            'job_id' => $deliveryNumber,
+            'user_id' => auth()->user()->user_id,
+            'approval_date' => time(),
+            'order' => 2,
+        ]);
+
+        $this->logger->create();
+
+        return redirect()->back()->with('success', 'Success! Transfer fully approved and completed');
+    }
+
+    public function releaseTransfer(Request $request)
+    {
+        $transfer = ExternalTransfer::where('ex_transfer_id', $request->releaseId)->first();
+
+        if (!$transfer) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Transfer not found'
+            ], 404);
+        }
+
+        if ($request->status === 'true') {
+            $releaseDate = now();
+            $today = $releaseDate->toDateString();
+
+            // Check if there are already releases today
+            $existingReleaseToday = ExternalTransfer::whereDate('release_date', $today)
+                ->where('delivery_number', $transfer->delivery_number)
+                ->whereNotNull('lot')
+                ->first();
+
+            $delNumber = $transfer->delivery_number;
+
+            if ($existingReleaseToday) {
+                // Use the same lot number as existing releases today
+                $lotNumber = $existingReleaseToday->lot;
+            } else {
+                // This is the first release today, get the next lot number
+                $lotNumber = $this->getNextLotNumber($today, $delNumber);
+            }
+
+            $transfer->update([
+                'release_date' => $releaseDate,
+                'lot' => $lotNumber
+            ]);
+
+            if (Auction::where(['stock_id' => $transfer->stock_id])->exists()) {
+                Auction::where(['stock_id' => $transfer->stock_id])->update(['release_date' => now()->format('Y-m-d')]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Transfer released successfully with Lot ' . $lotNumber,
+                'lot_number' => $lotNumber,
+                'release_date' => $releaseDate->format('Y-m-d')
+            ]);
+        } else {
+            $transfer->update([
+                'release_date' => null,
+                'lot' => null
+            ]);
+
+            if (Auction::where(['stock_id' => $transfer->stock_id])->exists()) {
+                Auction::where(['stock_id' => $transfer->stock_id])->update(['release_date' => null]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Transfer release cancelled successfully',
+                'release_date' => ''
+            ]);
+        }
+    }
+    public function prepareToReceiveTransfer($id)
+    {
+        $transfers = Transfers::leftJoin('blendBalances', function ($join) {
+            $join->on('blendBalances.blend_balance_id', '=', 'transfers.stock_id')
+                ->on('blendBalances.blend_id', '=', 'transfers.delivery_id');
+        })
+            ->leftJoin('delivery_orders', function ($join) {
+                $join->on('delivery_orders.delivery_id', '=', 'transfers.delivery_id');
+            })
+            ->join('stations', 'stations.station_id', '=', 'transfers.station_id')
+            ->leftJoin('grades', 'grades.grade_id', '=', 'delivery_orders.grade_id')
+            ->leftJoin('gardens', 'gardens.garden_id', '=', 'delivery_orders.garden_id')
+            ->leftJoin('clients', 'clients.client_id', '=', 'delivery_orders.client_id')
+            ->leftJoin('stations as destination_station', 'destination_station.station_id', '=', 'transfers.destination')
+            ->leftJoin('warehouse_locations', 'warehouse_locations.location_id', '=', 'destination_station.location_id')
+            ->leftJoin('transporters', 'transporters.transporter_id', '=', 'transfers.transporter_id')
+            ->leftJoin('drivers', 'drivers.driver_id', '=', 'transfers.driver_id')
+            ->orderBy('transfers.created_at', 'desc')
+            ->select('stations.station_name', 'stations.station_id', 'clients.client_name', 'destination_station.station_name as destination_name', 'destination_station.station_id as destination', 'transfers.status', 'transfers.delivery_number', 'transfers.created_at', 'warehouse_locations.location_id', 'stations.location_id as origin', 'transfers.requested_palettes', 'transfers.requested_weight', 'garden_name', 'grade_name', 'invoice_number', 'lot_number', 'stock_id', 'registration', 'driver_name', 'id_number', 'drivers.phone', 'transporters.transporter_id', 'transporter_name', 'transfer_id', 'garden', 'grade', 'blend_number', DB::raw("CASE WHEN blendBalances.blend_balance_id IS NOT NULL THEN 2 WHEN delivery_orders.delivery_id IS NOT NULL THEN 1 ELSE NULL END AS transfer_type"))
+            ->where(['delivery_number' => base64_decode($id)])
+            ->whereIn('transfers.status', [2, 3])
+            ->get();
+
+        $transporters = Transporter::all();
+        $registrations = Transfers::pluck('registration')->toArray();
+        $drivers = Driver::all();
+        $stations = WarehouseBay::where('station_id', $transfers[0]->destination)->get();
+        return view('admin::transfers.prepareToReceiveTransfer')->with(['transfers' => $transfers, 'transporters' => $transporters, 'registrations' => $registrations, 'users' => $drivers, 'stations' => $stations]);
     }
 }

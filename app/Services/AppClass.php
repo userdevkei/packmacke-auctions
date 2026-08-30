@@ -3392,10 +3392,10 @@ return Response::make($mpdf->Output($pdfFileName, PdfDestination::INLINE), 200, 
             ->leftJoin('grades', 'grades.grade_id', 'delivery_orders.grade_id')
             ->leftJoin('warehouses', 'warehouses.warehouse_id', '=', 'delivery_orders.warehouse_id')
             ->select(
-                'sale_number', 'garden_name', 'grade_name', 'invoice_number', 'registration',
+                'sale_number', 'garden_name', 'grade_name', 'delivery_orders.invoice_number', 'registration',
                 'driver_name', 'drivers.phone', 'shipping_instructions', 'ship_date',
                 'client_name', 'shipping_number', 'vessel_name', 'port_name',
-                'shipped_packages', 'shipped_weight', 'consignee', 'shipping_mark',
+                'shipped_packages', 'shipped_weight', 'consignee', 'shipping_mark', 'shipments.package_tare', 'shipments.pallet_weight', 'shipments.pallet_height',
                 'container_number', 'agent_name', 'transporter_name', 'seal_number', 'container_size', 'ship_date', 'delivery_orders.delivery_id', 'warehouse_name', 'production_date', 'expiry_date', 'height'
             )
             ->where('shipping_instructions.shipping_id', $id)
@@ -3459,9 +3459,8 @@ return Response::make($mpdf->Output($pdfFileName, PdfDestination::INLINE), 200, 
             ->join('stock_ins', 'stock_ins.stock_id', '=', 'shipments.stock_id')
             ->join('user_infos', 'user_infos.user_id', '=', 'shipping_instructions.user_id')
             ->select(
-                'clients.address as client_address', 'shipping_instructions.address', 'garden_name', 'grade_name', 'invoice_number', 'ship_date',
-                'client_name', 'shipping_number', 'vessel_name', 'port_name', 'shipped_packages', 'shipped_weight', 'consignee', 'shipping_mark', 'container_number', 'agent_name', 'seal_number','delivery_orders.delivery_id', 'production_date', 'expiry_date', 'shipments.pallet_height as height', 'lot_number', 'shipments.package_tare', 'shipments.pallet_weight', 'surname', 'first_name', 'shipping_instructions.booking_number'
-            )
+                'clients.address as client_address', 'shipping_instructions.address', 'garden_name', 'grade_name', 'ship_date',
+                'client_name', 'shipping_number', 'vessel_name', 'port_name', 'shipped_packages', 'shipped_weight', 'consignee', 'shipping_mark', 'container_number', 'agent_name', 'seal_number','delivery_orders.delivery_id', 'production_date', 'expiry_date', 'shipments.pallet_height as height', 'lot_number', 'shipments.package_tare', 'shipments.pallet_weight', 'surname', 'first_name', 'shipping_instructions.booking_number', 'shipping_instructions.invoice_number')
             ->where('shipping_instructions.shipping_id', $shippingId)
             ->whereNull('shipments.deleted_at')
             ->get();
@@ -3526,9 +3525,8 @@ return Response::make($mpdf->Output($pdfFileName, PdfDestination::INLINE), 200, 
             ->join('stock_ins', 'stock_ins.stock_id', '=', 'shipments.stock_id')
             ->join('user_infos', 'user_infos.user_id', '=', 'shipping_instructions.user_id')
             ->select(
-                'clients.address as client_address', 'shipping_instructions.address', 'garden_name', 'grade_name', 'invoice_number', 'ship_date',
-                'client_name', 'shipping_number', 'vessel_name', 'port_name', 'shipped_packages', 'shipped_weight', 'consignee', 'shipping_mark', 'container_number', 'agent_name', 'seal_number','delivery_orders.delivery_id', 'production_date', 'expiry_date', 'shipments.pallet_height as height', 'lot_number', 'shipments.package_tare', 'shipments.pallet_weight', 'surname', 'first_name', 'shipping_instructions.booking_number'
-            )
+                'clients.address as client_address', 'shipping_instructions.address', 'garden_name', 'grade_name', 'ship_date',
+                'client_name', 'shipping_number', 'vessel_name', 'port_name', 'shipped_packages', 'shipped_weight', 'consignee', 'shipping_mark', 'container_number', 'agent_name', 'seal_number','delivery_orders.delivery_id', 'production_date', 'expiry_date', 'shipments.pallet_height as height', 'lot_number', 'shipments.package_tare', 'shipments.pallet_weight', 'surname', 'first_name', 'shipping_instructions.booking_number', 'shipping_instructions.invoice_number')
             ->where(['shipping_instructions.si_number' => base64_decode($id), 'load_type' => 2])
             ->whereNull('shipments.deleted_at')
             ->get();
@@ -3540,7 +3538,7 @@ return Response::make($mpdf->Output($pdfFileName, PdfDestination::INLINE), 200, 
         $date = Carbon::now()->format('D, d-m-Y H:i:s');
 
         // Render Blade view
-            $html = View::make('clerk::downloads.si_palletized_continued_packing_list', compact('shippings', 'sheet', 'staffName', 'date'))->render();
+        $html = View::make('clerk::downloads.si_palletized_continued_packing_list', compact('shippings', 'sheet', 'staffName', 'date'))->render();
 
         // Initialize mPDF with settings
         $mpdf = new Mpdf([
@@ -3646,10 +3644,10 @@ return Response::make($mpdf->Output($pdfFileName, PdfDestination::INLINE), 200, 
             ->leftJoin('clearing_agents', 'clearing_agents.agent_id', '=', 'blend_sheets.agent_id')
             ->leftJoin('transporters', 'transporters.transporter_id', '=', 'blend_sheets.transporter_id')
             ->leftJoin('stations', 'stations.station_id', '=', 'blend_sheets.station_id')
-            ->select('blend_sheets.blend_id', 'blend_sheets.client_id', 'client_name', 'clients.phone as cPhone', 'email', 'blend_number', 'vessel_name', 'blend_sheets.destination_id', 'port_name', 'shipping_mark', 'consignee', 'contract', 'grade', 'garden', 'standard_details', 'blend_date', 'blend_sheets.status', 'container_size', 'clients.address', 'package_type', 'registration', 'transporter_name', 'transporters.transporter_id', 'driver_name', 'drivers.phone as driver_phone', 'container_tare', 'blend_shipped', 'agent_name', 'seal_number', 'escort', 'output_packages', 'output_weight', 'blend_sheets.packet_tare', 'blend_sheets.agent_id', 'id_number', 'stations.station_id', 'stations.station_name')
+            ->select('blend_sheets.blend_id', 'blend_sheets.client_id', 'client_name', 'clients.phone as cPhone', 'email', 'blend_number', 'vessel_name', 'blend_sheets.destination_id', 'port_name', 'shipping_mark', 'consignee', 'contract', 'grade', 'garden', 'standard_details', 'blend_date', 'blend_sheets.status', 'container_size', 'clients.address', 'package_type', 'registration', 'transporter_name', 'transporters.transporter_id', 'driver_name', 'drivers.phone as driver_phone', 'container_tare', 'blend_shipped', 'agent_name', 'seal_number', 'escort', 'output_packages', 'output_weight', 'blend_sheets.packet_tare', 'blend_sheets.agent_id', 'id_number', 'stations.station_id', 'stations.station_name', 'blend_sheets.type')
             ->selectRaw('SUM(blend_teas.blended_packages) as input_packages')
             ->selectRaw('SUM(blend_teas.blended_weight) as input_weight')
-            ->groupBy('blend_sheets.blend_id', 'blend_sheets.client_id', 'client_name', 'clients.phone', 'email', 'blend_number', 'vessel_name', 'blend_sheets.destination_id', 'port_name', 'shipping_mark', 'consignee', 'contract', 'grade', 'garden', 'standard_details', 'blend_date', 'blend_sheets.status', 'container_size', 'clients.address', 'package_type', 'registration', 'transporter_name', 'driver_name', 'driver_phone', 'container_tare', 'blend_shipped', 'agent_name', 'seal_number', 'escort', 'output_packages', 'output_weight', 'packet_tare', 'agent_id', 'transporter_id', 'id_number', 'station_id', 'station_name')
+            ->groupBy('blend_sheets.blend_id', 'blend_sheets.client_id', 'client_name', 'clients.phone', 'email', 'blend_number', 'vessel_name', 'blend_sheets.destination_id', 'port_name', 'shipping_mark', 'consignee', 'contract', 'grade', 'garden', 'standard_details', 'blend_date', 'blend_sheets.status', 'container_size', 'clients.address', 'package_type', 'registration', 'transporter_name', 'driver_name', 'driver_phone', 'container_tare', 'blend_shipped', 'agent_name', 'seal_number', 'escort', 'output_packages', 'output_weight', 'packet_tare', 'agent_id', 'transporter_id', 'id_number', 'station_id', 'station_name', 'blend_sheets.type')
             ->whereNull('blend_teas.deleted_at')
             ->where('blend_sheets.blend_id', $id)
             ->latest('blend_sheets.created_at')
@@ -3975,11 +3973,11 @@ return Response::make($mpdf->Output($pdfFileName, PdfDestination::INLINE), 200, 
     {
         $sheet = BlendSheet::join('destinations', 'destinations.destination_id', '=', 'blend_sheets.destination_id')
             ->join('blend_teas', 'blend_teas.blend_id', '=', 'blend_sheets.blend_id')
-            ->select('blend_date', 'vessel_name', 'consignee', 'standard_details', 'port_name', 'blend_number', 'b_dust', 'c_dust', 'fibre', 'sweepings')
+            ->select('blend_date', 'vessel_name', 'consignee', 'standard_details', 'port_name', 'blend_number', 'b_dust', 'c_dust', 'fibre', 'sweepings', 'type')
             ->where('blend_sheets.blend_id', $id)
             ->selectRaw('SUM(blend_teas.blended_packages) as input_packages')
             ->selectRaw('SUM(blend_teas.blended_weight) as input_weight')
-            ->groupBy('blend_date', 'vessel_name', 'consignee', 'standard_details', 'port_name', 'blend_number', 'b_dust', 'c_dust', 'fibre', 'sweepings')
+            ->groupBy('blend_date', 'vessel_name', 'consignee', 'standard_details', 'port_name', 'blend_number', 'b_dust', 'c_dust', 'fibre', 'sweepings', 'type')
             ->whereNull('blend_teas.deleted_at')
             ->first();
 
@@ -4038,28 +4036,35 @@ return Response::make($mpdf->Output($pdfFileName, PdfDestination::INLINE), 200, 
     }
     public function getAgingDays($id, $date)
     {
-            $originalDate = StockIn::where('delivery_id', $id)
-                ->orderBy('date_received', 'asc')
-                ->value('date_received');
+        $originalDate = StockIn::where('delivery_id', $id)
+            ->orderBy('date_received', 'asc')
+            ->value('date_received');
 
-            if (is_null($originalDate)) {
-                $blendDate = DB::table('blendBalances')
-                    ->where('blend_id', $id)
-                    ->orderBy('blend_date', 'asc')
-                    ->value('blend_date');
+        if (is_null($originalDate)) {
+            $blendDate = DB::table('blendBalances')
+                ->where('blend_id', $id)
+                ->orderBy('blend_date', 'asc')
+                ->value('blend_date');
 
-                $originalDate = $blendDate ? strtotime($blendDate) : null;
-            }
+            $originalDate = $blendDate ? strtotime($blendDate) : null;
+        }
 
         $receivedDate = Carbon::createFromTimestamp($originalDate, config('app.timezone'));
+
         if (Auction::where(['delivery_id' => $id])->exists()) {
             $dates = Auction::where(['delivery_id' => $id])->value('auctions.sale_date');
             $finalDate = Carbon::parse($dates);
         } else {
-            $finalDate = Carbon::createFromTimestamp($date, config('app.timezone')) ?? Carbon::now();
+            if (is_numeric($date)) {
+                // Unix timestamp
+                $finalDate = Carbon::createFromTimestamp($date, config('app.timezone'));
+            } else {
+                // Date string
+                $finalDate = Carbon::parse($date);
+            }
         }
-//        return $finalDate->diffInDays($receivedDate);
-        return (int) round($finalDate->diffInDays($receivedDate, true));
+
+        return (int) floor($finalDate->diffInDays($receivedDate, true));
     }
     public function getPromptAgingDays($id, $date)
     {
@@ -8142,41 +8147,40 @@ private function writeBlendHeader($ws, string $lastCol, $sheet, int $startRow): 
         }
     }
 
-        public function downloadSIPackingListExcel($id)
-{
-    list($shippingId, $type) = explode(':', base64_decode($id));
+    public function downloadSIPackingListExcel($id)
+    {
+        list($shippingId, $type) = explode(':', base64_decode($id));
 
-    $shippings = ShippingInstruction::join('clients', 'clients.client_id', '=', 'shipping_instructions.client_id')
-        ->leftJoin('clearing_agents', 'clearing_agents.agent_id', '=', 'shipping_instructions.clearing_agent')
-        ->join('destinations', 'destinations.destination_id', '=', 'shipping_instructions.destination_id')
-        ->leftJoin('shipments', 'shipments.shipping_id', '=', 'shipping_instructions.shipping_id')
-        ->leftJoin('delivery_orders', 'delivery_orders.delivery_id', 'shipments.delivery_id')
-        ->leftJoin('gardens', 'gardens.garden_id', 'delivery_orders.garden_id')
-        ->leftJoin('grades', 'grades.grade_id', 'delivery_orders.grade_id')
-        ->join('stock_ins', 'stock_ins.stock_id', '=', 'shipments.stock_id')
-        ->join('user_infos', 'user_infos.user_id', '=', 'shipping_instructions.user_id')
-        ->select(
-            'clients.address as client_address', 'shipping_instructions.address', 'garden_name', 'grade_name', 'invoice_number', 'ship_date',
-            'client_name', 'shipping_number', 'vessel_name', 'port_name', 'shipped_packages', 'shipped_weight', 'consignee', 'shipping_mark', 'container_number', 'agent_name', 'seal_number', 'delivery_orders.delivery_id', 'production_date', 'expiry_date', 'shipments.pallet_height as height', 'lot_number', 'shipments.package_tare', 'shipments.pallet_weight', 'surname', 'first_name', 'shipping_instructions.booking_number'
-        )
-        ->where('shipping_instructions.shipping_id', $shippingId)
-        ->whereNull('shipments.deleted_at')
-        ->get();
+        $shippings = ShippingInstruction::join('clients', 'clients.client_id', '=', 'shipping_instructions.client_id')
+            ->leftJoin('clearing_agents', 'clearing_agents.agent_id', '=', 'shipping_instructions.clearing_agent')
+            ->join('destinations', 'destinations.destination_id', '=', 'shipping_instructions.destination_id')
+            ->leftJoin('shipments', 'shipments.shipping_id', '=', 'shipping_instructions.shipping_id')
+            ->leftJoin('delivery_orders', 'delivery_orders.delivery_id', 'shipments.delivery_id')
+            ->leftJoin('gardens', 'gardens.garden_id', 'delivery_orders.garden_id')
+            ->leftJoin('grades', 'grades.grade_id', 'delivery_orders.grade_id')
+            ->join('stock_ins', 'stock_ins.stock_id', '=', 'shipments.stock_id')
+            ->join('user_infos', 'user_infos.user_id', '=', 'shipping_instructions.user_id')
+            ->select(
+                'clients.address as client_address', 'shipping_instructions.address', 'garden_name', 'grade_name', 'ship_date',
+                'client_name', 'shipping_number', 'vessel_name', 'port_name', 'shipped_packages', 'shipped_weight', 'consignee', 'shipping_mark', 'container_number', 'agent_name', 'seal_number', 'delivery_orders.delivery_id', 'production_date', 'expiry_date', 'shipments.pallet_height as height', 'lot_number', 'shipments.package_tare', 'shipments.pallet_weight', 'surname', 'first_name', 'shipping_instructions.booking_number', 'shipping_instructions.invoice_number')
+            ->where('shipping_instructions.shipping_id', $shippingId)
+            ->whereNull('shipments.deleted_at')
+            ->get();
 
-    $sheet = $shippings[0];
-    $printed = auth()->user();
-    $staffName = $printed ? ($printed->first_name . ' ' . $printed->surname) : auth()->user()->username;
-    $date = Carbon::now()->format('D, d-m-Y H:i:s');
-    $companyName = auth()->user()->company_name ?? config('app.name');
+        $sheet = $shippings[0];
+        $printed = auth()->user();
+        $staffName = $printed ? ($printed->first_name . ' ' . $printed->surname) : auth()->user()->username;
+        $date = Carbon::now()->format('D, d-m-Y H:i:s');
+        $companyName = auth()->user()->company_name ?? config('app.name');
 
-    $spreadsheet = ($type == 2)
-        ? $this->buildPalletizedPackingListSheet($shippings, $sheet, $staffName, $date, $companyName)
-        : $this->buildLoosePackingListSheet($shippings, $sheet, $staffName, $date, $companyName);
+        $spreadsheet = ($type == 2)
+            ? $this->buildPalletizedPackingListSheet($shippings, $sheet, $staffName, $date, $companyName)
+            : $this->buildLoosePackingListSheet($shippings, $sheet, $staffName, $date, $companyName);
 
-    $fileName = str_replace('/', '', $sheet->shipping_number) . '.xlsx';
+        $fileName = str_replace('/', '', $sheet->shipping_number) . '.xlsx';
 
-    return $this->streamSpreadsheet($spreadsheet, $fileName);
-}
+        return $this->streamSpreadsheet($spreadsheet, $fileName);
+    }
 
     /**
      * EXCEL: Continued (multi-container) palletized packing list.
@@ -8194,9 +8198,8 @@ private function writeBlendHeader($ws, string $lastCol, $sheet, int $startRow): 
             ->join('stock_ins', 'stock_ins.stock_id', '=', 'shipments.stock_id')
             ->join('user_infos', 'user_infos.user_id', '=', 'shipping_instructions.user_id')
             ->select(
-                'clients.address as client_address', 'shipping_instructions.address', 'garden_name', 'grade_name', 'invoice_number', 'ship_date',
-                'client_name', 'shipping_number', 'vessel_name', 'port_name', 'shipped_packages', 'shipped_weight', 'consignee', 'shipping_mark', 'container_number', 'agent_name', 'seal_number', 'delivery_orders.delivery_id', 'production_date', 'expiry_date', 'shipments.pallet_height as height', 'lot_number', 'shipments.package_tare', 'shipments.pallet_weight', 'surname', 'first_name', 'shipping_instructions.booking_number'
-            )
+                'clients.address as client_address', 'shipping_instructions.address', 'garden_name', 'grade_name', 'ship_date',
+                'client_name', 'shipping_number', 'vessel_name', 'port_name', 'shipped_packages', 'shipped_weight', 'consignee', 'shipping_mark', 'container_number', 'agent_name', 'seal_number', 'delivery_orders.delivery_id', 'production_date', 'expiry_date', 'shipments.pallet_height as height', 'lot_number', 'shipments.package_tare', 'shipments.pallet_weight', 'surname', 'first_name', 'shipping_instructions.booking_number', 'si_number', 'shipping_instructions.invoice_number')
             ->where(['shipping_instructions.si_number' => base64_decode($id), 'load_type' => 2])
             ->whereNull('shipments.deleted_at')
             ->get();

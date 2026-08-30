@@ -73,19 +73,19 @@
 </head>
 <body>
 <div class="company-info">
-    {{-- <span><img class="logo" src="{{ 'assets/img/favicons/icon.png' }}"></span> --}}
+    <img class="logo" src="data:image/png;base64,{{ base64_encode(file_get_contents(public_path('assets/img/favicons/icon.png'))) }}" alt="Logo">
     <span>
-    <img class="logo" src="{{ asset('assets/img/favicons/icon.png') }}" alt="Logo">
+{{--    --}}
 </span>
     <h1 class="heading">PACKMAC HOLDINGS LIMITED</h1>
     <p>Chai Street Shimanzi High Level, Mombasa P.O BOX 41328-80100, Mombasa, Kenya (TMSA 186)</p>
 </div>
-<div class="header">BLEND SHEET REPORT<hr></div>
+<div class="header">{{ $sheet->type == 'blend' ? 'BLEND' : 'REBAG' }} SHEET REPORT<hr></div>
 <table>
     <tr>
         <td style="width: 15% !important; font-weight: bold !important;"> CLIENT NAME </td>
         <td style="width: 35% !important;"> :  {{ $sheet->client_name }} </td>
-        <td style="width: 15%!important;"> BLEND NO. </td>
+        <td style="width: 15%!important;"> SI NO. </td>
         <td style="width: 35% !important;"> : {{ $sheet->blend_number }} </td>
     </tr>
     <tr>
@@ -97,44 +97,21 @@
     <tr>
         <td style="width: 15%!important;"> CONTRACT NO. </td>
         <td style="width: 35% !important;"> : {{ $sheet->contract }} </td>
-        <td style="width: 15% !important;"> SHIPP. AGENT </td>
-        <td style="width: 35% !important;"> :  {{ $sheet->agent_name }}</td>
-    </tr>
-    <tr>
         <td style="width: 15% !important;"> DESTINATION </td>
         <td style="width: 35% !important;"> :  {{ $sheet->port_name }} </td>
-        <td style="width: 15% !important;"> TRANSPORTER </td>
-        <td style="width: 35% !important;"> : {{ $sheet->transporter_name }} </td>
     </tr>
+
     <tr>
         <td style="width: 15% !important;"> CONSIGNEE </td>
         <td style="width: 35% !important;"> :  {{ $sheet->consignee }} </td>
-        <td style="width: 15% !important;"> TRUCK REG. </td>
-        <td style="width: 35% !important;"> :  {{ $sheet->registration }}</td>
-    </tr>
-    <tr>
         <td style="width: 15% !important;"> SHIPPING MARK </td>
         <td style="width: 35% !important;"> :  {{ $sheet->shipping_mark }} </td>
-        <td style="width: 15% !important;"> DRIVER NAME </td>
-        <td style="width: 35% !important;"> : {{ $sheet->driver_name }} </td>
     </tr>
     <tr>
         <td style="width: 15% !important;"> VESEL NAME </td>
         <td style="width: 35% !important;"> :  {{ $sheet->vessel_name }} </td>
-        <td style="width: 15% !important;"> DRIVER TEL. </td>
-        <td style="width: 35% !important;"> :  {{ $sheet->driver_phone }}</td>
-    </tr>
-    <tr>
-        <td style="width: 15% !important;"> SEAL NUMBER </td>
-        <td style="width: 35% !important;"> : {{ $sheet->seal_number }} </td>
         <td style="width: 15% !important;"> STATUS </td>
         <td style="width: 35% !important;"> : {{ $sheet->blend_shipped == null ? 'Being Processed' : 'Shipped On :'. Carbon\Carbon::createFromTimestamp($sheet->blend_shipped, config('app.timezone'))->format('d-m-Y') }} </td>
-    </tr>
-</table>
-<br>
-<table>
-    <tr>
-        <td style="width: 100% !important;" colspan="4"> CONTAINER NOS. :  {{ implode(', ', $containers) }} </td>
     </tr>
     <tr>
         <td style="width: 100% !important;" colspan="4"> STANDARD DETAILS :  {{ $sheet->standard_details }} </td>

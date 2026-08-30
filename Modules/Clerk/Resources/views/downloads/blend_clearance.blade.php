@@ -73,9 +73,9 @@
 </head>
 <body>
 <div class="company-info">
-    {{-- <span><img class="logo" src="{{ 'assets/img/favicons/icon.png' }}"></span> --}}
+    <img class="logo" src="data:image/png;base64,{{ base64_encode(file_get_contents(public_path('assets/img/favicons/icon.png'))) }}" alt="Logo">
     <span>
-    <img class="logo" src="{{ asset('assets/img/favicons/icon.png') }}" alt="Logo">
+
 </span>
     <h1 class="heading">PACKMAC HOLDINGS LIMITED</h1>
     <p>Chai Street Shimanzi High Level, Mombasa P.O BOX 41328-80100, Mombasa, Kenya (TMSA 186)</p>
@@ -86,6 +86,12 @@
 <br>
 <br>
 <table class="table">
+    <tr>
+        <td style="width: 15%!important;"> CONTAINER NUMBER </td>
+        <td style="width: 35% !important;"> {{ $shipment->container_number }} </td>
+        <td style="width: 20% !important;"> CONTAINER TYPE </td>
+        <td style="width: 30% !important;"> {{ $shipment->container_size == 1 ? '20 FT' : ($shipment->container_size == 2 ? '40 FT' : '40 FTHC') }} </td>
+    </tr>
     <tr>
         <td style="width: 15%!important;"> SI NUMBER </td>
         <td style="width: 35% !important;"> {{ $shipment->blend_number }} </td>
@@ -112,14 +118,12 @@
         <td style="width: 20% !important;"> DRIVER NAME </td>
         <td style="width: 30% !important;"> {{ $shipment->driver_name }} </td>
 
-
-
     </tr>
     <tr>
         <td style="width: 20%!important;"> CONTRACT NUMBER </td>
         <td style="width: 30% !important;"> {{ $shipment->contract }} </td>
         <td style="width: 20% !important;"> DRIVER PHONE </td>
-        <td style="width: 30% !important;"> {{ $shipment->driver_phone }}</td>
+        <td style="width: 30% !important;"> {{ $shipment->phone }}</td>
     </tr>
     <tr>
         <td style="width: 20% !important;"> SHIPPING AGENT </td>
@@ -130,17 +134,12 @@
     </tr>
 
 </table>
-<table class="table">
-    <tr>
-        <td style="width: 100% !important;" colspan="4"> CONTAINER NOS. :  {{ implode(', ', $containers) }} </td>
-    </tr>
-</table>
 
 <br>
 <br>
 <p><strong>Total Packages : </strong> {{ number_format($shipment->output_packages) }} </p>
 <p><strong>Total Weight : </strong> {{ number_format($shipment->output_weight, 2) }}</p>
-<p><strong>Loading Type : </strong> {{ $shipment->package_type == 1 ? 'LOOSE LOADING' : 'PALLETIZED LOADING' }}</p>
+<p><strong>Loading Type : </strong>  {{ $shipment->package_type == 1 ? 'PALLETIZED CARDBOARD' : ($shipment->package_type == 2 ? 'PALLETIZED SLIPSHEET' : ($shipment->package_type == 3 ? 'PALLETIZED WOODEN' : 'LOOSE LOADING')) }}</p>
 <br>
 <br>
 <p>Shipment left the warehouse in good order and condition;</p>

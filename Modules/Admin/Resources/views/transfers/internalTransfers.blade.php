@@ -112,39 +112,84 @@
                                 <td>{{ $transfer->station_name }}</td>
                                 <td>{{ $transfer->destination_name }}</td>
                                 <td>
-                                    {!! $transfer->status === null ? '<span class="badge bg-warning"> Created </span>' : ($transfer->status == 0 ? '<span class="badge bg-dark">  Initiated <span>' : ($transfer->status == 1 ? '<span class="badge bg-info"> Approved (Ops) <span>' : ($transfer->status == 2 ? '<span class="badge bg-secondary"> Approve (Fin) <span>' : ($transfer->status == 3 ? '<span class="badge bg-danger"> Released <span>' : '<span class="badge bg-success"> Received <span>')))) !!}
+                                    {!! $transfer->status === null
+                                        ? '<span class="badge bg-warning"> Created </span>'
+                                        : ($transfer->status == 0
+                                            ? '<span class="badge bg-dark"> Initiated </span>'
+                                            : ($transfer->status == 1
+                                                ? '<span class="badge bg-info"> 1st Approved </span>'
+                                                : ($transfer->status == 2
+                                                    ? '<span class="badge bg-secondary"> Released </span>'
+                                                    : ($transfer->status == 3
+                                                        ? '<span class="badge bg-primary"> Received </span>'
+                                                        : '<span class="badge bg-success"> Completed </span>')))) !!}
                                 </td>
                                 <td nowrap="">
                                     <div class="d-flex align-items-center">
-                                        <!-- Trace Tea Icon -->
-                                        @if($transfer->status === null )
-                                            <a class="link text-warning"  onclick="return confirm('Are you sure you want to initiate this request?')" data-bs-toggle="tooltip" data-bs-placement="left" title="Click to initiate transfer" href="{{ route('admin.initiateTransfer', base64_encode($transfer->delivery_number)) }}" > <span class="fa-solid fa-toggle-off"></span></a>
-                                        @elseif($transfer->status == 0 )
-                                            <a class="link text-info" data-bs-toggle="tooltip" data-bs-placement="left" title="Transfer initiated, approve operations"  onclick="return confirm('Are you sure you want to approve as operations department?')" href="{{ route('admin.serviceRequest', base64_encode($transfer->delivery_number)) }}"> <span class="fa-solid fa-check"></span> </a>
+                                        @if($transfer->status === null)
+                                            <a class="link text-warning" data-bs-toggle="tooltip" data-bs-placement="left"
+                                               title="Click to initiate transfer"
+                                               onclick="return confirm('Are you sure you want to initiate this transfer request?')"
+                                               href="{{ route('admin.initiateTransfer', base64_encode($transfer->delivery_number)) }}">
+                                                <span class="fa-solid fa-toggle-off"></span>
+                                            </a>
+                                        @elseif($transfer->status == 0)
+                                            <a class="link text-info" data-bs-toggle="tooltip" data-bs-placement="left"
+                                               title="Click to give first approval"
+                                               onclick="return confirm('Are you sure you want to approve this transfer request?')"
+                                               href="{{ route('admin.approveTransferFirst', base64_encode($transfer->delivery_number)) }}">
+                                                <span class="fa-regular fa-thumbs-up"></span>
+                                            </a>
                                         @elseif($transfer->status == 1)
-                                            <a class="link text-dark" data-bs-toggle="tooltip" data-bs-placement="left" title="Transfer initiated, approve finance"  onclick="return confirm('Are you sure you want to approve as finance department?')" href="{{ route('admin.serviceRequest', base64_encode($transfer->delivery_number)) }}"> <span class="fa-solid fa-check-circle"></span> </a>
+                                            <a class="link text-success" data-bs-toggle="tooltip" data-bs-placement="left"
+                                               title="Approved — release this transfer"
+                                               onclick="return confirm('Are you sure you want to release teas for this request?')"
+                                               href="{{ route('admin.serviceRequest', base64_encode($transfer->delivery_number)) }}">
+                                                <span class="fa-solid fa-retweet"></span>
+                                            </a>
                                         @elseif($transfer->status == 2)
-                                            <a class="link text-danger" data-bs-toggle="tooltip" data-bs-placement="left" title="Transfer approved, release now"  onclick="return confirm('Are you sure you want to release this transfer?')" href="{{ route('admin.serviceRequest', base64_encode($transfer->delivery_number)) }}"> <span class="fa-solid fa-truck-arrow-right"></span> </a>
+                                            <a class="link text-secondary" data-bs-toggle="tooltip" data-bs-placement="left"
+                                               title="Released — click to receive"
+                                               href="{{ route('admin.prepareToReceiveTransfer', base64_encode($transfer->delivery_number)) }}">
+                                                <span class="fa-solid fa-truck-arrow-right"></span>
+                                            </a>
                                         @elseif($transfer->status == 3)
-                                            <a class="link text-secondary" data-bs-toggle="tooltip" data-bs-placement="left" title="Transfer released"> <span class="fa-solid fa-truck-arrow-right"></span> </a>
+                                            <a class="link text-primary" data-bs-toggle="tooltip" data-bs-placement="left"
+                                               title="Received — give final approval"
+                                               onclick="return confirm('Are you sure you want to give final approval for this transfer?')"
+                                               href="{{ route('admin.approveTransferFinal', base64_encode($transfer->delivery_number)) }}">
+                                                <span class="fa-solid fa-check"></span>
+                                            </a>
                                         @else
-                                            <a class="link text-success" data-bs-toggle="tooltip" data-bs-placement="left" title="Transfer received, and stock updated"> <span class="fa-solid fa-check-double"></span> </a>
+                                            <a class="link text-success" data-bs-toggle="tooltip" data-bs-placement="left" title="Transfer completed">
+                                                <span class="fa-solid fa-check-double"></span>
+                                            </a>
                                         @endif
 
                                         <!-- Dropdown Icon -->
-                                        <div class="dropdown font-sans-serif position-static" >
-                                            <a class="link text-600 btn-sm dropdown-toggle btn-reveal" type="button" data-bs-toggle="dropdown" data-boundary="window" aria-haspopup="true" aria-expanded="false">
+                                        <div class="dropdown font-sans-serif position-static">
+                                            <a class="link text-600 btn-sm dropdown-toggle btn-reveal" type="button"
+                                               data-bs-toggle="dropdown" data-boundary="window" aria-haspopup="true" aria-expanded="false">
                                                 <span class="fas fa-ellipsis-h fs-10"></span>
                                             </a>
                                             <div class="dropdown-menu dropdown-menu-end border py-0">
                                                 <div class="py-2">
-                                                    <a class="dropdown-item text-info" href="{{ route('admin.viewInternalTransferDetails', base64_encode($transfer->delivery_number)) }}">View Transfer</a>
-                                                    <a class="dropdown-item text-primary" href="{{ route('admin.downloadInterDelNote', base64_encode($transfer->delivery_number)) }}" target="_blank">Download Transfer</a>
-                                                    @if($transfer->status <= 3)
-                                                        <a class="dropdown-item text-warning" href="{{ route('admin.prepareToReceiveTransfer', base64_encode($transfer->delivery_number)) }}">Receive Transfer</a>
+                                                    <a class="dropdown-item text-info"
+                                                       href="{{ route('admin.viewInternalTransferDetails', base64_encode($transfer->delivery_number)) }}">View Transfer</a>
+                                                    @php $approved = \Modules\Clerk\Entities\Approval::where('job_id', $transfer->delivery_number)->get(); @endphp
+                                                    @if($approved && $approved->count() >= 2)
+                                                        <a class="dropdown-item text-primary"
+                                                           href="{{ route('admin.downloadInterDelNote', base64_encode($transfer->delivery_number)) }}"
+                                                           target="_blank">Download Transfer</a>
+                                                    @endif
+                                                    @if($transfer->status == 2)
+                                                        <a class="dropdown-item text-warning"
+                                                           href="{{ route('admin.prepareToReceiveTransfer', base64_encode($transfer->delivery_number)) }}">Receive Transfer</a>
                                                     @endif
                                                     @if($transfer->status < 4)
-                                                        <a class="dropdown-item text-danger" href="{{ route('admin.cancelInterTransferRequest', base64_encode($transfer->delivery_number)) }}">Delete Transfer</a>
+                                                        <a class="dropdown-item text-danger"
+                                                           onclick="return confirm('Are you sure you want to delete this transfer request?')"
+                                                           href="{{ route('admin.cancelInterTransferRequest', base64_encode($transfer->delivery_number)) }}">Delete Transfer</a>
                                                     @endif
                                                 </div>
                                             </div>

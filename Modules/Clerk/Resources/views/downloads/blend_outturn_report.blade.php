@@ -79,18 +79,18 @@
 </head>
 <body>
 <div class="company-info">
-    {{-- <span><img class="logo" src="{{ 'assets/img/favicons/icon.png' }}"></span> --}}
+    <img class="logo" src="data:image/png;base64,{{ base64_encode(file_get_contents(public_path('assets/img/favicons/icon.png'))) }}" alt="Logo">
     <span>
-    <img class="logo" src="{{ asset('assets/img/favicons/icon.png') }}" alt="Logo">
+
 </span>
     <h1 class="heading">PACKMAC HOLDINGS LIMITED</h1>
     <p>Chai Street Shimanzi High Level, Mombasa P.O BOX 41328-80100, Mombasa, Kenya (TMSA 186)</p>
 </div>
-<div class="header">BLEND OUTTURN REPORT<hr></div>
+<div class="header">{{ $sheet->type == 'blend' ? 'BLEND' : 'REBAG' }} OUTTURN REPORT<hr></div>
 <br>
 <table class="table">
     <tr>
-        <td style="width: 50%!important;"> BLEND DATE </td>
+        <td style="width: 50%!important;"> {{ $sheet->type == 'blend' ? 'BLEND' : 'REBAG' }} DATE </td>
         <td style="width: 50% !important;"> {{ $sheet->blend_date }} </td>
     </tr>
     <tr>
@@ -102,7 +102,7 @@
         <td style="width: 35% !important;"> {{ $sheet->consignee }} </td>
     </tr>
     <tr>
-        <td style="width: 15% !important;"> SI/BLEND NUMBER </td>
+        <td style="width: 15% !important;"> SI NUMBER </td>
         <td style="width: 35% !important;"> {{ $sheet->blend_number }} </td>
     </tr>
     <tr>
@@ -115,7 +115,7 @@
     </tr>
 
 </table>
-<p class="h-center">BLEND SUMMARY </p>
+<p class="h-center">{{ $sheet->type == 'blend' ? 'BLEND' : 'REBAG' }} SUMMARY </p>
 <table class="table">
     <tr>
     <th>Item</th>
@@ -155,7 +155,7 @@
 
     @foreach($blendBalances as $key => $blendBalance)
         <tr>
-            <td>BLEND REMNANT {{ ++$key }}</td>
+            <td>{{ $sheet->type == 'blend' ? 'BLEND' : 'REBAG' }} REMNANT {{ ++$key }}</td>
             <td>{{ $blendBalance->ex_packages }}</td>
             <td>{{ number_format($blendBalance->unit_weight, 2) }}</td>
             <td>{{ number_format($blendBalance->net_weight, 2) }}</td>
@@ -188,19 +188,19 @@
         <td>{{ number_format($sheet->sweepings, 2) }}</td>
     </tr>
     <tr>
-        <td colspan="3">TOTAL BLEND INPUT</td>
+        <td colspan="3">TOTAL {{ $sheet->type == 'blend' ? 'BLEND' : 'REBAG' }} INPUT</td>
         <td>{{ number_format($input->input_weight, 2) }}</td>
     </tr>
     @if($blendSummaries->count() > 0)
         @php
-            $totalOutput =  floatval($totalRemnant) + floatval($totalWeight) + floatval($blendBalance->sweepings) + floatval($blendBalance->fibre) + floatval($blendBalance->c_dust) + floatval($blendBalance->b_dust) + floatval($blendSummary->weight_variance * $totalPackages);
+            $totalOutput =  floatval($totalRemnant) + floatval($totalWeight) + floatval($sheet->sweepings) + floatval($sheet->fibre) + floatval($sheet->c_dust) + floatval($sheet->b_dust) + floatval($blendSummary->weight_variance * $totalPackages);
         @endphp
     <tr>
-        <td colspan="3">TOTAL BLEND OUTPUT</td>
+        <td colspan="3">TOTAL {{ $sheet->type == 'blend' ? 'BLEND' : 'REBAG' }} OUTPUT</td>
         <td>{{ number_format($totalOutput, 2) }}</td>
     </tr>
     <tr>
-        <td colspan="3">BLEND GAIN/LOSS</td>
+        <td colspan="3">{{ $sheet->type == 'blend' ? 'BLEND' : 'REBAG' }} GAIN/LOSS</td>
         <td>{{ number_format($totalOutput - $sheet->input_weight, 2) }} ({{ number_format((($totalOutput - $sheet->input_weight)/$sheet->input_weight)*100,2) }}%)</td>
     </tr>
     @else
@@ -209,12 +209,12 @@
         @endphp
 
         <tr>
-            <td colspan="3">TOTAL BLEND OUTPUT</td>
+            <td colspan="3">TOTAL {{ $sheet->type == 'blend' ? 'BLEND' : 'REBAG' }} OUTPUT</td>
             <td>{{ number_format($totalOutput, 2) }}</td>
         </tr>
         <tr>
             @php $inputWeight = \App\Models\BlendTea::where('blend_id', $blendBalance->blend_id)->sum('blended_weight'); @endphp
-            <td colspan="3">BLEND GAIN/LOSS (%)</td>
+            <td colspan="3">{{ $sheet->type == 'blend' ? 'BLEND' : 'REBAG' }} GAIN/LOSS (%)</td>
             <td>{{ number_format($totalOutput - floatval($inputWeight), 2) }} ({{ number_format((($totalOutput-$inputWeight)/$inputWeight) * 100, 2) }}%)</td>
         </tr>
     @endif
@@ -227,7 +227,7 @@
         <th>POLY BAG</th>
         <th>SMALL POUCH</th>
         <th>PALLETS </th>
-        <th>GUMMY BAGS</th>
+        <th>GUNNY BAGS</th>
     </tr>
     <tr>
         <td>{{ $materials->where('condition', 1)->where('material_type', 1)->first() == null ? 0: $materials->where('condition', 1)->where('material_type', 1)->first()->total }}</td>
@@ -244,7 +244,7 @@
         <th>PAPER SACK</th>
         <th>POLY BAG</th>
         <th>PALLETS</th>
-        <th>GUMMY BAGS</th>
+        <th>GUNNY BAGS</th>
     </tr>
     <tr>
         <th>USED MATERIAL RETRIEVALS</th>
@@ -273,7 +273,7 @@
     <tr>
         <th style="width: 25% !important;">COMPLIED BY</th>
         <th style="width: 25% !important;">MACHINE OPERATOR(S)</th>
-        <th style="width: 25% !important;">BLEND SUPERVISOR(S)</th>
+        <th style="width: 25% !important;">{{ $sheet->type == 'blend' ? 'BLEND' : 'REBAG' }} SUPERVISOR(S)</th>
         <th style="width: 25% !important;">3rd PARTY INSPECTION CLERKS(S)</th>
     </tr>
     <tr>

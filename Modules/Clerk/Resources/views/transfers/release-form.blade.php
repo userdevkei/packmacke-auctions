@@ -2,7 +2,7 @@
     @csrf
     <div class="row row-cols-2 mb-3">
         <div class="mb-2">
-            <label class="my-1 fs-xs fw-bold" style="font-size: 85% !important;">DESTINATION</label>
+            <label>DESTINATION</label>
             <select class="form-select js-choice" name="warehouse_id" required>
                 @foreach($warehouses as $warehouse)
                     <option

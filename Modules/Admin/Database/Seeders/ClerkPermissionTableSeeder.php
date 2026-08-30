@@ -17,11 +17,6 @@ class ClerkPermissionTableSeeder extends Seeder
     {
 //        Model::unguard();
         $permissions = [
-            ['name' => 'Create Internal Transfers', 'key' => 'transfer.internal.create', 'category' => 'stocks'],
-            ['name' => 'Receive Internal Transfers', 'key' => 'transfer.internal.receive', 'category' => 'stocks'],
-            ['name' => 'Approve Internal Transfers', 'key' => 'transfer.internal.approve', 'category' => 'stocks'],
-            ['name' => 'Create External Transfers', 'key' => 'transfer.external.create', 'category' => 'stocks'],
-            ['name' => 'Approve External Transfers', 'key' => 'transfer.external.approve', 'category' => 'stocks'],
             ['name' => 'Receive Tea Collection Stocks', 'key' => 'stocks.receive', 'category' => 'stocks'],
             ['name' => 'Create Auction Sale', 'key' => 'auction.create', 'category' => 'auction'],
             ['name' => 'Export Stock In Excel', 'key' => 'export.stock-excel', 'category' => 'stocks'],
@@ -39,7 +34,7 @@ class ClerkPermissionTableSeeder extends Seeder
             ['name' => 'Edit Delivery Order', 'key' => 'do.edit', 'category' => 'delivery order'],
             ['name' => 'Delete Delivery Order', 'key' => 'do.delete', 'category' => 'delivery order'],
 
-            ['name' => 'Access Inventory', 'key' => 'inventory.access', 'category' => 'inventory'],
+/*            ['name' => 'Access Inventory', 'key' => 'inventory.access', 'category' => 'inventory'],
             ['name' => 'View Inventory', 'key' => 'inventory.view', 'category' => 'inventory'],
             ['name' => 'Add Inventory Item', 'key' => 'inventoryItem.add', 'category' => 'inventory'],
             ['name' => 'View Inventory Item', 'key' => 'inventoryItem.view', 'category' => 'inventory'],
@@ -73,24 +68,57 @@ class ClerkPermissionTableSeeder extends Seeder
             ['name' => 'View Suppliers', 'key' => 'supplier.view', 'category' => 'inventory'],
             ['name' => 'Add Suppliers', 'key' => 'supplier.add', 'category' => 'inventory'],
             ['name' => 'Edit Suppliers', 'key' => 'supplier.edit', 'category' => 'inventory'],
-            ['name' => 'Delete Suppliers', 'key' => 'supplier.delete', 'category' => 'inventory'],
+            ['name' => 'Delete Suppliers', 'key' => 'supplier.delete', 'category' => 'inventory'],*/
+
+            ['name' => 'Create Straight Line Jobs', 'key' => 'straightline.create', 'category' => 'straight line'],
+            ['name' => 'Update Straight Line - Knock off tea', 'key' => 'straightline.update', 'category' => 'straight line'],
+            ['name' => 'Delete Straight Line Jobs', 'key' => 'straightline.delete', 'category' => 'straight line'],
+            ['name' => 'Edit Straight Line Jobs', 'key' => 'straightline.edit', 'category' => 'straight line'],
+            ['name' => 'Amend Straight Line Teas', 'key' => 'straightline.amend', 'category' => 'straight line'],
+            ['name' => 'Add Missing Lines to Straight Line', 'key' => 'straightline.addmissinglines', 'category' => 'straight line'],
+            ['name' => 'First Approval Straight Line', 'key' => 'straightline.approve', 'category' => 'straight line'],
+            ['name' => 'Final Approval', 'key' => 'straightline.finalapproval', 'category' => 'straight line'],
+            ['name' => 'Amend Transport/Logistics Details', 'key' => 'straightline.amendtransportdetails', 'category' => 'straight line'],
+
+            ['name' => 'Create Blend Sheet', 'key' => 'blend.create', 'category' => 'blend sheets'],
+            ['name' => 'Add Teas To Blend Sheet', 'key' => 'blend.addblendteas', 'category' => 'blend sheets'],
+            ['name' => 'Update Blend Sheet - Knock off teas', 'key' => 'blend.updateblend', 'category' => 'blend sheets'],
+            ['name' => 'Delete Blend Sheet', 'key' => 'blend.delete', 'category' => 'blend sheets'],
+            ['name' => 'Edit Blend Sheet', 'key' => 'blend.edit', 'category' => 'blend sheets'],
+            ['name' => 'Amend Blend Teas', 'key' => 'blend.amend', 'category' => 'blend sheets'],
+            ['name' => 'Amend Blend Outturn Report', 'key' => 'blend.amendOutturn', 'category' => 'blend sheets'],
+            ['name' => 'First Blend Sheets Approval', 'key' => 'blend.approve', 'category' => 'blend sheets'],
+            ['name' => 'Final Blend Sheet Approval', 'key' => 'blend.finalblendsheetapproval', 'category' => 'blend sheets'],
+            ['name' => 'Amend Transport/Logistics Details', 'key' => 'blend.amendtransportdetails', 'category' => 'blend sheets'],
+            ['name' => 'Approve/Decline Container Details' , 'key' => 'blend.container.approve', 'category' => 'blend sheets'],
+            ['name' => 'Mark Blend as Shipped', 'key' => 'blend.markasshipped', 'category' => 'blend sheets'],
+
+            ['name' => 'Create Rebag Job', 'key' => 'rebag.create', 'category' => 'rebag job'],
+            ['name' => 'Add Teas To Rebag', 'key' => 'rebag.addblendteas', 'category' => 'rebag job'],
+            ['name' => 'Update Rebag Job - Knock off teas', 'key' => 'rebag.updateblend', 'category' => 'rebag job'],
+            ['name' => 'Delete Rebag Job', 'key' => 'rebag.delete', 'category' => 'rebag job'],
+            ['name' => 'Edit Rebag Job', 'key' => 'rebag.edit', 'category' => 'rebag job'],
+            ['name' => 'Amend Rebag Teas', 'key' => 'rebag.amend', 'category' => 'rebag job'],
+            ['name' => 'Amend Rebag Outturn Report', 'key' => 'rebag.amendOutturn', 'category' => 'rebag job'],
+            ['name' => 'First Rebag Job Approval', 'key' => 'rebag.approve', 'category' => 'rebag job'],
+            ['name' => 'Final Rebag Job Approval', 'key' => 'rebag.finalblendsheetapproval', 'category' => 'rebag job'],
+            ['name' => 'Amend Transport/Logistics Details', 'key' => 'rebag.amendtransportdetails', 'category' => 'rebag job'],
+            ['name' => 'Mark Rebag as Shipped', 'key' => 'rebag.markasshipped', 'category' => 'rebag job'],
+            ['name' => 'Approve/Decline Container Details' , 'key' => 'rebag.container.approve', 'category' => 'rebag job'],
 
 
-            ['name' => 'Create Blend Sheets Jobs', 'key' => 'blend.create', 'category' => 'shipping'],
-            ['name' => 'Create Straight Line Jobs', 'key' => 'straightline.create', 'category' => 'shipping'],
-            ['name' => 'Update Blend - Knock off teas', 'key' => 'blend.update', 'category' => 'shipping'],
-            ['name' => 'Update Straight Line - Knock off tea', 'key' => 'straightline.update', 'category' => 'shipping'],
-            ['name' => 'Delete Blend Jobs', 'key' => 'blend.delete', 'category' => 'shipping'],
-            ['name' => 'Edit Blend Jobs', 'key' => 'blend.edit', 'category' => 'shipping'],
-            ['name' => 'Delete Straight Line Jobs', 'key' => 'straightline.delete', 'category' => 'shipping'],
-            ['name' => 'Edit Straight Line Jobs', 'key' => 'straightline.edit', 'category' => 'shipping'],
-            ['name' => 'Amend Straight Line Teas', 'key' => 'straightline.amend', 'category' => 'shipping'],
-            ['name' => 'Amend Blend Teas', 'key' => 'blend.amend', 'category' => 'shipping'],
-            ['name' => 'Amend Blend Outturn Report', 'key' => 'blend.amendOutturn', 'category' => 'shipping'],
-            ['name' => 'Approve Blend Sheets', 'key' => 'blend.approve', 'category' => 'shipping'],
-            ['name' => 'Approve Straight Line', 'key' => 'straightline.approve', 'category' => 'shipping'],
-            ['name' => 'Approve Straight Line', 'key' => 'straightline.approve', 'category' => 'shipping'],
-            ['name' => 'Add Missing Lines to Straight Line', 'key' => 'straightline.addmissinglines', 'category' => 'shipping'],
+            ['name' => 'Create Internal Transfers', 'key' => 'transfer.internal.create', 'category' => 'internal transfer'],
+            ['name' => 'Receive Internal Transfers', 'key' => 'transfer.internal.receive', 'category' => 'internal transfer'],
+            ['name' => 'First Approval (Operations)', 'key' => 'transfer.internal.approve', 'category' => 'internal transfer'],
+            ['name' => 'Final Approval (Stock Controller)', 'key' => 'transfer.internal.approve.final', 'category' => 'internal transfer'],
+            ['name' => 'Release Internal Transfers', 'key' => 'transfer.internal.release', 'category' => 'internal transfer'],
+
+
+            ['name' => 'Create External Transfers', 'key' => 'transfer.external.create', 'category' => 'external transfer'],
+            ['name' => 'First Approval', 'key' => 'transfer.external.approve', 'category' => 'external transfer'],
+            ['name' => 'Second Transfer Approval', 'key' => 'transfer.external.approve.final', 'category' => 'external transfer'],
+            ['name' => 'Release Transfer', 'key' => 'transfer.external.release', 'category' => 'external transfer'],
+
         ];
 
         foreach ($permissions as $perm) {

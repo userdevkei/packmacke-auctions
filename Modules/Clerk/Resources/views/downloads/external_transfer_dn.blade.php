@@ -73,9 +73,8 @@
 </head>
 <body>
 <div class="company-info">
-    {{-- <span><img class="logo" src="{{ 'assets/img/favicons/icon.png' }}"></span> --}}
     <span>
-    <img class="logo" src="{{ asset('assets/img/favicons/icon.png') }}" alt="Logo">
+    <img class="logo" src="data:image/png;base64,{{ base64_encode(file_get_contents(public_path('assets/img/favicons/icon.png'))) }}" alt="Logo">
 </span>
     <h1 class="heading">PACKMAC HOLDINGS LIMITED</h1>
     <p>Chai Street Shimanzi High Level, Mombasa P.O BOX 41328-80100, Mombasa, Kenya (TMSA 186)</p>

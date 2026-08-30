@@ -17,6 +17,7 @@ use Modules\Admin\Http\Controllers\AdminController;
 
 Route::prefix('admin')->middleware(['auth', 'web', 'userRoles', 'userRole:1', 'domainValidation'])->group(function() {
     Route::get('/', [AdminController::class, 'index'])->name('admin.dashboard');
+    Route::get('dashboard-stats', [AdminController::class, 'dashboardStats'])->name('admin.dashboard.stats');
     Route::get('dashboard-report/{id}', [AdminController::class, 'dashboardReport'])->name('admin.dashboardReport');
     Route::get('users', [AdminController::class, 'users'])->name('admin.users');
     Route::post('register-user', [AdminController::class, 'registerUser'])->name('admin.registerUser');
@@ -324,5 +325,13 @@ Route::prefix('admin')->middleware(['auth', 'web', 'userRoles', 'userRole:1', 'd
     Route::get('user-permissions', [AdminController::class, 'userPermissions'])->name('admin.userPermissions');
     Route::get('user-permission/{id}', [AdminController::class, 'userPermission'])->name('admin.userPermission');
     Route::post('user-permission-toggle', [AdminController::class, 'usersPermissionsToggle'])->name('admin.usersPermissionsToggle');
+
+    Route::get('/transfers/internal/approve-first/{id}', [AdminController::class, 'approveTransferFirst'])->name('admin.approveTransferFirst');
+    Route::get('/transfers/internal/approve-final/{id}', [AdminController::class, 'approveTransferFinal'])->name('admin.approveTransferFinal');
+
+    Route::get('transfers/external/approve-final/{id}', [AdminController::class, 'approveExternalTransferFinal'])->name('admin.approveExternalTransferFinal');
+
+    Route::get('/si/approve-first/{id}', [AdminController::class, 'approveSIFirst'])->name('admin.approveSIFirst');
+    Route::get('/si/approve-final/{id}', [AdminController::class, 'approveSIFinal'])->name('admin.approveSIFinal');
 
 });

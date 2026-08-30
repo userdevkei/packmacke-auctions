@@ -8,7 +8,9 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ShipmentContainer extends Model
 {
-    use HasFactory, softDeletes;
+    use softDeletes;
 
-    protected $fillable = ['container_id', 'container_number', 'blend_id', 'seal_number', 'tare_weight', 'pallet_weight'];
+    protected $primaryKey = 'container_id';
+    protected $keyType = 'string';
+    protected $fillable = ['container_id', 'container_number', 'blend_id', 'seal_number', 'tare_weight', 'pallet_weight', 'packages', 'weight', 'agent_id', 'escort', 'transporter_id', 'registration', 'driver_id', 'status'];
 }

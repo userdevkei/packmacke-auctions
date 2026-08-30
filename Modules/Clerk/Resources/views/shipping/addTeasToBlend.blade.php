@@ -8,7 +8,7 @@
                 </div>
                 <div class="col-6 col-sm-auto ms-auto text-end ps-0">
                     <div id="table-simple-pagination-replace-element">
-                        @if($bs->status == 0 && @canuser('blend.update') || @canuser('blend.amend'))
+                        @if($bs->status == 0 && @canuser('blend.update') || @canuser('blend.addblendteas') || @canuser('blend.amendblend'))
                             <a class="btn btn-falcon-default btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#staticBackdrop">Select Teas</a>
                             <a class="btn btn-falcon-default btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#staticBackdrop1">Use Blend Bal</a>
                         @endif
@@ -122,7 +122,6 @@
                                             <input type="hidden" value="{{ $bs->station_id }}" name="station_id">
                                         </tr>
                                     @endforeach
-
                                     </tbody>
                                 </table>
 
@@ -228,10 +227,14 @@
                                 <th>SALE</th>
                                 <th>PROMPT DATE</th>
                                 <th>TCI NO.</th>
-                                <th>Action</th>
+                                @if(@canuser('blend.amend'))
+                                    <th>Action</th>
+                                @endif
                             </tr>
                             </thead>
                             <?php $inputPacks = 0; $inputWeight = 0; ?>
+                            @php $totalPackages = 0; $totalWeight = 0; @endphp
+
 
                             <tbody>
                             @foreach($teas as $shipping)
@@ -239,25 +242,38 @@
                                     $inputPacks += $shipping->blended_packages;
                                     $inputWeight += $shipping->blended_weight;
                                     ?>
+                                    @php
+                                        $totalPackages += $shipping->blended_packages;
+                                        $totalWeight += str_replace(',', '', $shipping->blended_weight);
+                                    @endphp
+
                                 <tr>
                                     <td> {{ $loop->iteration }} </td>
                                     <td> {{ $shipping->garden_name == null ? $shipping->garden : $shipping->garden_name  }} </td>
                                     <td> {{ $shipping->grade_name == null ? $shipping->grade : $shipping->grade_name }} </td>
                                     <td> {{ $shipping->invoice_number == null ? $shipping->blend_number : $shipping->invoice_number }} </td>
                                     <td> {{ $shipping->blended_packages }} </td>
-                                    <td> {{ $shipping->blended_weight }} </td>
+                                    <td> {{ number_format($shipping->blended_weight, 2) }} </td>
                                     <td> {{ $shipping->sale_number == null ? 'B/RM' : $shipping->sale_number }} </td>
                                     <td> {{ $shipping->prompt_date == null ? $shipping->blend_date : $shipping->prompt_date }} </td>
                                     <td> {{ $shipping->loading_number == null ? 'NO TCI' : $shipping->loading_number }} </td>
-                                    <td>
-                                        @if(@canuser('blend.amend'))
+                                    @if(@canuser('blend.amend'))
+                                        <td>
                                             <a class="link-danger" data-bs-toggle="tooltip" data-bs-placement="left" title="Remove line from Blendsheet" onclick="return confirm('Are you sure you want to remove selected line from the SI?')" href="{{ route('clerk.deleteBlendTea', $shipping->blended_id) }}"><span class="fa fa-trash-alt"></span></a>
-                                        @endif
-                                    </td>
+                                        </td>
+                                    @endif
                                 </tr>
-
                             @endforeach
                             </tbody>
+                            <tr style="font-weight: bold !important;">
+                                <td style="text-align: center !important;" colspan="4">TOTALS </td>
+                                <td style="text-align: right !important;">{{ $totalPackages }}</td>
+                                <td style="text-align: right !important;">{{ number_format($totalWeight, 2) }}</td>
+                                <td colspan="3"></td>
+                                @if(@canuser('blend.amend'))
+                                    <td></td>
+                                @endif
+                            </tr>
                         </table>
                 </div>
             </div>
@@ -294,7 +310,9 @@
                                 <p class="lh-sm mb-0 text-700">SI Number :<span class="text-900 ps-2">{{ $bs->blend_number }}</span></p>
                             </li>
                             <li class="d-flex align-items-center fs-11 fw-medium pt-1 mb-3"><span class="dot bg-primary bg-opacity-50"></span>
-                                <p class="lh-sm mb-0 text-700">Load Type :<span class="text-900 ps-2">{{ $bs->load_type == 1 ? 'LOOSE LOADING' : 'PALLETIZED LOADING'}}</span></p>
+                                <p class="lh-sm mb-0 text-700">Load Type :<span class="text-900 ps-2">
+                                        {{ $bs->package_type == 1 ? 'PALLETIZED CARDBOARD' : ($bs->package_type == 2 ? 'PALLETIZED SLIPSHEET' : ($bs->package_type == 3 ? 'PALLETIZED WOODEN' : 'LOOSE LOADING')) }}
+                                    </span></p>
                             </li>
                             <li class="d-flex align-items-center fs-11 fw-medium pt-1 mb-3"><span class="dot bg-primary bg-opacity-50"></span>
                                 <p class="lh-sm mb-0 text-700">Vessel Name :<span class="text-900 ps-2">{{ $bs->vessel_name }}</span></p>
@@ -322,7 +340,7 @@
                             </li>
                             <li class="d-flex align-items-center fs-11 fw-medium pt-1 mb-3"><span class="dot bg-primary bg-opacity-50"></span>
                                 <p class="lh-sm mb-0 text-700">Status :<span class="text-900 ps-2">
-                                        {!! $bs->status == 0 ? '<span class="badge bg-warning"> Blend Created </span>' : ($bs->status == 1 ? '<span class="badge bg-info"> Teas Updated </span>' : ($bs->status == 2 ? '<span class="badge bg-secondary"> Blend Updated </span>' : ($bs->status == 3 ? '<span class="badge bg-dark"> Pend. Approval </span>' : '<span class="badge bg-success"> Shipped on'. \Carbon\Carbon::createFromTimestamp($bs->ship_date, config('app.timezone'))->format('D, d M Y H:i') .'</span>'))) !!}
+                                        {!! $bs->status == 0 ? '<span class="badge bg-warning"> Blend Created </span>' : ($bs->status == 1 ? '<span class="badge bg-info"> Teas Updated </span>' : ($bs->status == 2 ? '<span class="badge bg-secondary"> Blend Updated </span>' : ($bs->status == 3 ? '<span class="badge bg-dark"> Pend. Approval </span>' : '<span class="badge bg-success"> Shipped on'. \Carbon\Carbon::parse($bs->blend_shipped)->format('D, d M Y H:i') .'</span>'))) !!}
                                     </span>
                                 </p>
                             </li>
@@ -353,6 +371,28 @@
                             <li class="d-flex align-items-center fs-11 fw-medium pt-1 mb-3"><span class="dot bg-primary bg-opacity-50"></span>
                                 <p class="lh-sm mb-0 text-700">Consignee :<span class="text-900 ps-2">{{ $bs->consignee }}</span></p>
                             </li>
+
+                            <li class="d-flex align-items-start fs-11 fw-medium pt-1 mb-3">
+                                <span class="dot bg-primary bg-opacity-50 mt-1"></span>
+
+                                <div class="lh-sm">
+                                    <span class="text-700">Consignee Address</span>
+
+                                    <div class="text-900 ps-2 mt-1">
+                                        @php
+                                            $address = is_array($bs->c_address)
+                                                ? $bs->c_address
+                                                : json_decode($bs->c_address, true);
+                                        @endphp
+
+                                        <div>{{ $address['address'] ?? '' }}</div>
+                                        <div>{{ $address['box'] ?? '' }}</div>
+                                        <div>{{ $address['state'] ?? '' }}</div>
+                                        <div>{{ $address['mobile'] ?? '' }}</div>
+                                    </div>
+                                </div>
+                            </li>
+
                             <li class="d-flex align-items-center fs-11 fw-medium pt-1 mb-3"><span class="dot bg-primary bg-opacity-50"></span>
                                 <p class="lh-sm mb-0 text-700">Container Size :<span class="text-900 ps-2">{{ $bs->container_size == 1 ? '20 FT' :($bs->conatiner_size == 2 ? '40 FT' : '40 FTHC') }}</span></p>
                             </li>

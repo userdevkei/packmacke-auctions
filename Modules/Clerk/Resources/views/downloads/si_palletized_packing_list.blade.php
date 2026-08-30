@@ -79,7 +79,7 @@
 <body>
 <div class="company-info">
     <span>
-        <img class="logo" src="{{ asset('assets/img/favicons/icon.png') }}" alt="Logo">
+        <img class="logo" src="data:image/png;base64,{{ base64_encode(file_get_contents(public_path('assets/img/favicons/icon.png'))) }}" alt="Logo">
     </span>
     <h1 class="heading">PACKMAC HOLDINGS LIMITED</h1>
     <p>Chai Street Shimanzi High Level, Mombasa P.O BOX 41328-80100, Mombasa, Kenya (TMSA 186)</p>
@@ -89,51 +89,57 @@
     <tr>
         <td style="width: 15% !important; font-weight: bold !important;"> SHIPPER </td>
         <td style="width: 85% !important;">
-            <h4> : {{ $sheet->client_name }}</h3>
+            <h4> : {{ $sheet->client_name }}</h4>
             <p> : {{ $sheet->client_address }}</p>
         </td>
     </tr>
     <tr>
-        <td style="width: 15% !important; font-weight: bold !important;"> INVOICE NUMBER </td>
+        <td style="width: 15% !important; font-weight: bold !important;"> SI NUMBER </td>
         <td style="width: 40% !important;"> :  {{ $sheet->shipping_number }} </td>
+
         <td style="width: 20%!important;"> PORT OF LOADING </td>
         <td style="width: 25% !important;"> : MOMBASA, KENYA </td>
     </tr>
     <tr>
-        <td style="width: 15%!important;"> CONSIGNEE </td>
-        <td style="width: 40% !important;"> : {{ $sheet->consignee }} </td>
+        <td style="width: 15% !important; font-weight: bold !important;"> PO/INVOICE NUMBER </td>
+        <td style="width: 40% !important;"> :  {{ $sheet->invoice_number }} </td>
         <td style="width: 20% !important;"> DESTINATION PORT </td>
         <td style="width: 25% !important;"> :  {{ $sheet->port_name }}</td>
     </tr>
     <tr>
-        <td style="width: 15% !important;">  </td>
-        <td style="width: 40% !important;"> :  {{ $sheet->address['box'] ?? '' }} </td>
+        <td style="width: 15%!important;"> CONSIGNEE </td>
+        <td style="width: 40% !important;"> : {{ $sheet->consignee }} </td>
+
         <td style="width: 20% !important;"> BOOKING NUMBER</td>
         <td style="width: 25% !important;"> : {{ $sheet->booking_number }} </td>
     </tr>
     <tr>
-        <td style="width: 15% !important;">  </td>
-        <td style="width: 40% !important;"> :  {{ $sheet?->address['address'] ?? '' }} </td>
+        <td style="width: 15% !important;"> CONSIGNEE PO BOX </td>
+        <td style="width: 40% !important;"> :  {{ $sheet->address['box'] }} </td>
         <td style="width: 20% !important;"> DATE </td>
         <td style="width: 25% !important;"> : {{ $sheet->ship_date !== null ? Carbon\Carbon::createFromTimestamp($sheet->ship_date, config('app.timezone'))->format('d/m/Y') : '' }} </td>
     </tr>
     <tr>
-        <td style="width: 15% !important;"> </td>
-        <td style="width: 40% !important;"> :  {{ $sheet?->address['state'] ?? '' }} </td>
+        <td style="width: 15% !important;"> CONSIGNEE ADDRESS </td>
+        <td style="width: 40% !important;"> :  {{ $sheet->address['address'] }} </td>
         <td style="width: 20% !important;"> CONTAINER NUMBER </td>
         <td style="width: 25% !important;"> : {{ $sheet->container_number }} </td>
     </tr>
     <tr>
-        <td style="width: 15% !important;"> </td>
-        <td style="width: 40% !important;"> :  {{ $sheet?->address['mobile'] ?? '' }} </td>
+        <td style="width: 15% !important;"> STATE/COUNTRY </td>
+        <td style="width: 40% !important;"> :  {{ $sheet->address['state'] }} </td>
         <td style="width: 20% !important;"> SEAL NUMBER</td>
         <td style="width: 25% !important;"> : {{ $sheet->seal_number }}</td>
     </tr>
     <tr>
+        <td style="width: 15% !important;"> PHONE NUMBER </td>
+        <td style="width: 40% !important;"> :  {{ $sheet->address['mobile'] }} </td>
+        <td style="width: 20% !important;"> SHIPPING MARK </td>
+        <td style="width: 25% !important;"> : {{ $sheet->shipping_mark }} </td>
+    </tr>
+    <tr>
         <td style="width: 15% !important;"> OCEAN VESSEL </td>
         <td style="width: 40% !important;"> :  {{ $sheet->vessel_name }} </td>
-        <td style="width: 20% !important;"> Shipping Marks </td>
-        <td style="width: 25% !important;"> : {{ $sheet->shipping_mark }} </td>
     </tr>
 </table>
 

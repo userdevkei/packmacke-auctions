@@ -112,9 +112,9 @@
                                     <td>{{ number_format($transfer->transferred_weight, 2) }}</td>
                                     <td>{{ $transfer->release_date ? $transfer->release_date->format('d-m-Y') : null }}{{ $transfer->lot ? '('.$transfer->lot.')' : null }}</td>
                                     <td>
-                                       @if($transfer->status == 3)
+                                       @if($transfer->status == 2)
                                         <input class="release-checkbox" data-id="{{ $transfer->ex_transfer_id }}" @if($transfer->release_date) checked @else @endif type="checkbox" value="{{ $transfer->ex_transfer_id }}">
-                                       @endif 
+                                       @endif
                                     </td>
                                     {{-- @if($transfer->status < 4) --}}
                                         <td>
@@ -197,7 +197,7 @@
                 }
             });
         });
-   
+
         const selectedItems = {}; // Object to track selected items
 
         // Event binding for changes in the palette input and checkbox

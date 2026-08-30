@@ -8,7 +8,7 @@
                 </div>
                 <div class="col-6 col-sm-auto ms-auto text-end ps-0">
                     <div id="table-simple-pagination-replace-element">
-                        @if($si->status == 0 && @canuser('straightline.update') || $si->status < 4 && @canuser('straightline.amend') || $si->status < 4 && @canuser('straightline.addmissinglines'))
+                        @if($si->status == 0 && @canuser('straightline.update') || $si->status < 4 && @canuser('straightline.amend'))
                             <a class="btn btn-falcon-default btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#staticBackdrop">Select Teas</a>
                         @endif
                     </div>
@@ -55,7 +55,7 @@
                                             <td>{{ $cTea->grade_name }}</td>
                                             <td>{{ $cTea->invoice_number }}</td>
                                             <td>{{ $cTea->lot_number }}</td>
-                                            <td><input type="number" min="1" max="{{ $cTea->current_stock }}" step="0.1" class="form-control form-control-sm" name="current_stock[]" value="{{ $cTea->current_stock }}" onchange="recalculateWeight(this)"></td>
+                                            <td><input type="number" min="1.0" max="{{ $cTea->current_stock }}" step="0.01" class="form-control form-control-sm" name="current_stock[]" value="{{ $cTea->current_stock }}" onchange="recalculateWeight(this)"></td>
                                             <td><span id="current_weight_{{ $cTea->stock_id }}">{{ $cTea->current_weight }}</span></td>
                                            {{-- <td>
                                                 <input type="number" class="form-control form-control-sm" step="0.01" name="package_tare[]" value="{{ $cTea->package_tare }}">
@@ -204,11 +204,19 @@
                                 <th>Lot Number</th>
                                 <th>Packages</th>
                                 <th>Net Weight</th>
+                                <th>Tare Weight</th>
+                                <th>Pallet Weight</th>
+                                <th>Pallet Height</th>
                                 <th>Action</th>
                             </tr>
                             </thead>
                             <tbody>
+                            @php $totalPackages = 0; $totalWeight = 0; @endphp
                             @foreach($teas as $transfer)
+                                @php
+                                    $totalPackages += $transfer->shipped_packages;
+                                    $totalWeight += str_replace(',', '', $transfer->shipped_weight);
+                                @endphp
                                 <tr>
                                     <td>{{ $loop->iteration }}</td>
                                     <td>{{ $transfer->garden_name }}</td>
@@ -217,6 +225,9 @@
                                     <td>{{ $transfer->lot_number }}</td>
                                     <td>{{ $transfer->shipped_packages }}</td>
                                     <td>{{ $transfer->shipped_weight }} </td>
+                                    <td>{{ $transfer->package_tare }} </td>
+                                    <td>{{ $transfer->pallet_weight }} </td>
+                                    <td>{{ $transfer->pallet_height }} </td>
                                     <td>
                                         @if(@canuser('straightline.amend') && $transfer->status <= 3)
                                             <a class="link-danger" data-bs-toggle="tooltip" data-bs-placement="left" title="Remove line from SI" onclick="return confirm('Are you sure you want to remove selected line from the SI?')" href="{{ route('clerk.deleteSITea', $transfer->shipment_id) }}"><span class="fa fa-trash-alt"></span></a>
@@ -225,6 +236,15 @@
                                 </tr>
                             @endforeach
                             </tbody>
+                            <tr style="font-weight: bold !important;">
+                                <td style="text-align: center !important;" colspan="5">TOTALS </td>
+                                <td style="text-align: right !important;">{{ $totalPackages }}</td>
+                                <td style="text-align: right !important;">{{ number_format($totalWeight, 2) }}</td>
+                                <td colspan="3"></td>
+                                @if(@canuser('straightline.amend') && $si->status <= 3)
+                                    <td></td>
+                                @endif
+                            </tr>
                         </table>
                 </div>
             </div>
@@ -272,9 +292,31 @@
                             <li class="d-flex align-items-center fs-11 fw-medium pt-1 mb-3"><span class="dot bg-primary bg-opacity-50"></span>
                                 <p class="lh-sm mb-0 text-700">Consignee :<span class="text-900 ps-2">{{ $si->consignee }}</span></p>
                             </li>
+
+                            <li class="d-flex align-items-start fs-11 fw-medium pt-1 mb-3">
+                                <span class="dot bg-primary bg-opacity-50 mt-1"></span>
+
+                                <div class="lh-sm">
+                                    <span class="text-700">Consignee Address</span>
+
+                                    <div class="text-900 ps-2 mt-1">
+                                        @php
+                                            $address = is_array($si->c_address)
+                                                ? $si->c_address
+                                                : json_decode($si->c_address, true);
+                                        @endphp
+
+                                        <div>{{ $address['address'] ?? '' }}</div>
+                                        <div>{{ $address['box'] ?? '' }}</div>
+                                        <div>{{ $address['state'] ?? '' }}</div>
+                                        <div>{{ $address['mobile'] ?? '' }}</div>
+                                    </div>
+                                </div>
+                            </li>
                             <li class="d-flex align-items-center fs-11 fw-medium pt-1 mb-3"><span class="dot bg-primary bg-opacity-50"></span>
                                 <p class="lh-sm mb-0 text-700">Container Size :<span class="text-900 ps-2">{{ $si->container_size == 1 ? '20 FT' :($si->conatiner_size == 2 ? '40 FT' : '40 FTHC') }}</span></p>
                             </li>
+
                             <li class="d-flex align-items-center fs-11 fw-medium pt-1 mb-3"><span class="dot bg-primary bg-opacity-50"></span>
                                 <p class="lh-sm mb-0 text-700">Shipping Mark :<span class="text-900 ps-2">{{ $si->shipping_mark }}</span></p>
                             </li>

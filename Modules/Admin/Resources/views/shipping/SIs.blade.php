@@ -19,10 +19,8 @@
                 </div>
                 <div class="col-6 col-sm-auto ms-auto text-end ps-0">
                     <div id="table-simple-pagination-replace-element">
-{{--                        @if(auth()->user()->role_id == 3)--}}
                             <a class="btn btn-falcon-default btn-sm" href="{{ route('admin.createSI') }}"><span class="fas fa-plus" data-fa-transform="shrink-3 down-2"></span><span class="d-none d-sm-inline-block ms-1">Create SI</span></a>
                             <a class="btn btn-falcon-danger btn-sm" data-bs-toggle="modal" data-bs-target="#staticBackdrop"><span class="fas fa-cloud-download-alt" data-fa-transform=""></span><span class="d-none d-sm-inline-block ms-1">Report</span></a>
-{{--                        @endif--}}
                     </div>
                 </div>
                 <div class="modal fade" id="staticBackdrop" data-bs-keyboard="false" data-bs-backdrop="static" tabindex="-1" aria-labelledby="staticBackdropLabel" aria-hidden="true">
@@ -215,120 +213,37 @@
                                 <td>{{ $transfer->port_name }}</td>
                                 <td>{{ $transfer->station_name }}</td>
                                 <td>
-                                    {!! $transfer->status == 0 ? '<span class="badge bg-warning"> SI Created </span>' : ($transfer->status == 1 ? '<span class="badge bg-info"> Teas Updated </span>' : ($transfer->status == 2 ? '<span class="badge bg-secondary"> SI Updated </span>' : ($transfer->status == 3 ? '<span class="badge bg-dark"> Pend. Approval </span>' : '<span class="badge bg-success"> Shipped </span>'))) !!}
+                                    {!! $transfer->status == 0 ? '<span class="badge bg-warning"> SI Created </span>'
+                                        : ($transfer->status == 1 ? '<span class="badge bg-dark"> Initiated </span>'
+                                        : ($transfer->status == 2 ? '<span class="badge bg-info"> 1st Approved </span>'
+                                        : ($transfer->status == 3 ? '<span class="badge bg-primary"> Pend. Final Approval </span>'
+                                        : '<span class="badge bg-success"> Shipped </span>'))) !!}
                                 </td>
                                 <td nowrap="">
                                     <div class="d-flex align-items-center">
                                         @if($transfer->status == 0)
                                             <a class="link text-warning"  onclick="return confirm('Are you sure you want to initiate SI?')" data-bs-toggle="tooltip" data-bs-placement="left" title="Click to initiate SI" href="{{ route('admin.initateSI', $transfer->shipping_id) }}"><span class="fa-solid fa-share-from-square" ></span></a>
                                         @elseif($transfer->status == 1)
-                                                <a class="link text-info" data-bs-placement="left" title="Click to update SI" data-bs-toggle="modal" data-bs-target="#staticBackdrop-{{ $transfer->shipping_id }}"><span class="fa-solid fa-file-pen"></span></a>
-
-                                                <div class="modal fade" id="staticBackdrop-{{ $transfer->shipping_id }}" data-bs-keyboard="false" data-bs-backdrop="static" tabindex="-1" aria-labelledby="staticBackdropLabel" aria-hidden="true">
-                                                    <div class="modal-dialog modal-xl modal-dialog-centered mt-6" role="document">
-                                                        <div class="modal-content border-0">
-                                                            <div class="position-absolute top-0 end-0 mt-3 me-3 z-1">
-                                                                <button class="btn-close btn btn-sm btn-circle d-flex flex-center transition-base" data-bs-dismiss="modal" aria-label="Close"></button>
-                                                            </div>
-                                                            <div class="modal-body p-0">
-                                                                <div class="rounded-top-3 bg-body-tertiary py-3 ps-4 pe-6">
-                                                                    <h5 class="mb-1" id="staticBackdropLabel">UPDATE SHIPPING INSTRUCTION SI NO: {{ $transfer->shipping_number }}</h5>
-                                                                </div>
-                                                                <div class="p-4">
-                                                                    <form class="form" method="POST" action="{{ route('admin.updateShippingInstructionDetails', $transfer->shipping_id) }}">
-                                                                        @csrf
-                                                                        <div class="row row-cols-sm-3 g-2">
-                                                                            <div class="mb-2">
-                                                                                <label class="my-1 fs-xs fw-bold" style="font-size: 85% !important;">CONTAINER NUMBER</label>
-                                                                                <input type="text" name="containerNumber" class="form-control form-control-lg" placeholder="--" style="height: 62% !important;" required>
-                                                                            </div>
-                                                                            <div class="mb-2">
-                                                                                <label class="my-1 fs-xs fw-bold" style="font-size: 85% !important;">CONTAINER TARE</label>
-                                                                                <input type="number" step="0.01" name="tare" class="form-control form-control-lg" placeholder="--" style="height: 62% !important;" required>
-                                                                            </div>
-                                                                            <div class="mb-2">
-                                                                                <label class="my-1 fs-xs fw-bold" style="font-size: 85% !important;">CLEARING AGENT</label>
-                                                                                <select name="agent" class="form-select js-choice" required data-options='{"removeItemButton":true,"placeholder":true}'>
-                                                                                    <option selected disabled value="">-- select clearing agent -- </option>
-                                                                                    @foreach($agents as $agent)
-                                                                                        <option value="{{ $agent->agent_id }}">{{ $agent->agent_name }}</option>
-                                                                                    @endforeach
-                                                                                </select>
-                                                                            </div>
-
-                                                                            <div class="mb-2">
-                                                                                <label class="my-1 fs-xs fw-bold" style="font-size: 85% !important;">SEAL NUMBER</label>
-                                                                                <input type="text" name="seal" class="form-control form-control-lg" placeholder="--" style="height: 62% !important;" required>
-                                                                            </div>
-
-                                                                            <div class="mb-2">
-                                                                                <label class="my-1 fs-xs fw-bold" style="font-size: 85% !important;">CARGO ESCORTED?</label>
-                                                                                <select name="escort" class="form-select js-choice" required data-options='{"removeItemButton":true,"placeholder":true}'>
-                                                                                    <option selected disabled value="">-- select option -- </option>
-                                                                                    <option value="1">YES</option>
-                                                                                    <option value="2">NO</option>
-                                                                                </select>
-                                                                            </div>
-
-                                                                            <div class="mb-2">
-                                                                                <label class="my-1 fs-xs fw-bold" style="font-size: 85% !important;">TRANSPORTER</label>
-                                                                                <select name="transporter" class="form-select js-choice" required data-options='{"removeItemButton":true,"placeholder":true}'>
-                                                                                    <option selected disabled value="">-- select transporter -- </option>
-                                                                                    @foreach($transporters as $transporter)
-                                                                                        <option value="{{ $transporter->transporter_id }}">{{ $transporter->transporter_name }}</option>
-                                                                                    @endforeach
-                                                                                </select>
-                                                                            </div>
-
-                                                                            <div class="mb-2">
-                                                                                <label class="my-1 fs-xs fw-bold" style="font-size: 85% !important;">VEHICLE REGISTRATION</label><br>
-                                                                                <input class="form-control form-control-lg" name="registration" id="editableSelect" type="text" list="optionsList" placeholder="-- plate number --" required>
-                                                                                <datalist id="optionsList">
-                                                                                    @foreach($registrations as $registration => $transporter)
-                                                                                        <option value="{{ $registration }}">{{ $registration }} </option>
-                                                                                    @endforeach
-                                                                                </datalist>
-                                                                            </div>
-
-                                                                            <div class="mb-2">
-                                                                                <label class="my-1 fs-xs fw-bold" style="font-size: 85% !important;">DRIVER'S ID NUMBER</label> <br>
-                                                                                <input id="idSelect" type="text" list="idList" name="idNumber" class="form-control form-control-lg idSelect" placeholder="-- driver's ID Number --" required>
-                                                                                <datalist id="idList">
-                                                                                    @foreach($users as $user)
-                                                                                        <option value="{{ $user->id_number }}">{{ $user->id_number }}</option>
-                                                                                    @endforeach
-                                                                                </datalist>
-                                                                            </div>
-
-                                                                            <div class="mb-2">
-                                                                                <label class="my-1 fs-xs fw-bold" style="font-size: 85% !important;">DRIVER'S NAME</label>
-                                                                                <input type="text" name="driverName" id="driverName" class="form-control form-control-lg driverName" required>
-                                                                            </div>
-
-                                                                            <div class="mb-4">
-                                                                                <label class="my-1 fs-xs fw-bold" style="font-size: 85% !important;">DRIVER'S PHONE NUMBER</label>
-                                                                                <input type="text" name="driverPhone" id="driverPhone" class="form-control form-control-lg driverPhone" required>
-                                                                            </div>
-                                                                        </div>
-                                                                        <div class="d-flex justify-content-center mt-2">
-                                                                            <button type="submit" class="btn btn-success" onclick="return confirm('Once submitted you can not change shipping instruction. Are you sure you want to proceed?')">UPDATE SHIPPING INSTRUCTION</button>
-                                                                        </div>
-                                                                    </form>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                        {{--@elseif($transfer->status == 2)
-                                            @if($transfer->location_id == auth()->user()->station->location->location_id && auth()->user()->role_id == 3)
-                                                <a class="link text-danger" data-bs-toggle="tooltip" data-bs-placement="left" title="Send SI for approval" onclick="return confirm('Are you sure you want to send this SI for approval?')" href="{{ route('admin.updateShippingInstruction', $transfer->shipping_id) }}"><span class="fa-regular fa-paper-plane"></span></a>
-                                            @else
-                                                <a class="link text-danger" data-bs-toggle="tooltip" data-bs-placement="left" title="SI updated, pending submission for approval"><span class="fa-solid fa-spinner"></span></a>
-                                            @endif--}}
-
-                                        @elseif($transfer->status == 2 || $transfer->status == 3)
-                                                <a class="link text-danger" data-bs-toggle="tooltip" data-bs-placement="left" title="SI pending confirmation and shipping" onclick="return confirm('Are you sure you want to approve this SI? This will mark SI as shipped')" href="{{ route('admin.markAsShipped', $transfer->shipping_id) }}"><span class="fa-regular fa-thumbs-up"></span></a>
-                                        @elseif($transfer->status == 4)
+                                            <a class="link text-warning" data-bs-toggle="tooltip" data-bs-placement="left" title="Click to give first approval" onclick="return confirm('Are you sure you want to approve this SI?')" href="{{ route('admin.approveSIFirst', $transfer->shipping_id) }}"><span class="fa-regular fa-thumbs-up"></span></a>
+                                        @elseif($transfer->status == 2)
+                                            <a class="link text-info js-open-transport-modal" href="javascript:void(0)" data-bs-placement="left" title="Click to update transport details and submit for approval"
+                                               data-shipping-id="{{ $transfer->shipping_id }}"
+                                               data-shipping-number="{{ $transfer->shipping_number }}"
+                                               data-container-number="{{ $transfer->container_number ?? '' }}"
+                                               data-container-tare="{{ $transfer->container_tare ?? '' }}"
+                                               data-seal-number="{{ $transfer->seal_number ?? '' }}"
+                                               data-escorted="{{ $transfer->escort ?? '' }}"
+                                               data-agent-id="{{ $transfer->agent_id ?? '' }}"
+                                               data-transporter-id="{{ $transfer->transporter_id ?? '' }}"
+                                               data-registration="{{ $transfer->registration ?? '' }}"
+                                               data-id-number="{{ $transfer->id_number ?? '' }}"
+                                               data-driver-name="{{ $transfer->driver_name ?? '' }}"
+                                               data-driver-phone="{{ $transfer->phone ?? '' }}"
+                                               data-action-url="{{ route('admin.updateShippingInstructionDetails', $transfer->shipping_id) }}"
+                                            ><span class="fa-solid fa-file-pen"></span></a>
+                                        @elseif($transfer->status == 3)
+                                            <a class="link text-danger" data-bs-toggle="tooltip" data-bs-placement="left" title="Give final approval — marks as shipped" onclick="return confirm('Are you sure you want to approve this SI? This will mark SI as shipped')" href="{{ route('admin.approveSIFinal', $transfer->shipping_id) }}"><span class="fa-regular fa-thumbs-up"></span></a>
+                                        @else
                                             <a class="link text-success" data-bs-toggle="tooltip" data-bs-placement="left" title="SI shipped, stock updated"><span class="fa-solid fa-check-double"></span></a>
                                         @endif
                                         <div class="dropdown font-sans-serif position-static" >
@@ -339,17 +254,36 @@
                                                 <div class="py-2">
                                                     <a class="dropdown-item text-info" href="{{ route('admin.addShipmentTeas', $transfer->shipping_id) }}">View SI</a>
                                                     <a class="dropdown-item text-warning" href="{{ route('admin.editSI', $transfer->shipping_id) }}">Edit SI Sheet</a>
+
+                                                    @if($transfer->status >= 2)
+                                                        <a class="dropdown-item text-info js-open-transport-modal" href="javascript:void(0)"
+                                                           data-shipping-id="{{ $transfer->shipping_id }}"
+                                                           data-shipping-number="{{ $transfer->shipping_number }}"
+                                                           data-container-number="{{ $transfer->container_number ?? '' }}"
+                                                           data-container-tare="{{ $transfer->container_tare ?? '' }}"
+                                                           data-seal-number="{{ $transfer->seal_number ?? '' }}"
+                                                           data-escorted="{{ $transfer->escort ?? '' }}"
+                                                           data-agent-id="{{ $transfer->agent_id ?? '' }}"
+                                                           data-transporter-id="{{ $transfer->transporter_id ?? '' }}"
+                                                           data-registration="{{ $transfer->registration ?? '' }}"
+                                                           data-id-number="{{ $transfer->id_number ?? '' }}"
+                                                           data-driver-name="{{ $transfer->driver_name ?? '' }}"
+                                                           data-driver-phone="{{ $transfer->phone ?? '' }}"
+                                                           data-action-url="{{ route('admin.updateShippingInstructionDetails', $transfer->shipping_id) }}"
+                                                        >Amend Transport Details</a>
+                                                    @endif
+
                                                     @if($transfer->status < 4)
                                                         <a class="dropdown-item text-danger" onclick="return confirm('Are you sure you want to delete SI Number {{ $transfer->shipping_number }}?')" href="{{ route('admin.deleteShippingInstruction', $transfer->shipping_id) }}"> Delete SI</a>
                                                     @endif
-                                                    @if($transfer->status >= 1)
+                                                    @if($transfer->status >= 2)
                                                         <a class="dropdown-item text-primary" href="{{ route('admin.downloadSIDocument', $transfer->shipping_id) }}" target="_blank">Download SI</a>
                                                         <a class="dropdown-item text-dark" href="{{ route('admin.downloadDriverClearance', $transfer->shipping_id) }}" target="_blank"> Port Delivery Note</a>
                                                         <a class="dropdown-item text-secondary" href="{{ route('admin.downloadSIPackingList', base64_encode($transfer->shipping_id.':'.$transfer->load_type)) }}" target="_blank">Packing List</a>
                                                         <a class="dropdown-item text-secondary" href="{{ route('admin.downloadSIPackingListExcel', base64_encode($transfer->shipping_id.':'.$transfer->load_type)) }}" target="_blank">Packing List (Excel)</a>
                                                         @if($transfer->load_type == 2)
-                                                            <a class="dropdown-item text-secondary" href="{{ route('admin.downloadSIContinuedPackingList', base64_encode($transfer->si_number) ?? base64_encode($transfer->shipping_number)) }}" target="_blank">Packing List (Cont.) </a>
-                                                            <a class="dropdown-item text-secondary" href="{{ route('admin.downloadSIContinuedPackingListExcel', base64_encode($transfer->si_number) ?? base64_encode($transfer->shipping_number)) }}" target="_blank">Packing List (Cont.) (Excel)</a>
+                                                            <a class="dropdown-item text-secondary" href="{{ route('admin.downloadSIContinuedPackingList', base64_encode($transfer->si_number ?? $transfer->shipping_number)) }}" target="_blank">Packing List (Cont.) </a>
+                                                            <a class="dropdown-item text-secondary" href="{{ route('admin.downloadSIContinuedPackingListExcel', base64_encode($transfer->si_number ?? $transfer->shipping_number)) }}" target="_blank">Packing List (Cont.) (Excel) </a>
                                                         @endif
                                                     @endif
                                                 </div>
@@ -365,9 +299,107 @@
             </div>
         </div>
     </div>
+    {{-- ==========================================================================
+         Shared datalists — rendered ONCE for the whole page, not per row.
+    ========================================================================== --}}
+    <datalist id="optionsList">
+        @foreach($registrations as $registration)
+            <option value="{{ $registration }}">{{ $registration }}</option>
+        @endforeach
+    </datalist>
+    <datalist id="idList">
+        @foreach($users as $user)
+            <option value="{{ $user->id_number }}">{{ $user->id_number }}</option>
+        @endforeach
+    </datalist>
+
+    {{-- ==========================================================================
+         ONE shared modal for every row, instead of one modal per shipping
+         instruction (previously rendered inside the row @foreach, causing
+         PHP memory exhaustion on large tables and thousands of duplicate
+         Choices.js instances freezing the browser — same issue fixed on the
+         clerk side). Clicking either trigger above fills these fields via
+         JS instead of the server rendering a brand new modal per row.
+    ========================================================================== --}}
+    <div class="modal fade" id="transportModal" data-bs-keyboard="false" data-bs-backdrop="static" tabindex="-1" aria-labelledby="transportModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-centered mt-6" role="document">
+            <div class="modal-content border-0">
+                <div class="position-absolute top-0 end-0 mt-3 me-3 z-1">
+                    <button class="btn-close btn btn-sm btn-circle d-flex flex-center transition-base" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-0">
+                    <div class="rounded-top-3 bg-body-tertiary py-3 ps-4 pe-6">
+                        <h5 class="mb-1" id="transportModalLabel">UPDATE SHIPPING INSTRUCTION SI NO: <span id="transportModalSiNumber"></span></h5>
+                    </div>
+                    <div class="p-4">
+                        <form class="form" method="POST" id="transportModalForm" action="">
+                            @csrf
+                            <div class="row row-cols-sm-3 g-2">
+                                <div class="mb-2">
+                                    <label class="my-1 fs-xs fw-bold" style="font-size: 85% !important;">CONTAINER NUMBER</label>
+                                    <input type="text" name="containerNumber" class="form-control form-control-lg" placeholder="--" style="height: 62% !important;" required>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="my-1 fs-xs fw-bold" style="font-size: 85% !important;">CONTAINER TARE</label>
+                                    <input type="number" step="0.01" name="tare" class="form-control form-control-lg" placeholder="--" style="height: 62% !important;" required>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="my-1 fs-xs fw-bold" style="font-size: 85% !important;">CLEARING AGENT</label>
+                                    <select name="agent" class="form-select" required>
+                                        <option selected disabled value="">-- select clearing agent -- </option>
+                                        @foreach($agents as $agent)
+                                            <option value="{{ $agent->agent_id }}">{{ $agent->agent_name }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="my-1 fs-xs fw-bold" style="font-size: 85% !important;">SEAL NUMBER</label>
+                                    <input type="text" name="seal" class="form-control form-control-lg" placeholder="--" style="height: 62% !important;" required>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="my-1 fs-xs fw-bold" style="font-size: 85% !important;">CARGO ESCORTED?</label>
+                                    <select name="escort" class="form-select" required>
+                                        <option selected disabled value="">-- select option -- </option>
+                                        <option value="1">YES</option>
+                                        <option value="2">NO</option>
+                                    </select>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="my-1 fs-xs fw-bold" style="font-size: 85% !important;">TRANSPORTER <sup class="text-danger">*</sup></label>
+                                    <select name="transporter" class="form-select" required>
+                                        <option selected disabled value="">-- select transporter -- </option>
+                                        @foreach($transporters as $transporter)
+                                            <option value="{{ $transporter->transporter_id }}">{{ $transporter->transporter_name }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="my-1 fs-xs fw-bold" style="font-size: 85% !important;">VEHICLE REGISTRATION</label><br>
+                                    <input class="form-control form-control-lg js-registration-input" type="text" name="registration" list="optionsList" placeholder="-- plate number --" required>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="my-1 fs-xs fw-bold" style="font-size: 85% !important;">DRIVER'S ID NUMBER</label> <br>
+                                    <input type="text" class="form-control form-control-lg js-id-input" name="idNumber" list="idList" placeholder="-- driver's ID Number --" required>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="my-1 fs-xs fw-bold" style="font-size: 85% !important;">DRIVER'S NAME</label>
+                                    <input type="text" name="driverName" class="form-control form-control-lg js-driver-name" required>
+                                </div>
+                                <div class="mb-4">
+                                    <label class="my-1 fs-xs fw-bold" style="font-size: 85% !important;">DRIVER'S PHONE NUMBER</label>
+                                    <input type="text" name="driverPhone" class="form-control form-control-lg js-driver-phone" required>
+                                </div>
+                            </div>
+                            <div class="d-flex justify-content-center mt-2">
+                                <button type="submit" class="btn btn-success" onclick="return confirm('Once submitted this SI will be sent for final approval. Are you sure you want to proceed?')">SAVE & SUBMIT FOR APPROVAL</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 @endsection
-{{--<script src="https://code.jquery.com/jquery-3.7.1.js"></script>--}}
-{{-- <script src="https://cdn.datatables.net/2.1.5/js/dataTables.js"></script> --}}
 <script src="https://code.jquery.com/jquery-3.7.1.js"></script>
 <script>
     $(document).ready(function() {
@@ -375,92 +407,86 @@
             order: [0, 'asc'],
             pageLength: 50
         });
-
     });
 
-        document.addEventListener("DOMContentLoaded", function () {
-            var input = document.getElementById("editableSelect");
-            new Awesomplete(input, {
-                list: "#optionsList",
-                autoFirst: false, // Automatically select the first option
-                minChars: 2,
-                filter: function (text, input) {
-                    return Awesomplete.FILTER_CONTAINS(text, input.match(/[^,]*$/)[0]);
-                },
-                replace: function (text) {
-                    this.input.value = text; // Replace entire input value with selected option
-                }
-            });
+    // Instantiate Choices.js ourselves for the 3 modal selects, once, and
+    // keep direct references. These selects intentionally do NOT carry the
+    // "js-choice" class or "data-options" attribute that theme.js's global
+    // auto-init looks for — if they did, theme.js would create a SECOND
+    // Choices instance wrapping the same <select>, and our setChoiceByValue
+    // calls below would silently update the wrong (invisible) instance.
+    // (The report modal's client/station selects above are unaffected by
+    // this — they're not duplicated per row, so theme.js's normal auto-init
+    // is fine for those and was left untouched.)
+    var agentChoices, escortChoices, transporterChoices;
+
+    $(document).ready(function () {
+        var choicesOptions = { removeItemButton: true, placeholder: true };
+        agentChoices = new Choices(document.querySelector('#transportModal [name="agent"]'), choicesOptions);
+        escortChoices = new Choices(document.querySelector('#transportModal [name="escort"]'), choicesOptions);
+        transporterChoices = new Choices(document.querySelector('#transportModal [name="transporter"]'), choicesOptions);
+    });
+
+    document.addEventListener('click', function (e) {
+        var trigger = e.target.closest('.js-open-transport-modal');
+        if (!trigger) return;
+
+        if (typeof bootstrap === 'undefined') {
+            console.error('Bootstrap JS is not loaded yet — check that the Bootstrap bundle script tag loads before this script, or move this script to load after it.');
+            return;
+        }
+
+        var transportModalEl = document.getElementById('transportModal');
+        var transportModal = bootstrap.Modal.getOrCreateInstance(transportModalEl);
+
+        var d = trigger.dataset;
+
+        document.getElementById('transportModalSiNumber').textContent = d.shippingNumber || '';
+        document.getElementById('transportModalForm').action = d.actionUrl;
+
+        var form = document.getElementById('transportModalForm');
+        form.querySelector('[name="containerNumber"]').value = d.containerNumber || '';
+        form.querySelector('[name="tare"]').value = d.containerTare || '';
+        form.querySelector('[name="seal"]').value = d.sealNumber || '';
+        form.querySelector('.js-registration-input').value = d.registration || '';
+        form.querySelector('.js-id-input').value = d.idNumber || '';
+        form.querySelector('.js-driver-name').value = d.driverName || '';
+        form.querySelector('.js-driver-phone').value = d.driverPhone || '';
+
+        setChoiceValue(agentChoices, d.agentId);
+        setChoiceValue(escortChoices, d.escorted);
+        setChoiceValue(transporterChoices, d.transporterId);
+
+        transportModal.show();
+    });
+
+    function setChoiceValue(choicesInstance, value) {
+        if (!choicesInstance) return;
+        choicesInstance.removeActiveItems();
+        if (value) {
+            choicesInstance.setChoiceByValue(value);
+        }
+    }
+
+    // Auto-fill driver name/phone when a driver ID is picked in the modal.
+    $(document).on('change', '#transportModal .js-id-input', function () {
+        var $modal = $(this).closest('.modal');
+        var idNumber = $(this).val();
+
+        $.ajax({
+            url: '{{ route('admin.fetchIdNumber') }}',
+            method: 'GET',
+            data: {idNumber},
+            dataType: 'json',
+            success: function (response) {
+                $modal.find('.js-driver-name').val(response.driver_name);
+                $modal.find('.js-driver-phone').val(response.driver_phone);
+            },
+            error: function (xhr, status, error) {
+                console.error('Error:', error);
+                $modal.find('.js-driver-name').val('');
+                $modal.find('.js-driver-phone').val('');
+            }
         });
-
-        document.addEventListener("DOMContentLoaded", function () {
-            var input = document.getElementById("idSelect");
-            new Awesomplete(input, {
-                list: "#idList",
-                autoFirst: true, // Automatically select the first option
-                minChars: 3,
-                filter: function (text, input) {
-                    return Awesomplete.FILTER_CONTAINS(text, input.match(/[^,]*$/)[0]);
-                },
-                replace: function (text) {
-                    this.input.value = text; // Replace entire input value with selected option
-                }
-            });
-        });
-
-        document.addEventListener("DOMContentLoaded", function () {
-            var input = document.getElementById("editableSelected");
-            new Awesomplete(input, {
-                list: "#optionsListed",
-                autoFirst: false, // Automatically select the first option
-                minChars: 2,
-                filter: function (text, input) {
-                    return Awesomplete.FILTER_CONTAINS(text, input.match(/[^,]*$/)[0]);
-                },
-                replace: function (text) {
-                    this.input.value = text; // Replace entire input value with selected option
-                }
-            });
-        });
-
-        document.addEventListener("DOMContentLoaded", function () {
-            var input = document.getElementById("idSelected");
-            new Awesomplete(input, {
-                list: "#idListed",
-                autoFirst: true, // Automatically select the first option
-                minChars: 3,
-                filter: function (text, input) {
-                    return Awesomplete.FILTER_CONTAINS(text, input.match(/[^,]*$/)[0]);
-                },
-                replace: function (text) {
-                    this.input.value = text; // Replace entire input value with selected option
-                }
-            });
-        });
-
-        $(document).ready(function () {
-            $('.idSelect').on('change', function () {
-
-                var idNumber = $(this).val();
-
-                $.ajax({
-                    url: '{{ route('admin.fetchIdNumber') }}',
-                    method: 'GET',
-                    data: {idNumber},
-                    dataType: 'json',
-                    success: function (response) {
-                        console.log('Success:', response.driver_name);
-
-                        $('.driverName').val(response.driver_name)
-                        $('.driverPhone').val(response.driver_phone)
-                    },
-                    error: function (xhr, status, error) {
-                        // Function to handle errors
-                        console.error('Error:', error);
-                        $('#driverName').val('')
-                        $('#driverPhone').val('')
-                    }
-                });
-            });
-        });
+    });
 </script>
