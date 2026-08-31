@@ -102,7 +102,7 @@
     </tr>
     <tr>
         <td style="width: 15% !important; font-weight: bold !important;"> PO/INVOICE NUMBER </td>
-        <td style="width: 40% !important;"> :  {{ $sheet->invoice_number }} </td>
+        <td style="width: 40% !important;"> :  {{ $sheet->inv_number }} </td>
         <td style="width: 20% !important;"> DESTINATION PORT </td>
         <td style="width: 25% !important;"> :  {{ $sheet->port_name }}</td>
     </tr>

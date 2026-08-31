@@ -5994,16 +5994,29 @@ class ClerkController extends Controller
     }
     public function receiveDirectDeliveries(Request $request, $id)
     {
-        $request->validate([
+        return $request->validate([
             // 'delivery_note' => 'required|image|mimes:png,jpg,jpeg|max:5120'
             'delivery_note' => 'required|file|mimetypes:image/png,image/jpeg,application/pdf|max:5120',
         ]);
 
         try {
+            // $file = $request->file('delivery_note');
+            // $ext = $file->getClientOriginalExtension();
+            // $fileName = (string) Str::uuid() . '.' .$ext;
+            // $path = $file->storeAs('/', $fileName, 'delivery_notes');
+
             $file = $request->file('delivery_note');
             $ext = $file->getClientOriginalExtension();
-            $fileName = (string) Str::uuid() . '.' .$ext;
-            $path = $file->storeAs('/', $fileName, 'delivery_notes');
+            $fileName = (string) Str::uuid() . '.' . $ext;
+
+            $destination = base_path('Files/uploads/delivery_notes');
+
+            if (!is_dir($destination) && !mkdir($destination, 0775, true) && !is_dir($destination)) {
+                throw new \RuntimeException("Unable to create directory: {$destination}. Check that " . base_path('Files') . " is writable by the web server user.");
+            }
+
+            $file->move($destination, $fileName);
+            $path = 'Files/uploads/delivery_notes/' . $fileName;
 
             DeliveryNote::updateOrCreate(['delivery_number' => base64_decode($id)], ['path' => '/'.$path]);
 
@@ -6563,7 +6576,7 @@ class ClerkController extends Controller
     }
     public function downloadTemplate()
     {
-        $file = 'imports/bulky_tea_import.xlsx';
+        $file = base_path('imports/bulky_tea_import.xlsx');
         return response()->download($file);
     }
     public function teaAuction(Request $request)

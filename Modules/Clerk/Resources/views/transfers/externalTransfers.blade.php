@@ -186,11 +186,16 @@
                                                     <a class="dropdown-item text-info" href="{{ route('clerk.viewExternalTransferDetails', base64_encode($transfer->delivery_number)) }}">View Transfer</a>
                                                     @if($transfer->buyer_name == null)
                                                         <a class="dropdown-item text-primary" href="{{ route('clerk.downloadExtraDelNote', base64_encode($transfer->delivery_number.':'.$transfer->lot)) }}" target="_blank">Download Transfer</a>
+                                                    
                                                     @else
                                                         @if(in_array(auth()->user()->role_id, [2, 3, 5]))
                                                             <a class="dropdown-item text-danger" href="{{ route('clerk.downloadDelNote', base64_encode($transfer->delivery_number.':'.$transfer->lot)) }}" target="_blank">Download Del Note</a>
                                                         @endif
                                                     @endif
+
+                                                        @if($transfer->buyer_name != null && $transfer->lot != null)
+                                                            <a class="dropdown-item text-info" href="{{ route('clerk.downloadLocalDeliveryNote', base64_encode($transfer->delivery_number . ':' . $transfer->lot)) }}" target="_blank">Local Delivery Note</a>
+                                                        @endif
                                                 </div>
                                             </div>
                                         </div>

@@ -3460,7 +3460,7 @@ return Response::make($mpdf->Output($pdfFileName, PdfDestination::INLINE), 200, 
             ->join('user_infos', 'user_infos.user_id', '=', 'shipping_instructions.user_id')
             ->select(
                 'clients.address as client_address', 'shipping_instructions.address', 'garden_name', 'grade_name', 'ship_date',
-                'client_name', 'shipping_number', 'vessel_name', 'port_name', 'shipped_packages', 'shipped_weight', 'consignee', 'shipping_mark', 'container_number', 'agent_name', 'seal_number','delivery_orders.delivery_id', 'production_date', 'expiry_date', 'shipments.pallet_height as height', 'lot_number', 'shipments.package_tare', 'shipments.pallet_weight', 'surname', 'first_name', 'shipping_instructions.booking_number', 'shipping_instructions.invoice_number')
+                'client_name', 'shipping_number', 'vessel_name', 'port_name', 'shipped_packages', 'shipped_weight', 'consignee', 'shipping_mark', 'container_number', 'agent_name', 'seal_number','delivery_orders.delivery_id', 'production_date', 'expiry_date', 'shipments.pallet_height as height', 'lot_number', 'shipments.package_tare', 'shipments.pallet_weight', 'surname', 'first_name', 'shipping_instructions.booking_number', 'shipping_instructions.invoice_number as inv_number', 'delivery_orders.invoice_number')
             ->where('shipping_instructions.shipping_id', $shippingId)
             ->whereNull('shipments.deleted_at')
             ->get();
@@ -3526,7 +3526,7 @@ return Response::make($mpdf->Output($pdfFileName, PdfDestination::INLINE), 200, 
             ->join('user_infos', 'user_infos.user_id', '=', 'shipping_instructions.user_id')
             ->select(
                 'clients.address as client_address', 'shipping_instructions.address', 'garden_name', 'grade_name', 'ship_date',
-                'client_name', 'shipping_number', 'vessel_name', 'port_name', 'shipped_packages', 'shipped_weight', 'consignee', 'shipping_mark', 'container_number', 'agent_name', 'seal_number','delivery_orders.delivery_id', 'production_date', 'expiry_date', 'shipments.pallet_height as height', 'lot_number', 'shipments.package_tare', 'shipments.pallet_weight', 'surname', 'first_name', 'shipping_instructions.booking_number', 'shipping_instructions.invoice_number')
+                'client_name', 'shipping_number', 'vessel_name', 'port_name', 'shipped_packages', 'shipped_weight', 'consignee', 'shipping_mark', 'container_number', 'agent_name', 'seal_number','delivery_orders.delivery_id', 'production_date', 'expiry_date', 'shipments.pallet_height as height', 'lot_number', 'shipments.package_tare', 'shipments.pallet_weight', 'surname', 'first_name', 'shipping_instructions.booking_number', 'shipping_instructions.invoice_number as inv_number', 'delivery_orders.invoice_number')
             ->where(['shipping_instructions.si_number' => base64_decode($id), 'load_type' => 2])
             ->whereNull('shipments.deleted_at')
             ->get();
@@ -8162,7 +8162,7 @@ private function writeBlendHeader($ws, string $lastCol, $sheet, int $startRow): 
             ->join('user_infos', 'user_infos.user_id', '=', 'shipping_instructions.user_id')
             ->select(
                 'clients.address as client_address', 'shipping_instructions.address', 'garden_name', 'grade_name', 'ship_date',
-                'client_name', 'shipping_number', 'vessel_name', 'port_name', 'shipped_packages', 'shipped_weight', 'consignee', 'shipping_mark', 'container_number', 'agent_name', 'seal_number', 'delivery_orders.delivery_id', 'production_date', 'expiry_date', 'shipments.pallet_height as height', 'lot_number', 'shipments.package_tare', 'shipments.pallet_weight', 'surname', 'first_name', 'shipping_instructions.booking_number', 'shipping_instructions.invoice_number')
+                'client_name', 'shipping_number', 'vessel_name', 'port_name', 'shipped_packages', 'shipped_weight', 'consignee', 'shipping_mark', 'container_number', 'agent_name', 'seal_number', 'delivery_orders.delivery_id', 'production_date', 'expiry_date', 'shipments.pallet_height as height', 'lot_number', 'shipments.package_tare', 'shipments.pallet_weight', 'surname', 'first_name', 'shipping_instructions.booking_number', 'shipping_instructions.invoice_number as inv_number', 'delivery_orders.invoice_number')
             ->where('shipping_instructions.shipping_id', $shippingId)
             ->whereNull('shipments.deleted_at')
             ->get();
@@ -8199,7 +8199,7 @@ private function writeBlendHeader($ws, string $lastCol, $sheet, int $startRow): 
             ->join('user_infos', 'user_infos.user_id', '=', 'shipping_instructions.user_id')
             ->select(
                 'clients.address as client_address', 'shipping_instructions.address', 'garden_name', 'grade_name', 'ship_date',
-                'client_name', 'shipping_number', 'vessel_name', 'port_name', 'shipped_packages', 'shipped_weight', 'consignee', 'shipping_mark', 'container_number', 'agent_name', 'seal_number', 'delivery_orders.delivery_id', 'production_date', 'expiry_date', 'shipments.pallet_height as height', 'lot_number', 'shipments.package_tare', 'shipments.pallet_weight', 'surname', 'first_name', 'shipping_instructions.booking_number', 'si_number', 'shipping_instructions.invoice_number')
+                'client_name', 'shipping_number', 'vessel_name', 'port_name', 'shipped_packages', 'shipped_weight', 'consignee', 'shipping_mark', 'container_number', 'agent_name', 'seal_number', 'delivery_orders.delivery_id', 'production_date', 'expiry_date', 'shipments.pallet_height as height', 'lot_number', 'shipments.package_tare', 'shipments.pallet_weight', 'surname', 'first_name', 'shipping_instructions.booking_number', 'si_number', 'shipping_instructions.invoice_number as inv_number', 'delivery_orders.invoice_number')
             ->where(['shipping_instructions.si_number' => base64_decode($id), 'load_type' => 2])
             ->whereNull('shipments.deleted_at')
             ->get();

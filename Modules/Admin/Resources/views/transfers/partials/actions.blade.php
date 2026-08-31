@@ -58,9 +58,11 @@
                 @if($transfer->buyer_name != null && $transfer->lot != null)
                     <a class="dropdown-item text-danger"
                        href="{{ route('admin.downloadDelNote', base64_encode($transfer->delivery_number.':'.$transfer->lot)) }}" target="_blank">Download Del Note</a>
+                        <a class="dropdown-item text-info" href="{{ route('admin.downloadLocalDeliveryNote', base64_encode($transfer->delivery_number . ':' . $transfer->lot)) }}" target="_blank">Local Delivery Note</a>
                 @else
                     <a class="dropdown-item text-primary"
                        href="{{ route('admin.downloadExtraDelNote', base64_encode($transfer->delivery_number.':'.$transfer->lot)) }}" target="_blank">Download Transfer</a>
+                      
                 @endif
             </div>
         </div>
