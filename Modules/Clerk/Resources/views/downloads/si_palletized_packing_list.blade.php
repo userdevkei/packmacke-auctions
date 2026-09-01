@@ -155,7 +155,7 @@
         <th style="width: 7% !important;">No. of Packages</th>
         <th style="width: 9% !important;">Net WT (Kgs)</th>
         <th style="width: 8% !important;">Tare WT (Kgs)</th>
-        <th style="width: 8% !important;">{{ $sheet->load_type == 2 ? 'Pallet WT' : 'Slip Sheet WH' }} (Kgs)</th>
+        <th style="width: 8% !important;">{{ $sheet->load_type != 3 ? 'Pallet WT' : 'Slip Sheet WH' }} (Kgs)</th>
         <th style="width: 8% !important;">Gross WT (Kgs)</th>
         <th style="width: 8% !important;">Prod. Date</th>
         <th style="width: 8% !important;">Expiry Date</th>
