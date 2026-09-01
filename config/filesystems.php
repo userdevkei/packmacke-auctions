@@ -46,21 +46,21 @@ return [
 
         'signatures' => [
             'driver' => 'local',
-            'root' => 'Files/uploads/signatures',
+            'root' => base_path('Files/uploads/signatures'),
             'url' => env('APP_URL').'/Files/uploads/signatures',
             'visibility' => 'public',
         ],
 
         'attachments' => [
             'driver' => 'local',
-            'root' => 'Files/uploads/attachments',
+            'root' => base_path('Files/uploads/attachments'),
             'url' => env('APP_URL').'/Files/uploads/attachments',
             'visibility' => 'public',
         ],
 
         'delivery_notes' => [
             'driver' => 'local',
-            'root' => 'Files/uploads/delivery_notes',
+            'root' => base_path('Files/uploads/delivery_notes'),
             'url' => env('APP_URL').'/Files/uploads/delivery_notes',
             'visibility' => 'public',
         ],

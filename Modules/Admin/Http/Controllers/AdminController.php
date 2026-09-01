@@ -5360,21 +5360,7 @@ class AdminController extends Controller
             return redirect()->back()->with('success', 'Successful! Tea have been imported to the system successfully');
         }
     }
-//    public function importStock(Request $request)
-//    {
-//        $deliveryNumber = $request->delivery_number;
-//        $import = new ImportBulkyTeas($deliveryNumber);
-//        // Perform the import
-//        Excel::import($import, $request->file('uploadFile'));
-//        // Get specific errors
-//        $errors = $import->getErrors();
-//        if (!empty($errors)) {
-//            return redirect()->back()->with('importErrors', $errors);
-//        } else {
-//            // If no errors, continue with your desired action
-//            return redirect()->back()->with('success', 'Successful! Tea have been imported to the system successfully');
-//        }
-//    }
+
     public function receiveDirectDeliveries(Request $request, $id)
     {
         $request->validate([
@@ -5384,23 +5370,10 @@ class AdminController extends Controller
         ]);
 
         try {
-            // $file = $request->file('delivery_note');
-            // $ext = $file->getClientOriginalExtension();
-            // $fileName = (string) Str::uuid() . '.' .$ext;
-            // $path = $file->storeAs('/', $fileName, 'delivery_notes');
-
             $file = $request->file('delivery_note');
             $ext = $file->getClientOriginalExtension();
-            $fileName = (string) Str::uuid() . '.' . $ext;
-
-            $destination = base_path('Files/uploads/delivery_notes');
-
-            if (!is_dir($destination) && !mkdir($destination, 0775, true) && !is_dir($destination)) {
-                throw new \RuntimeException("Unable to create directory: {$destination}. Check that " . base_path('Files') . " is writable by the web server user.");
-            }
-
-            $file->move($destination, $fileName);
-            $path = 'Files/uploads/delivery_notes/' . $fileName;
+            $fileName = (string) Str::uuid() . '.' .$ext;
+            $path = $file->storeAs('/', $fileName, 'delivery_notes');
 
             DeliveryNote::updateOrCreate(['delivery_number' => base64_decode($id)], ['path' => '/'.$path]);
 

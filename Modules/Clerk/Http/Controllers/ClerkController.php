@@ -6000,23 +6000,10 @@ class ClerkController extends Controller
         ]);
 
         try {
-            // $file = $request->file('delivery_note');
-            // $ext = $file->getClientOriginalExtension();
-            // $fileName = (string) Str::uuid() . '.' .$ext;
-            // $path = $file->storeAs('/', $fileName, 'delivery_notes');
-
             $file = $request->file('delivery_note');
             $ext = $file->getClientOriginalExtension();
-            $fileName = (string) Str::uuid() . '.' . $ext;
-
-            $destination = base_path('Files/uploads/delivery_notes');
-
-            if (!is_dir($destination) && !mkdir($destination, 0775, true) && !is_dir($destination)) {
-                throw new \RuntimeException("Unable to create directory: {$destination}. Check that " . base_path('Files') . " is writable by the web server user.");
-            }
-
-            $file->move($destination, $fileName);
-            $path = 'Files/uploads/delivery_notes/' . $fileName;
+            $fileName = (string) Str::uuid() . '.' .$ext;
+            $path = $file->storeAs('/', $fileName, 'delivery_notes');
 
             DeliveryNote::updateOrCreate(['delivery_number' => base64_decode($id)], ['path' => '/'.$path]);
 

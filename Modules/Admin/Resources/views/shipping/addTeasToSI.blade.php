@@ -10,9 +10,9 @@
                 </div>
                 <div class="col-6 col-sm-auto ms-auto text-end ps-0">
                     <div id="table-simple-pagination-replace-element">
-                        @if($si->status < 4)
+                        <!-- @if($si->status < 4) -->
                             <a class="btn btn-falcon-default btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#staticBackdrop">Select Teas</a>
-                        @endif
+                        <!-- @endif -->
                     </div>
                 </div>
 
@@ -199,9 +199,9 @@
                                 <th>Lot Number</th>
                                 <th>Packages</th>
                                 <th>Net Weight</th>
-                                @if($si->status < 4)
+                                <!-- @if($si->status < 4) -->
                                 <th></th>
-                                @endif
+                                <!-- @endif -->
                             </tr>
                             </thead>
                             <tbody>
@@ -214,11 +214,11 @@
                                     <td>{{ $transfer->lot_number }}</td>
                                     <td>{{ $transfer->shipped_packages }}</td>
                                     <td>{{ $transfer->shipped_weight }} </td>
-                                    @if($si->status < 4)
+                                    <!-- @if($si->status < 4) -->
                                     <td>
                                         <a class="link-danger" data-bs-toggle="tooltip" data-bs-placement="left" title="Remove line from SI" onclick="return confirm('Are you sure you want to remove selected line from the SI?')" href="{{ route('admin.deleteShippingInstructionTea', $transfer->shipment_id) }}"><span class="fa fa-trash-alt"></span></a>
                                     </td>
-                                    @endif
+                                    <!-- @endif -->
                                 </tr>
                             @endforeach
                             </tbody>
