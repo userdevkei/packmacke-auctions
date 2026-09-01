@@ -60,6 +60,7 @@
                                     <option disabled selected value="">Select Tea Type...</option>
                                     <option value="1">LOOSE LOADING</option>
                                     <option value="2">PALLETIZED LOADING</option>
+                                    <option value="3">SLIP SHEET</option>
                                 </select>
                             </div>
 

@@ -154,7 +154,7 @@
         <th style="width: 7% !important;">No. of Packages</th>
         <th style="width: 9% !important;">Net WT (Kgs)</th>
         <th style="width: 8% !important;">Tare WT (Kgs)</th>
-        <th style="width: 8% !important;">Pallet WT (Kgs)</th>
+        <th style="width: 8% !important;">{{ $sheet->load_type == 2 ? 'Pallet WT' : 'Slip Sheet WH' }} (Kgs)</th>
         <th style="width: 8% !important;">Gross WT (Kgs)</th>
         <th style="width: 8% !important;">Prod. Date</th>
         <th style="width: 8% !important;">Expiry Date</th>
@@ -195,8 +195,8 @@
                 <td>{{ $order->grade_name }}</td>
                 <td>{{ $order->shipped_packages }}</td>
                 <td>{{ number_format(str_replace([',', '.00'], '', $order->shipped_weight), 2) }}</td>
-                <td>{{ $order->package_tare * $order->shipped_packages }}</td>
-                <td>{{ $order->pallet_weight }}</td>
+                <td>{{ number_format($order->package_tare * $order->shipped_packages, 2) }}</td>
+                <td>{{ number_format($order->pallet_weight, 2) }}</td>
                 <td>
                     {{
                         number_format(
@@ -208,9 +208,9 @@
                     }}
                 </td>
 
-                <td>{{ $order->production_date }}</td>
-                <td>{{ $order->expiry_date }}</td>
-                <td>{{ $order->height ?? 0 }}</td>
+                <td>{{ \Carbon\Carbon::parse($order->production_date)->format('d/m/Y') }}</td>
+                <td>{{ \Carbon\Carbon::parse($order->expiry_date)->format('d/m/Y') }}</td>
+                <td>{{ number_format($order->height, 2) ?? 0 }}</td>
                 <td>{{ $order->container_number }}</td>
                 <td>{{ $order->seal_number }}</td>
                 <?php

@@ -61,6 +61,7 @@
                                     <option disabled selected value="">Select Tea Type...</option>
                                     <option @if($si->load_type == 1) selected @endif value="1">LOOSE LOADING</option>
                                     <option @if($si->load_type == 2) selected @endif value="2">PALLETIZED LOADING</option>
+                                    <option @if($si->load_type == 3) selected @endif value="3">SLIP SHEET</option>
                                 </select>
                             </div>
 

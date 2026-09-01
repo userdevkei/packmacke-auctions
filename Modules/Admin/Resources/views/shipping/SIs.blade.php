@@ -281,7 +281,7 @@
                                                         <a class="dropdown-item text-dark" href="{{ route('admin.downloadDriverClearance', $transfer->shipping_id) }}" target="_blank"> Port Delivery Note</a>
                                                         <a class="dropdown-item text-secondary" href="{{ route('admin.downloadSIPackingList', base64_encode($transfer->shipping_id.':'.$transfer->load_type)) }}" target="_blank">Packing List</a>
                                                         <a class="dropdown-item text-secondary" href="{{ route('admin.downloadSIPackingListExcel', base64_encode($transfer->shipping_id.':'.$transfer->load_type)) }}" target="_blank">Packing List (Excel)</a>
-                                                        @if($transfer->load_type == 2)
+                                                        @if($transfer->load_type == 2 || $transfer->load_type == 3)
                                                             <a class="dropdown-item text-secondary" href="{{ route('admin.downloadSIContinuedPackingList', base64_encode($transfer->si_number ?? $transfer->shipping_number)) }}" target="_blank">Packing List (Cont.) </a>
                                                             <a class="dropdown-item text-secondary" href="{{ route('admin.downloadSIContinuedPackingListExcel', base64_encode($transfer->si_number ?? $transfer->shipping_number)) }}" target="_blank">Packing List (Cont.) (Excel) </a>
                                                         @endif

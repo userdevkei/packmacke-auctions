@@ -10,9 +10,7 @@
                 </div>
                 <div class="col-6 col-sm-auto ms-auto text-end ps-0">
                     <div id="table-simple-pagination-replace-element">
-                        <!-- @if($si->status < 4) -->
-                            <a class="btn btn-falcon-default btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#staticBackdrop">Select Teas</a>
-                        <!-- @endif -->
+                        <a class="btn btn-falcon-default btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#staticBackdrop">Select Teas</a>
                     </div>
                 </div>
 
@@ -30,7 +28,7 @@
                         <div class="p-4">
                             <form id="shippingForm" method="POST" action="{{ route('admin.storeShippingInstruction', $si->shipping_id) }}">
                                 @csrf
-                                <table id="datatable1" class="table table-striped table-sm table-bordered fs-xs">
+                                <table id="datatable1" class="table table-striped table-sm table-bordered fs-sm w-100" style="font-size: 0.75rem !important;">
                                     <thead>
                                     <tr>
                                         <th>&#10003;</th>
@@ -38,13 +36,12 @@
                                         <th>GARDEN NAME</th>
                                         <th>GRADE</th>
                                         <th>INV NO.</th>
-                                        {{-- <th>LOT NO.</th> --}}
+                                        <th nowrap="">LOT NO.</th>
                                         <th>PKGS</th>
                                         <th>WEIGHT</th>
                                         <th>PCK TARE</th>
-                                        <th>PALLETE WT</th>
-                                        <th>PALLETE HT</th>
-                                        {{-- <th>TCI NO.</th> --}}
+                                        <th>{{ $si->load_type == 3 ? 'SLIP SHEET WH' : 'PALLET WT' }}</th>
+                                        <th>PALLET HT</th>
 
                                     </tr>
                                     </thead>
@@ -57,21 +54,25 @@
                                             <td>{{ $cTea->garden_name }}</td>
                                             <td>{{ $cTea->grade_name }}</td>
                                             <td>{{ $cTea->invoice_number }}</td>
-                                            {{-- <td>{{ $cTea->lot_number }}</td> --}}
+                                             <td>
+                                                 <input type="text" class="form-control form-control-sm"
+                                                        name="lot_number[]" value="{{ $cTea->lot_number ?? null }}"
+                                                        onchange="updateRowData(this)">
+                                             </td>
                                             <td><input type="number" min="1" max="{{ $cTea->current_stock }}" class="form-control form-control-sm" name="current_stock[]" value="{{ $cTea->current_stock }}" onchange="recalculateWeight(this)"></td>
                                             <td><span id="current_weight_{{ $cTea->stock_id }}">{{ $cTea->current_weight }}</span></td>
                                             <td>
-                                                <input type="number" class="form-control form-control-sm" step="0.01"
+                                                <input type="number" class="form-control form-control-sm" step="0.1"
                                                        name="package_tare[]" value="{{ $cTea->package_tare }}"
                                                        onchange="updateRowData(this)">
                                             </td>
                                             <td>
-                                                <input type="number" class="form-control form-control-sm" step="0.01"
+                                                <input type="number" class="form-control form-control-sm" step="0.1"
                                                        name="pallet_weight[]" value="{{ $cTea->pallet_weight }}"
                                                        onchange="updateRowData(this)">
                                             </td>
                                             <td>
-                                                <input type="number" class="form-control form-control-sm" step="0.01"
+                                                <input type="number" class="form-control form-control-sm" step="0.1"
                                                        name="pallet_height[]" value="{{ $cTea->height ?? '0.0' }}"
                                                        onchange="updateRowData(this)">
                                             </td>
@@ -144,6 +145,7 @@
                     var packageTareInput = row.querySelector('input[name="package_tare[]"]');
                     var palletWeightInput = row.querySelector('input[name="pallet_weight[]"]');
                     var palletHeightInput = row.querySelector('input[name="pallet_height[]"]');
+                    var lotNumber = row.querySelector('input[name="lot_number[]"]');
 
                     var currentStock = parseFloat(currentStockInput.value);
                     var weightPerStock = parseFloat(row.dataset.weightPerStock);
@@ -155,7 +157,8 @@
                         weight: newCurrentWeight,
                         package_tare: parseFloat(packageTareInput.value) || 0,
                         pallet_weight: parseFloat(palletWeightInput.value) || 0,
-                        pallet_height: parseFloat(palletHeightInput.value) || 0
+                        pallet_height: parseFloat(palletHeightInput.value) || 0,
+                        lot_number: lotNumber.value || null
                     };
 
                     var formDataInput = document.getElementById('form_data');
@@ -199,9 +202,10 @@
                                 <th>Lot Number</th>
                                 <th>Packages</th>
                                 <th>Net Weight</th>
-                                <!-- @if($si->status < 4) -->
+                                <th>PCK TARE</th>
+                                <th>{{ $si->load_type == 3 ? 'SLIP SHEET WH' : 'PALLET WT' }}</th>
+                                <th>PALLET HT</th>
                                 <th></th>
-                                <!-- @endif -->
                             </tr>
                             </thead>
                             <tbody>
@@ -214,11 +218,12 @@
                                     <td>{{ $transfer->lot_number }}</td>
                                     <td>{{ $transfer->shipped_packages }}</td>
                                     <td>{{ $transfer->shipped_weight }} </td>
-                                    <!-- @if($si->status < 4) -->
+                                    <td>{{ number_format($transfer->package_tare * $transfer->shipped_packages, 2) }} </td>
+                                    <td>{{ number_format($transfer->pallet_weight, 2) }} </td>
+                                    <td>{{ number_format($transfer->pallet_height, 2) }} </td>
                                     <td>
                                         <a class="link-danger" data-bs-toggle="tooltip" data-bs-placement="left" title="Remove line from SI" onclick="return confirm('Are you sure you want to remove selected line from the SI?')" href="{{ route('admin.deleteShippingInstructionTea', $transfer->shipment_id) }}"><span class="fa fa-trash-alt"></span></a>
                                     </td>
-                                    <!-- @endif -->
                                 </tr>
                             @endforeach
                             </tbody>
@@ -258,7 +263,7 @@
                                 <p class="lh-sm mb-0 text-700">SI Number :<span class="text-900 ps-2">{{ $si->shipping_number }}</span></p>
                             </li>
                             <li class="d-flex align-items-center fs-11 fw-medium pt-1 mb-3"><span class="dot bg-primary bg-opacity-50"></span>
-                                <p class="lh-sm mb-0 text-700">Load Type :<span class="text-900 ps-2">{{ $si->load_type == 1 ? 'LOOSE LOADING' : 'PALLETIZED LOADING'}}</span></p>
+                                <p class="lh-sm mb-0 text-700">Load Type :<span class="text-900 ps-2">{{ $si->load_type == 1 ? 'LOOSE LOADING' : ($si->load_type == 2 ? 'PALLETIZED LOADING' : 'SLIP SHEET') }}</span></p>
                             </li>
                             <li class="d-flex align-items-center fs-11 fw-medium pt-1 mb-3"><span class="dot bg-primary bg-opacity-50"></span>
                                 <p class="lh-sm mb-0 text-700">Vessel Name :<span class="text-900 ps-2">{{ $si->vessel_name }}</span></p>

@@ -3975,7 +3975,7 @@ class AdminController extends Controller
             ->join('delivery_orders', 'delivery_orders.delivery_id', '=', 'stock_ins.delivery_id')
             ->join('gardens', 'gardens.garden_id', '=', 'delivery_orders.garden_id')
             ->join('grades', 'grades.grade_id', '=', 'delivery_orders.grade_id')
-            ->select('shipment_id', 'shipments.shipped_packages', 'shipments.shipped_weight', 'shipments.status', 'garden_name', 'grade_name', 'invoice_number', 'stock_ins.package_tare', 'stock_ins.pallet_weight', 'delivery_orders.height')
+            ->select('shipment_id', 'shipments.shipped_packages', 'shipments.shipped_weight', 'shipments.status', 'garden_name', 'grade_name', 'invoice_number', 'shipments.package_tare', 'shipments.pallet_weight', 'shipments.pallet_height', 'delivery_orders.lot_number')
             ->where('shipping_id', $id)
             ->orderBy('shipments.created_at', 'desc')
             ->get();
@@ -4009,6 +4009,8 @@ class AdminController extends Controller
             ];
 
             Shipment::create($shipment);
+
+            DeliveryOrder::where('delivery_id', $stock->delivery_id)->update(['lot_number' => $tea->lot_number]);
         }
         $this->logger->create();
         return redirect()->back()->with('success', 'Successful! Teas added to shipping instruction');

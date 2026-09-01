@@ -178,7 +178,7 @@
             <td>{{ $order->grade_name }}</td>
             <td>{{ $order->shipped_packages }}</td>
             <td>{{ number_format(str_replace([',', '.00'], '', $order->shipped_weight), 2) }}</td>
-            <td>{{ $order->package_tare * $order->shipped_packages }}</td>
+            <td>{{ number_format($order->package_tare * $order->shipped_packages, 2) }}</td>
                 <td>
                     {{
                         number_format(
@@ -189,8 +189,8 @@
                     }}
                 </td>
 
-                <td>{{ $order->production_date }}</td>
-            <td>{{ $order->expiry_date }}</td>
+                <td>{{ \Carbon\Carbon::parse($order->production_date)->format('d/m/Y') }}</td>
+            <td>{{ \Carbon\Carbon::parse($order->expiry_date)->format('d/m/Y') }}</td>
             <?php
                 $receivedPackages += $order->shipped_packages;
                 $netWeights += floatval(str_replace([',', '.00'], '', $order->shipped_weight));
