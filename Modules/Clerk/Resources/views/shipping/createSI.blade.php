@@ -14,7 +14,7 @@
                     <form method="POST" action="{{ route('clerk.addShippingInstruction') }}">
                         @csrf
                         <div class="row g-2 needs-validation" novalidate="">
-                            <div class="col-md-4 mb-2">
+                            <div class="col-md-3 mb-2">
                                 <label for="organizerSingle">CLIENTS</label>
                                 <select class="form-select js-choice" name="client" data-options='{"removeItemButton":true,"placeholder":true}'>
                                     <option selected disabled value="">Select Client...</option>
@@ -24,7 +24,7 @@
                                 </select>
                             </div>
 
-                            <div class="col-md-4 mb-2">
+                            <div class="col-md-3 mb-2">
                                 <label for="organizerSingle">PREPARED AT</label>
                                 <select class="form-select js-choice" name="station" data-options='{"removeItemButton":true,"placeholder":true}'>
                                     <option disabled selected value="">Select PHML Warehouse...</option>
@@ -34,7 +34,7 @@
                                 </select>
                             </div>
 
-                            <div class="col-md-4 mb-2">
+                            <div class="col-md-3 mb-2">
                                 <label for="organizerSingle">DESTINATION PORT</label>
                                 <select class="form-select js-choice" id="selectedWarehouse" size="1" name="destination" data-options='{"removeItemButton":true,"placeholder":true}'>
                                     <option disabled selected value="">Select Port ...</option>
@@ -44,7 +44,7 @@
                                 </select>
                             </div>
 
-                            <div class="col-md-4 mb-2">
+                            <div class="col-md-3 mb-2">
                                 <label for="organizerSingle">CONTAINER SIZE</label>
                                 <select class="form-select js-choice" name="containerSize" data-options='{"removeItemButton":true,"placeholder":true}'>
                                     <option disabled selected value="">Select Tea Type...</option>
@@ -54,7 +54,7 @@
                                 </select>
                             </div>
 
-                            <div class="col-md-4 mb-2">
+                            <div class="col-md-3 mb-2">
                                 <label for="organizerSingle">LOADING TYPE</label>
                                 <select class="form-select js-choice" name="package" data-options='{"removeItemButton":true,"placeholder":true}'>
                                     <option disabled selected value="">Select Tea Type...</option>
@@ -64,52 +64,57 @@
                                 </select>
                             </div>
 
-                            <div class="col-md-4 mb-2">
+                            <div class="col-md-3 mb-2">
                                 <label for="floatingInputValid">SI NUMBER (PARENT)</label>
                                 <input class="form-control"  type="text" name="shippingNumber" placeholder="provide SI number" style="height: 58% !important;"/>
                             </div>
 
-                            <div class="col-md-4 mb-2">
+                            <div class="col-md-3 mb-2">
                                 <label for="floatingInputValid">SI NUMBER</label>
                                 <input class="form-control"  type="text" name="shipmentNumber" placeholder="provide SI number" style="height: 58% !important;"/>
                             </div>
 
-                            <div class="col-md-4 mb-2">
+                            <div class="col-md-3 mb-2">
                                 <label for="floatingInputValid">SHIPPING MARK</label>
                                 <input class="form-control" id="totalWeight" type="text" name="mark" placeholder="provide shipping mark" style="height: 58% !important;"/>
                             </div>
 
-                            <div class="col-md-4 mb-2">
+                            <div class="col-md-3 mb-2">
                                 <label for="floatingInputValid">BOOKING NUMBER</label>
                                 <input class="form-control" id="bookingNumber" type="text" name="bookingNumber" placeholder="provide shipping mark" style="height: 58% !important;"/>
                             </div>
 
-                            <div class="col-md-4 mb-2">
+                            <div class="col-md-3 mb-2">
+                                <label for="floatingInputValid">PO NUMBER</label>
+                                <input class="form-control" id="poNumber" type="text" name="poNumber" placeholder="provide po number" style="height: 58% !important;"/>
+                            </div>
+
+                            <div class="col-md-3 mb-2">
                                 <label for="floatingInputValid">CONSIGNEE</label>
                                 <input class="form-control" id="totalWeight" type="text" name="consignee" placeholder="consignee name" required style="height: 58% !important;"/>
                             </div>
 
-                            <div class="col-md-4 mb-2">
+                            <div class="col-md-3 mb-2">
                                 <label for="floatingInputValid">P.O BOX</label>
                                 <input class="form-control" id="totalWeight" type="text" name="box" placeholder="consignee p.o box" required style="height: 58% !important;"/>
                             </div>
 
-                            <div class="col-md-4 mb-2">
+                            <div class="col-md-3 mb-2">
                                 <label for="floatingInputValid">ADDRESS LINE</label>
                                 <input class="form-control" id="totalWeight" type="text" name="address" placeholder="consignee address" required style="height: 58% !important;"/>
                             </div>
 
-                            <div class="col-md-4 mb-2">
+                            <div class="col-md-3 mb-2">
                                 <label for="floatingInputValid">STATE/COUNTRY</label>
                                 <input class="form-control" id="totalWeight" type="text" name="state" placeholder="consignee state and country" required style="height: 58% !important;"/>
                             </div>
 
-                            <div class="col-md-4 mb-2">
+                            <div class="col-md-3 mb-2">
                                 <label for="floatingInputValid">TELEPHONE NUMBER</label>
                                 <input class="form-control" id="totalWeight" type="text" name="mobile" placeholder="telephone number" required style="height: 58% !important;"/>
                             </div>
 
-                            <div class="col-md-4 mb-2">
+                            <div class="col-md-3 mb-2">
                                 <label for="floatingInputValid">VESSEL NAME</label>
                                 <input class="form-control" type="text" name="vessel" placeholder="provide vessel name" style="height: 58% !important;"/>
                             </div>

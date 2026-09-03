@@ -62,17 +62,17 @@
                                             <td><input type="number" min="1" max="{{ $cTea->current_stock }}" class="form-control form-control-sm" name="current_stock[]" value="{{ $cTea->current_stock }}" onchange="recalculateWeight(this)"></td>
                                             <td><span id="current_weight_{{ $cTea->stock_id }}">{{ $cTea->current_weight }}</span></td>
                                             <td>
-                                                <input type="number" class="form-control form-control-sm" step="0.1"
+                                                <input type="number" class="form-control form-control-sm" step="0.01"
                                                        name="package_tare[]" value="{{ $cTea->package_tare }}"
                                                        onchange="updateRowData(this)">
                                             </td>
                                             <td>
-                                                <input type="number" class="form-control form-control-sm" step="0.1"
+                                                <input type="number" class="form-control form-control-sm" step="0.01"
                                                        name="pallet_weight[]" value="{{ $cTea->pallet_weight }}"
                                                        onchange="updateRowData(this)">
                                             </td>
                                             <td>
-                                                <input type="number" class="form-control form-control-sm" step="0.1"
+                                                <input type="number" class="form-control form-control-sm" step="0.01"
                                                        name="pallet_height[]" value="{{ $cTea->height ?? '0.0' }}"
                                                        onchange="updateRowData(this)">
                                             </td>

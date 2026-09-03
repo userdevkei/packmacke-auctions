@@ -3954,6 +3954,7 @@ class AdminController extends Controller
         $shipment->station_id = $request->station;
         $shipment->booking_number = $request->bookingNumber;
         $shipment->si_number = $request->shippingNumber;
+        $shipment->invoice_number = $request->poNumber;
         $shipment->shipping_instructions = $request->shippingInstruction;
         $shipment->user_id = auth()->user()->user_id;
         $shipment->save();
